@@ -3,13 +3,21 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: CRIA - Convergent Research Intelligence Architecture API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: experiments
+    description: Experiment management
+  - name: findings
+    description: Findings and outputs
+  - name: templates
+    description: Artefact templates
+  - name: analytics
+    description: Dashboard analytics and cross-experiment views
 paths:
   /healthz:
     get:
@@ -24,6 +32,259 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /experiments:
+    get:
+      operationId: listExperiments
+      tags: [experiments]
+      summary: List all experiments
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, complete, failed, paused]
+        - name: project
+          in: query
+          schema:
+            type: string
+        - name: channel
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of experiments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Experiment"
+    post:
+      operationId: createExperiment
+      tags: [experiments]
+      summary: Create a new experiment from artefact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentArtefactInput"
+      responses:
+        "201":
+          description: Experiment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /experiments/summary:
+    get:
+      operationId: getExperimentsSummary
+      tags: [analytics]
+      summary: Get dashboard summary statistics
+      responses:
+        "200":
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentsSummary"
+
+  /experiments/cross-view:
+    get:
+      operationId: getCrossExperimentView
+      tags: [analytics]
+      summary: Cross-experiment convergence and divergence view
+      parameters:
+        - name: project
+          in: query
+          schema:
+            type: string
+        - name: channel
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cross-experiment analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrossExperimentView"
+
+  /experiments/reflexivity-report:
+    get:
+      operationId: getReflexivityReport
+      tags: [analytics]
+      summary: Reflexivity report - what has been asked, what frames dominated
+      responses:
+        "200":
+          description: Reflexivity report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReflexivityReport"
+
+  /experiments/{id}:
+    get:
+      operationId: getExperiment
+      tags: [experiments]
+      summary: Get a single experiment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Experiment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateExperiment
+      tags: [experiments]
+      summary: Update experiment (e.g. approve for final synthesis)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentUpdateInput"
+      responses:
+        "200":
+          description: Updated experiment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+    delete:
+      operationId: deleteExperiment
+      tags: [experiments]
+      summary: Delete an experiment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /experiments/{id}/run:
+    post:
+      operationId: runExperiment
+      tags: [experiments]
+      summary: Start running an experiment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Experiment started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+
+  /experiments/{id}/findings:
+    get:
+      operationId: getExperimentFindings
+      tags: [findings]
+      summary: Get findings for an experiment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Findings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentFindings"
+
+  /experiments/{id}/validate:
+    post:
+      operationId: validateExperiment
+      tags: [experiments]
+      summary: Validate an experiment artefact YAML/JSON
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationResult"
+
+  /templates:
+    get:
+      operationId: listTemplates
+      tags: [templates]
+      summary: List artefact templates
+      responses:
+        "200":
+          description: Templates list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Template"
+
+  /templates/{id}:
+    get:
+      operationId: getTemplate
+      tags: [templates]
+      summary: Get a single template with prefilled artefact YAML
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Template with artefact YAML
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +295,391 @@ components:
       required:
         - status
 
+    ExperimentStatus:
+      type: string
+      enum: [pending, running, complete, failed, paused]
+
+    ExperimentProject:
+      type: string
+      enum: [hum, book3, civilisational, art_soul_ai]
+
+    ExperimentChannel:
+      type: string
+      enum: [chronic_pain, abi, dementia, perinatal, eating_disorder, first_nations]
+      nullable: true
+
+    OutputVoice:
+      type: string
+      enum: [academic_only, ferrier_popular_only, academic_first_then_ferrier, raw_findings_only]
+
+    OutputFormat:
+      type: string
+      enum: [report, structured_data, annotated_results, convergence_map, frame_inventory_only, reflexivity_report]
+
+    ProtectionsConfig:
+      type: object
+      properties:
+        p1_falsification:
+          type: boolean
+        p2_eliza_output:
+          type: boolean
+        p3_meta_observation:
+          type: boolean
+        p4_independence_testing:
+          type: boolean
+
+    PositionPrivilegeBalance:
+      type: object
+      properties:
+        state_admin:
+          type: number
+          nullable: true
+        credentialed_research:
+          type: number
+          nullable: true
+        community_curated:
+          type: number
+          nullable: true
+        indigenous_scholarship:
+          type: number
+          nullable: true
+        theoretical_tradition:
+          type: number
+          nullable: true
+        advocacy:
+          type: number
+          nullable: true
+        grey_practitioner:
+          type: number
+          nullable: true
+
+    Experiment:
+      type: object
+      properties:
+        id:
+          type: integer
+        experimentId:
+          type: string
+          description: snake_case identifier (from artefact)
+        project:
+          $ref: "#/components/schemas/ExperimentProject"
+        status:
+          $ref: "#/components/schemas/ExperimentStatus"
+        question:
+          type: string
+        hypothesis:
+          type: string
+          nullable: true
+        expectedOutcomeTypes:
+          type: array
+          items:
+            type: string
+        channel:
+          $ref: "#/components/schemas/ExperimentChannel"
+        patterns:
+          type: array
+          items:
+            type: integer
+        protections:
+          $ref: "#/components/schemas/ProtectionsConfig"
+        evidenceTierThreshold:
+          type: string
+        convergenceRequirement:
+          type: string
+        includeLayers:
+          type: array
+          items:
+            type: string
+        framesExpected:
+          type: array
+          items:
+            type: string
+        framesExplicitlyExcluded:
+          type: array
+          items:
+            type: string
+        dissonanceBudget:
+          type: number
+          nullable: true
+        positionPrivilegeBalance:
+          $ref: "#/components/schemas/PositionPrivilegeBalance"
+          nullable: true
+        outputVoice:
+          $ref: "#/components/schemas/OutputVoice"
+        outputFormat:
+          $ref: "#/components/schemas/OutputFormat"
+        budgetCapAud:
+          type: number
+        iterationCap:
+          type: integer
+          nullable: true
+        timeCapSeconds:
+          type: integer
+          nullable: true
+        requireHumanReview:
+          type: boolean
+        observerNote:
+          type: string
+        reflexivityQuestions:
+          type: array
+          items:
+            type: string
+        createdBy:
+          type: string
+          nullable: true
+        elapsedSeconds:
+          type: integer
+          nullable: true
+        budgetConsumed:
+          type: number
+          nullable: true
+        currentIteration:
+          type: integer
+          nullable: true
+        isTruncated:
+          type: boolean
+        validationErrors:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        completedAt:
+          type: string
+          nullable: true
+        artefactYaml:
+          type: string
+          nullable: true
+      required:
+        - id
+        - experimentId
+        - project
+        - status
+        - question
+        - expectedOutcomeTypes
+        - evidenceTierThreshold
+        - convergenceRequirement
+        - outputVoice
+        - outputFormat
+        - budgetCapAud
+        - requireHumanReview
+        - observerNote
+        - isTruncated
+        - createdAt
+        - updatedAt
+
+    ExperimentArtefactInput:
+      type: object
+      properties:
+        artefactYaml:
+          type: string
+          description: Raw YAML content of the experiment artefact
+        artefactJson:
+          type: object
+          description: JSON object if providing JSON directly
+      minProperties: 1
+
+    ExperimentUpdateInput:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/ExperimentStatus"
+        requireHumanReview:
+          type: boolean
+
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: string
+      required:
+        - message
+        - errors
+
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+      required:
+        - valid
+        - errors
+
+    ExperimentFindings:
+      type: object
+      properties:
+        experimentId:
+          type: integer
+        findingsMarkdown:
+          type: string
+          nullable: true
+        convergenceMap:
+          type: object
+          nullable: true
+        positionPrivilegeSummary:
+          type: object
+          nullable: true
+        citations:
+          type: array
+          items:
+            type: string
+        outcomeTypes:
+          type: array
+          items:
+            type: string
+        generatedAt:
+          type: string
+          nullable: true
+      required:
+        - experimentId
+        - citations
+        - outcomeTypes
+
+    ExperimentsSummary:
+      type: object
+      properties:
+        totalExperiments:
+          type: integer
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+        byProject:
+          type: object
+          additionalProperties:
+            type: integer
+        totalBudgetConsumed:
+          type: number
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/Experiment"
+        requireReview:
+          type: array
+          items:
+            $ref: "#/components/schemas/Experiment"
+        topFrames:
+          type: array
+          items:
+            type: object
+            properties:
+              frame:
+                type: string
+              count:
+                type: integer
+      required:
+        - totalExperiments
+        - byStatus
+        - byProject
+        - totalBudgetConsumed
+        - recentActivity
+        - requireReview
+        - topFrames
+
+    CrossExperimentView:
+      type: object
+      properties:
+        convergentFindings:
+          type: array
+          items:
+            type: object
+            properties:
+              theme:
+                type: string
+              experiments:
+                type: array
+                items:
+                  type: string
+              strength:
+                type: string
+        divergentFindings:
+          type: array
+          items:
+            type: object
+            properties:
+              theme:
+                type: string
+              experiments:
+                type: array
+                items:
+                  type: string
+              tension:
+                type: string
+        frameDistribution:
+          type: object
+          additionalProperties:
+            type: integer
+      required:
+        - convergentFindings
+        - divergentFindings
+        - frameDistribution
+
+    ReflexivityReport:
+      type: object
+      properties:
+        period:
+          type: string
+        totalExperiments:
+          type: integer
+        dominantFrames:
+          type: array
+          items:
+            type: string
+        underrepresentedPositions:
+          type: array
+          items:
+            type: string
+        channelBreakdown:
+          type: object
+          additionalProperties:
+            type: integer
+        projectBreakdown:
+          type: object
+          additionalProperties:
+            type: integer
+        suggestedRebalanceExperiments:
+          type: array
+          items:
+            type: string
+        positionPrivilegeAverage:
+          $ref: "#/components/schemas/PositionPrivilegeBalance"
+          nullable: true
+      required:
+        - period
+        - totalExperiments
+        - dominantFrames
+        - underrepresentedPositions
+        - channelBreakdown
+        - projectBreakdown
+        - suggestedRebalanceExperiments
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        templateType:
+          type: string
+          enum: [channel_therapeutic, cross_cultural_validity, frame_extinction_audit, civilisational, meta_synthesis, methodology_audit]
+        artefactYaml:
+          type: string
+      required:
+        - id
+        - name
+        - description
+        - templateType
+        - artefactYaml
