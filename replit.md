@@ -4,7 +4,16 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
-## Project: CRIA Dashboard
+## Project: CRIA — Two Versions for Comparison
+
+Two parallel CRIA implementations for architecture comparison:
+
+### CRIA v1 (Claude build) — at path `/`
+### CRIA v2 (DeepSeek build) — at path `/cria-v2/`
+
+---
+
+## Project: CRIA Dashboard (v1 — Claude)
 
 **CRIA** (Convergent Research Intelligence Architecture) — a full-stack research experiment management dashboard.
 
@@ -54,6 +63,29 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Project: CRIA v2 (DeepSeek build)
+
+**Path**: `/cria-v2/`
+**Stack**: Python + FastAPI + uvicorn (single-file, no database)
+**File**: `artifacts/cria-deepseek/main.py`
+
+### Architecture
+- 10 parallel research channels (Scoping, Evidence, Contradiction, Synthesis, Causal, Critic, Serendipity, Quality, Cultural, Steering)
+- Meta-layer for cross-channel pattern detection
+- Real free-tier API connections: Semantic Scholar, OpenAlex, PubMed, arXiv, re3data
+- Simulated LLM calls (replace `call_llm()` with real API if desired)
+- Self-contained HTML dashboard served by FastAPI
+- Runs as workflow: `artifacts/cria-dashboard: cria-v2` on port 8001
+
+### Key differences from v1
+| | Claude v1 | DeepSeek v2 |
+|---|---|---|
+| Stack | React + Express + PostgreSQL | Python FastAPI (single file) |
+| Architecture | YAML artefact management | Multi-agent channel system |
+| Database | PostgreSQL (Drizzle ORM) | None (stateless) |
+| LLM | Simulated | Simulated (pluggable) |
+| External APIs | None | Semantic Scholar, OpenAlex, PubMed, arXiv |
 
 ## Important Notes
 

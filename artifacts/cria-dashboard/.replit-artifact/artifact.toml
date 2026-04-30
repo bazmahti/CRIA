@@ -29,3 +29,14 @@ to = "/index.html"
 [services.env]
 PORT = "19806"
 BASE_PATH = "/"
+
+[[services]]
+name = "cria-v2"
+paths = [ "/cria-v2" ]
+localPort = 8001
+
+[services.development]
+run = "python /home/runner/workspace/artifacts/cria-deepseek/main.py"
+
+[services.env]
+PORT = "8001"

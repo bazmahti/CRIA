@@ -1,0 +1,12 @@
+kind = "web"
+previewPath = "/cria-v2/"
+title = "CRIA v2 (DeepSeek)"
+version = "1.0.0"
+
+[[services]]
+localPort = 8001
+name = "web"
+paths = ["/cria-v2"]
+
+[services.development]
+run = "python artifacts/cria-deepseek/main.py"
