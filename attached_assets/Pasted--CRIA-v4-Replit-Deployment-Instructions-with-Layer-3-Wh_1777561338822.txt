@@ -1,0 +1,217 @@
+# CRIA v4 — Replit Deployment Instructions (with Layer 3)
+
+## What this is
+
+CRIA v4 is the parallel research instrument designed to run alongside CLIA 2.
+The two pipelines are deliberately architecturally distinct:
+
+|Aspect                |CLIA 2                                                               |CRIA v4                                                                                           |
+|----------------------|---------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+|Channel taxonomy      |10 cognitive-role channels (acquire, contradict, synthesise, falsify)|10 epistemic-mode channels (empirical, phenomenological, philosophical, civilisational)           |
+|Optimised for         |Converging on findings under disciplined workflow                    |Excavating frames, refusal-aware reading, civilisational anchoring                                |
+|Layer 2 metagent      |Single layer with novelty scoring                                    |Two streams (academic + experimental) reading same outputs through different theoretical apparatus|
+|Layer 3 meta-cognitive|General pattern-detection archetype learning                         |v4-distinctive frame-critical strategy learning                                                   |
+|Source treatment      |All sources by relevance + citation count                            |Position-privilege and dissonance-role tagging on every source                                    |
+|Sovereign material    |Treated as standard evidence                                         |Non-aggregation discipline; appears in result sets but not for triangulation                      |
+|Output voice          |Single paper-style format                                            |Two-voice (academic + Ferrier popular)                                                            |
+|Hofstadter discipline |Not implemented                                                      |Strange Loop Validator, Gödelian reset, Eliza Effect warning                                      |
+|Refusal handling      |Not first-class                                                      |First-class output when sovereign sources flag it                                                 |
+|Stagnation recovery   |Random parameter mutation                                            |Raise dissonance budget, re-weight to counter-corpus                                              |
+
+Both pipelines have Layer 3 meta-cognitive learning, but the layers are
+structurally distinct:
+
+**CLIA 2’s Layer 3** learns which general pattern-detection archetypes
+(cross-domain analogy, residual anomaly clustering, frame extinction, etc.)
+work best for which research contexts.
+
+**CRIA v4’s Layer 3** learns which v4-distinctive frame-critical strategies
+earn their keep:
+
+- position_privilege_rebalancing
+- dissonance_budget_calibration
+- refusal_precedence_detection
+- frame_extinction_tracking (with longitudinal logs)
+- sovereign_aggregation_audit
+- strange_loop_validation_tuning
+- two_voice_fidelity_check
+
+Each strategy is evaluated against a frame-critical heuristic: distinctness
+(does the output reference v4’s distinctive territory?), position-privilege
+diversity, and Hofstadter actionable-signal count. The layer learns over
+time which strategies and configurations work for which question types.
+
+The two together cover broader research territory than either alone.
+
+## Setup steps (paste this prompt to the Replit agent)
+
+-----
+
+I have a working FastAPI multi-agent research tool (`main.py`) called CLIA 2.
+I now want to add CRIA v4 as a parallel research instrument running on the
+same Replit project but on a different port. CRIA v4 includes Layer 3
+meta-cognitive learning that is structurally parallel to CLIA 2’s Layer 3
+but operates on a different strategy library.
+
+**Steps:**
+
+**1. Add `cria_v4_main.py` to the project**
+
+Save the provided `cria_v4_main.py` file to the project root, alongside the
+existing `main.py`.
+
+**2. Update requirements.txt**
+
+Ensure `requirements.txt` includes:
+
+```
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.0
+httpx==0.25.1
+python-dotenv==1.0.0
+jinja2==3.1.2
+aiofiles==23.2.1
+beautifulsoup4==4.12.2
+lxml==4.9.3
+anthropic==0.39.0
+```
+
+The `anthropic` package is required for both CLIA 2 and CRIA v4.
+
+**3. Verify Replit Secrets**
+
+Confirm the following are set in Replit Secrets (lock icon, left sidebar):
+
+- `ANTHROPIC_API_KEY` — same key CLIA 2 uses
+- `CRIA_CONTACT_EMAIL` — optional, for OpenAlex polite pool
+- `SEMANTIC_SCHOLAR_KEY` — optional, for higher rate limits
+
+CRIA v4 reads these from environment variables. Do not put them in any file.
+
+**4. Run both pipelines simultaneously**
+
+CRIA v4 listens on port 8001 by default. CLIA 2 listens on port 8000.
+
+To run both, you have two options:
+
+*Option A — separate Replit deployments:* Create a second Repl for CRIA v4
+specifically. Run `python cria_v4_main.py` there. Each Repl gets its own URL.
+
+*Option B — single Repl, two processes:* In the existing Repl, modify the
+run command to start both:
+
+```bash
+python main.py & python cria_v4_main.py
+```
+
+Then expose both ports. The Replit web view will show whichever was set as
+primary, but both APIs will be reachable.
+
+**5. Verify**
+
+Visit:
+
+- `http://localhost:8000` — CLIA 2 dashboard
+- `http://localhost:8001` — CRIA v4 dashboard
+- `http://localhost:8001/health` — should return CRIA v4 status JSON
+- `http://localhost:8001/connectors` — should list all 40 connectors with
+  position-privilege and dissonance-role tags
+
+**6. First test query**
+
+In CRIA v4’s dashboard at port 8001:
+
+- Research question: “What does post-AI work-meaning collapse look like
+  across cultural traditions?”
+- Observer note: “Researcher anchored in HUM/civilisational lineage;
+  partnership-pending for Indigenous sources”
+- Dissonance budget: 0.30 (higher for foundational/theoretical questions)
+- Voice: both
+- Profile: general_scholarship
+- Max iterations: 2
+
+Expected behaviour:
+
+- Ten channels run in parallel
+- Two metagent streams produce distinct readings
+- Hofstadter validation reports strange-loop check, Gödelian gap status,
+  and actionable-signal counts
+- Layer 3 selects three v4-distinctive strategies, executes them, evaluates
+  outcomes, logs longitudinal patterns (frame extinction, refusal patterns,
+  dissonance calibration)
+- Findings carry position-privilege, dissonance-role, evidence-tier,
+  reading-mode tags
+- Refusal signals from C5 (Critical) or C7 (Cross-cultural) flagged if
+  triggered
+- Two-voice output (academic + Ferrier popular)
+
+Cost: roughly $0.50-$1.00 per query at 2 iterations with claude-sonnet-4-5.
+Higher than CLIA 2 because CRIA v4 makes more LLM calls (10 channels +
+2 metagent streams + Hofstadter validator + 3 Layer 3 strategies +
+2-voice rendering).
+
+**Layer 3 learning behaviour:**
+
+Layer 3 starts cold — first iteration explores random strategies. Over
+multiple research queries, the layer accumulates performance data for each
+strategy and shifts toward exploiting high performers (with one exploration
+slot retained per iteration). The dashboard displays:
+
+- Which strategies were selected this iteration
+- Whether stagnation recovery was triggered (5 consecutive non-improving
+  iterations raises the dissonance budget by 0.15)
+- Frame extinction observations logged longitudinally
+- Refusal pattern observations logged by profile
+- Dissonance calibration observations logged by budget setting
+- Per-strategy performance report (avg score, times used, trend direction)
+
+This data accumulates across queries and gets richer over time. Run several
+queries before drawing conclusions about strategy performance.
+
+**What not to do:**
+
+- Don’t modify the channel taxonomy (the 10 epistemic modes are deliberate)
+- Don’t activate partnership-gated connectors (they stay catalogued-but-inactive
+  per the project’s gating discipline)
+- Don’t merge CRIA v4 with CLIA 2 — they’re meant to run in parallel
+- Don’t replace v4’s Layer 3 strategies with CLIA 2’s strategies — the
+  v4-distinctive strategies are part of the architectural differentiation
+- Don’t put API keys in any file — environment variables only
+
+If you have questions about the architecture, ask before changing anything.
+
+-----
+
+## Comparison layer between CLIA 2 and CRIA v4
+
+The CRIA v4 endpoint accepts an optional `clia2_result` field in the POST body:
+
+```json
+{
+  "query": "...",
+  "observer_note": "...",
+  "clia2_result": { /* CLIA 2's output JSON */ }
+}
+```
+
+When provided, CRIA v4 includes a `comparison_with_clia2` field in its output
+that produces structured comparison: convergence, productive disagreement,
+v4’s frame archaeology of A’s framing, refusal signals affecting A’s
+confidence, what v4 saw that A’s architecture couldn’t produce, and an
+overall reading that may refuse synthesis when synthesis would paper over
+real disagreement.
+
+To use the comparison layer in your dashboard:
+
+1. Run CLIA 2 query, capture the JSON response (including its Layer 3 output)
+1. POST to CRIA v4’s `/research` with the same query plus the CLIA 2
+   response in `clia2_result`
+1. Display CRIA v4’s full output including the comparison section
+
+Over time, the comparison layer becomes more valuable as both pipelines’
+Layer 3 layers accumulate longitudinal data — comparing what each pipeline
+has learned about which strategies work in their respective territories.
+This is the dual-pipeline tool’s deepest value: not just two readings
+displayed side by side but two architecturally distinct pipelines accumulating
+complementary research wisdom over time.
