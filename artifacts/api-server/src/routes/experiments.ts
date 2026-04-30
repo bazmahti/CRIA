@@ -76,27 +76,27 @@ function validateArtefact(data: Record<string, unknown>): string[] {
   }
   const validProjects = ["hum", "book3", "civilisational", "art_soul_ai"];
   if (data.project && !validProjects.includes(data.project as string)) {
-    errors.push(`project must be one of: ${validProjects.join(", ")}`);
+    errors.push(`project "${data.project}" is not valid — must be one of: ${validProjects.join(", ")}`);
   }
   const validTiers = ["T1", "T2", "T3"];
   if (data.evidence_tier_threshold && !validTiers.includes(data.evidence_tier_threshold as string)) {
-    errors.push(`evidence_tier_threshold must be one of: T1, T2, T3`);
+    errors.push(`evidence_tier_threshold "${data.evidence_tier_threshold}" is not valid — must be one of: T1, T2, T3`);
   }
   const validVoices = ["academic_only", "ferrier_popular_only", "academic_first_then_ferrier", "raw_findings_only"];
   if (data.output_voice && !validVoices.includes(data.output_voice as string)) {
-    errors.push(`output_voice must be one of: ${validVoices.join(", ")}`);
+    errors.push(`output_voice "${data.output_voice}" is not valid — must be one of: ${validVoices.join(", ")}`);
   }
   const validFormats = ["report", "structured_data", "annotated_results", "convergence_map", "frame_inventory_only", "reflexivity_report"];
   if (data.output_format && !validFormats.includes(data.output_format as string)) {
-    errors.push(`output_format must be one of: ${validFormats.join(", ")}`);
+    errors.push(`output_format "${data.output_format}" is not valid — must be one of: ${validFormats.join(", ")}`);
   }
   if (data.observer_note && typeof data.observer_note === "string" && data.observer_note.length < 30) {
-    errors.push("observer_note must be at least 30 characters");
+    errors.push(`observer_note is ${(data.observer_note as string).length} characters — must be at least 30`);
   }
   if (data.budget_cap_aud !== undefined) {
     const cap = Number(data.budget_cap_aud);
     if (isNaN(cap) || cap < 0.1 || cap > 100) {
-      errors.push("budget_cap_aud must be between 0.10 and 100.00");
+      errors.push(`budget_cap_aud "${data.budget_cap_aud}" is not valid — must be a number between 0.10 and 100.00`);
     }
   }
   return errors;
@@ -178,7 +178,8 @@ router.post("/experiments", async (req, res): Promise<void> => {
       yamlStr = body.data.artefactYaml;
       artefactData = yaml.load(yamlStr) as Record<string, unknown>;
     } catch (err) {
-      res.status(422).json({ message: "Invalid YAML", errors: ["Could not parse YAML artefact"] });
+      const yamlErr = err instanceof Error ? err.message : String(err);
+      res.status(422).json({ message: "Invalid YAML", errors: [`YAML parse error: ${yamlErr}`] });
       return;
     }
   } else if (body.data.artefactJson) {
