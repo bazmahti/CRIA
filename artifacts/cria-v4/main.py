@@ -430,9 +430,9 @@ class PubMedAPI:
                 results = []
                 for article in root.findall(".//PubmedArticle"):
                     title_elem = article.find(".//ArticleTitle")
-                    title = title_elem.text if title_elem is not None else ""
+                    title = (title_elem.text or "") if title_elem is not None else ""
                     abstract_elem = article.find(".//Abstract/AbstractText")
-                    abstract = abstract_elem.text if abstract_elem is not None else ""
+                    abstract = (abstract_elem.text or "") if abstract_elem is not None else ""
                     authors = []
                     for author in article.findall(".//Author"):
                         last = author.find("LastName")
@@ -473,12 +473,12 @@ class ArxivAPI:
                 results = []
                 for entry in root.findall(".//atom:entry", ns):
                     title_elem = entry.find("atom:title", ns)
-                    title = title_elem.text.strip() if title_elem is not None else ""
+                    title = (title_elem.text or "").strip() if title_elem is not None else ""
                     summary_elem = entry.find("atom:summary", ns)
-                    abstract = summary_elem.text.strip() if summary_elem is not None else ""
+                    abstract = (summary_elem.text or "").strip() if summary_elem is not None else ""
                     authors = [a.text for a in entry.findall("atom:author/atom:name", ns) if a.text]
                     published_elem = entry.find("atom:published", ns)
-                    year = published_elem.text[:4] if published_elem is not None else ""
+                    year = (published_elem.text or "")[:4] if published_elem is not None else ""
                     results.append({
                         "title": title,
                         "abstract": abstract[:500],
@@ -626,7 +626,7 @@ class C1_Empirical(BaseChannel):
 
         papers_text = "\n\n".join(
             f"- {p.get('title', '')} ({p.get('year', '')}) — "
-            f"{p.get('abstract', '')[:200]}"
+            f"{(p.get('abstract') or '')[:200]}"
             for p in unique[:8]
         )
 
@@ -691,7 +691,7 @@ class C2_Phenomenological(BaseChannel):
                 papers.extend(r)
 
         papers_text = "\n\n".join(
-            f"- {p.get('title', '')} — {p.get('abstract', '')[:200]}"
+            f"- {p.get('title', '')} — {(p.get('abstract') or '')[:200]}"
             for p in papers[:6]
         ) if papers else "No phenomenological literature retrieved."
 
@@ -1079,7 +1079,7 @@ class C8_Computational(BaseChannel):
         results = await self.arxiv.search(comp_query, max_results=8)
 
         papers_text = "\n\n".join(
-            f"- {p.get('title', '')}: {p.get('abstract', '')[:200]}"
+            f"- {p.get('title', '')}: {(p.get('abstract') or '')[:200]}"
             for p in results[:6]
         ) if results else "Limited computational literature retrieved."
 
@@ -1531,8 +1531,8 @@ class MetaCognitiveLayer:
             for f in findings[:8]
         )
 
-        academic_text = academic_reading.get("reading", "")[:1500]
-        experimental_text = experimental_reading.get("reading", "")[:1500]
+        academic_text = (academic_reading.get("reading") or "")[:1500]
+        experimental_text = (experimental_reading.get("reading") or "")[:1500]
 
         prompt = self._get_mutated_prompt(strategy, base_prompt)
         prompt += (
