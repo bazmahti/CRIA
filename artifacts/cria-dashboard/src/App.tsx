@@ -10,6 +10,7 @@ import NewExperimentPage from "@/pages/new-experiment";
 import FindingsPage from "@/pages/findings";
 import ReflexivityPage from "@/pages/reflexivity";
 import TemplatesPage from "@/pages/templates";
+import ParallelResearch from "@/pages/parallel-research";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -22,6 +23,7 @@ function Router() {
   return (
     <Layout>
       <Switch>
+        <Route path="/research" component={ParallelResearch} />
         <Route path="/" component={DashboardPage} />
         <Route path="/experiments/new" component={NewExperimentPage} />
         <Route path="/experiments/:id" component={ExperimentDetailPage} />

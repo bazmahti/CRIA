@@ -6,12 +6,13 @@ import {
   FileText,
   Library,
   RefreshCw,
+  Zap,
   BookOpen,
-  Plus,
   ChevronRight,
 } from "lucide-react";
 
 const NAV = [
+  { href: "/research", label: "Parallel Research", icon: Zap, highlight: true },
   { href: "/", label: "Control Room", icon: LayoutDashboard },
   { href: "/experiments", label: "Experiment Queue", icon: FlaskConical },
   { href: "/findings", label: "Findings Index", icon: FileText },
@@ -39,12 +40,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* New Experiment CTA */}
+        {/* New Research CTA */}
         <div className="px-3 pt-4 pb-2">
-          <Link href="/experiments/new">
+          <Link href="/research">
             <button className="w-full flex items-center gap-2 px-3 py-2 rounded bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary/40 text-primary text-xs font-medium transition-colors group">
-              <Plus className="w-3.5 h-3.5" />
-              New Experiment
+              <Zap className="w-3.5 h-3.5" />
+              New Research
               <ChevronRight className="w-3 h-3 ml-auto opacity-50 group-hover:opacity-100 transition-opacity" />
             </button>
           </Link>
@@ -52,7 +53,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-2 space-y-0.5">
-          {NAV.map(({ href, label, icon: Icon }) => {
+          {NAV.map(({ href, label, icon: Icon, highlight }) => {
             const active = href === "/" ? location === "/" : location.startsWith(href);
             return (
               <Link key={href} href={href}>
@@ -60,9 +61,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   "flex items-center gap-2.5 px-3 py-2 rounded text-xs transition-colors cursor-pointer",
                   active
                     ? "bg-sidebar-accent text-foreground font-medium"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                    : highlight
+                      ? "text-primary hover:bg-primary/10"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
                 )}>
-                  <Icon className={cn("w-3.5 h-3.5", active ? "text-primary" : "opacity-60")} />
+                  <Icon className={cn("w-3.5 h-3.5", active || highlight ? "text-primary" : "opacity-60")} />
                   {label}
                   {active && <div className="ml-auto w-1 h-1 rounded-full bg-primary" />}
                 </div>
@@ -74,7 +77,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Footer */}
         <div className="px-5 py-3 border-t border-sidebar-border">
           <p className="text-[10px] text-muted-foreground font-mono">
-            Intelligence Architecture v1
+            CLIA 2 + CRIA v4 · Parallel Engines
           </p>
         </div>
       </aside>
