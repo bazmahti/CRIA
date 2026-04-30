@@ -3,6 +3,8 @@ import httpx
 import uuid
 import xml.etree.ElementTree as ET
 import os
+import random
+from collections import defaultdict
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
@@ -764,6 +766,135 @@ State it boldly and explain why it only becomes visible at this integrative leve
 
 
 # ============================================================
+# LAYER 3: RECURSIVE META-COGNITIVE AGENT
+# ============================================================
+
+class MetaCognitiveLayer:
+    """
+    Layer 3: Self-improving meta-cognition.
+    Monitors Layer 2 (Meta-Layer) performance and evolves strategies.
+    """
+
+    def __init__(self):
+        self.strategy_performance: Dict[str, List[float]] = defaultdict(list)
+        self.strategies = [
+            "cross_domain_analogy_mapping",
+            "residual_anomaly_clustering",
+            "absence_as_signal",
+            "isomorphic_graph_mismatch",
+            "hidden_moderator_chain",
+            "boundary_condition_inversion",
+            "semantic_drift_bridge",
+            "unused_constraint_exploitation",
+            "temporal_sequential_echo",
+            "meta_pattern_of_channel_biases",
+        ]
+        self.iteration_outcomes: List[float] = []
+        self.strategy_prompts: Dict[str, str] = self._initialize_prompts()
+        self.performance_threshold = 0.3
+
+    def _initialize_prompts(self) -> Dict[str, str]:
+        return {
+            "cross_domain_analogy_mapping": "Find two findings from different channels that share abstract relational form but use different vocabularies. Propose a transfer hypothesis.",
+            "residual_anomaly_clustering": "Cluster low-confidence, contradictory, or outlier claims around entities, methods, or assumptions. Propose a hidden common cause.",
+            "absence_as_signal": "List what the combined research surprisingly does not contain. Rank absences by explanatory power.",
+            "isomorphic_graph_mismatch": "Compare causal maps across sub-domains. Where are graphs structurally identical but node labels different?",
+            "hidden_moderator_chain": "Trace variables that appear as outcomes in one channel and inputs in another with no direct connection. Test as hidden moderator.",
+            "boundary_condition_inversion": "Find findings that hold under narrow conditions. Search for the opposite condition. Does the inverse relationship hold?",
+            "semantic_drift_bridge": "Track the same concept as defined across channels. Where definitions diverge, treat the divergence as data correlated with outcomes.",
+            "unused_constraint_exploitation": "Identify constraints set aside as out-of-scope. Check if multiple channels violate or solve them if reintroduced.",
+            "temporal_sequential_echo": "Find claims rejected early that later evidence supports. Propose a delayed-validation hypothesis.",
+            "meta_pattern_of_channel_biases": "Audit which channels most often agree vs. disagree. Hypothesize systemic blind spots.",
+        }
+
+    def select_strategies(self, context: Dict[str, Any], budget: int = 3) -> List[str]:
+        iteration = context.get("iteration", 1)
+        if iteration == 1 or not any(self.strategy_performance.values()):
+            return random.sample(self.strategies, min(budget, len(self.strategies)))
+        strategy_scores = {
+            s: sum(self.strategy_performance[s]) / len(self.strategy_performance[s])
+            if self.strategy_performance[s] else 0.5
+            for s in self.strategies
+        }
+        sorted_strategies = sorted(strategy_scores.items(), key=lambda x: x[1], reverse=True)
+        selected = [s[0] for s in sorted_strategies[:budget - 1]]
+        remaining = [s for s in self.strategies if s not in selected]
+        if remaining:
+            selected.append(random.choice(remaining))
+        return selected
+
+    async def execute_strategy(self, strategy: str, findings: List[Finding], query: str) -> Finding:
+        base_prompt = self.strategy_prompts.get(strategy, self.strategy_prompts["cross_domain_analogy_mapping"])
+        findings_text = "\n\n".join([
+            f"[{f.source_channel}] (conf={f.confidence:.2f}): {f.content[:300]}"
+            for f in findings[:10]
+        ])
+        prompt = self._get_mutated_prompt(strategy, base_prompt, findings_text, query)
+        full_prompt = f"""Research question: "{query}"
+
+Channel findings:
+{findings_text}
+
+Meta-query strategy — {strategy}:
+{prompt}
+
+Provide a specific, actionable insight that only becomes visible by applying this strategy across ALL channel findings at once."""
+        response = await call_llm(full_prompt, system_prompt="You are a meta-analyst finding hidden patterns across research channels.")
+        historical_scores = self.strategy_performance.get(strategy, [0.5])
+        avg_performance = sum(historical_scores) / len(historical_scores)
+        confidence = min(0.85, 0.5 + avg_performance * 0.3)
+        finding = Finding(
+            content=f"[LAYER 3 — {strategy}]\n\n{response}",
+            source_channel=f"L3:{strategy[:28]}",
+            confidence=confidence,
+            evidence=[f"Strategy: {strategy}"],
+            epistemic_modality=Modality.BELIEF,
+        )
+        finding.novelty_score = 4.0
+        return finding
+
+    def evaluate_outcome(self, strategy: str, finding: Finding) -> float:
+        novelty = finding.novelty_score if finding.novelty_score else 2.5
+        length_score = min(1.0, len(finding.content) / 500)
+        score = (novelty / 5.0) * 0.5 + finding.confidence * 0.3 + length_score * 0.2
+        self.strategy_performance[strategy].append(score)
+        if len(self.strategy_performance[strategy]) > 10:
+            self.strategy_performance[strategy] = self.strategy_performance[strategy][-10:]
+        return score
+
+    def _get_mutated_prompt(self, strategy: str, base_prompt: str, findings_text: str, query: str) -> str:
+        scores = self.strategy_performance.get(strategy, [0.5])
+        avg_score = sum(scores) / len(scores)
+        if avg_score > 0.7:
+            return base_prompt + "\n\nPrevious applications of this strategy were highly successful. Apply it with extra care and depth."
+        elif avg_score < 0.3:
+            mutations = [
+                base_prompt + "\n\nPrevious attempts found nothing. Look for inverse, negative, or absent patterns.",
+                base_prompt + "\n\nIgnore surface content. Focus only on structural relationships.",
+                base_prompt + "\n\nApply this strategy to the contradictions between channels, not the findings themselves.",
+            ]
+            return random.choice(mutations)
+        return base_prompt
+
+    def should_restart(self) -> bool:
+        if len(self.iteration_outcomes) < 5:
+            return False
+        recent = self.iteration_outcomes[-5:]
+        return all(recent[i] <= recent[i - 1] for i in range(1, len(recent)))
+
+    def get_performance_report(self) -> Dict[str, Any]:
+        report = {}
+        for strategy in self.strategies:
+            scores = self.strategy_performance.get(strategy, [])
+            report[strategy] = {
+                "avg_score": round(sum(scores) / len(scores), 3) if scores else None,
+                "times_used": len(scores),
+                "trend": round(scores[-1] - scores[0], 3) if len(scores) > 1 else 0,
+            }
+        return report
+
+
+# ============================================================
 # CITATION MANAGER
 # ============================================================
 
@@ -830,12 +961,14 @@ class ResearchOrchestrator:
             Channel10_Steering(),
         ]
         self.meta_layer = MetaLayer()
+        self.layer3 = MetaCognitiveLayer()
         self.citation_manager = CitationManager()
         self.max_iterations = max_iterations
         self.context: Dict[str, Any] = {"previous_findings": [], "iteration": 0, "raw_papers": []}
 
     async def research(self, query: str) -> Dict[str, Any]:
         start_time = datetime.now()
+        layer3_all_findings: List[Finding] = []
 
         for iteration in range(self.max_iterations):
             self.context["iteration"] = iteration + 1
@@ -843,8 +976,28 @@ class ResearchOrchestrator:
             tasks = [ch.research(query, self.context) for ch in self.channels]
             raw_findings = await asyncio.gather(*tasks)
 
+            # Layer 2: Meta-layer cross-channel synthesis
             processed_findings = await self.meta_layer.process(list(raw_findings), query)
-            self.context["previous_findings"] = processed_findings
+
+            # Layer 3: Recursive meta-cognitive strategies
+            layer3_strategies = self.layer3.select_strategies(self.context)
+            layer3_findings: List[Finding] = []
+            for strategy in layer3_strategies:
+                finding = await self.layer3.execute_strategy(strategy, processed_findings, query)
+                self.layer3.evaluate_outcome(strategy, finding)
+                layer3_findings.append(finding)
+            layer3_all_findings.extend(layer3_findings)
+
+            # Track iteration outcome for stagnation detection
+            if layer3_findings:
+                avg_outcome = sum(f.confidence for f in layer3_findings) / len(layer3_findings)
+                self.layer3.iteration_outcomes.append(avg_outcome)
+
+            # Combine all findings; Layer 3 feeds the next iteration's context
+            self.context["previous_findings"] = processed_findings + layer3_findings
+
+            if self.layer3.should_restart():
+                self.context["restart_triggered"] = True
 
         for paper in self.context.get("raw_papers", []):
             self.citation_manager.add_from_paper(paper)
@@ -853,6 +1006,9 @@ class ResearchOrchestrator:
         paper = await self._generate_paper(query, final_synthesis)
         duration = (datetime.now() - start_time).total_seconds()
 
+        # Separate L1/L2 findings from L3 for display
+        l1l2_findings = [f for f in self.context["previous_findings"] if not f.source_channel.startswith("L3:")]
+
         return {
             "query": query,
             "iterations": self.max_iterations,
@@ -860,8 +1016,11 @@ class ResearchOrchestrator:
             "paper": paper,
             "citations": self.citation_manager.format_apa(),
             "citations_bibtex": self.citation_manager.format_bibtex(),
-            "findings": [f.to_dict() for f in self.context["previous_findings"]],
-            "paper_count": len(self.context.get("raw_papers", []))
+            "findings": [f.to_dict() for f in l1l2_findings],
+            "layer3_findings": [f.to_dict() for f in layer3_all_findings],
+            "layer3_performance": self.layer3.get_performance_report(),
+            "layer3_stagnation": self.layer3.should_restart(),
+            "paper_count": len(self.context.get("raw_papers", [])),
         }
 
     async def _final_synthesis(self, query: str) -> str:
@@ -1061,17 +1220,32 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
         .finding-card.real-data { border-left-color: #00c853; }
         .finding-card.meta { border-left-color: #ff6b9d; }
+        .finding-card.layer3 { border-left-color: #f59e0b; background: rgba(245,158,11,0.04); }
         .finding-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 8px; }
         .finding-source { font-size: 0.78rem; font-weight: 600; color: #00d4ff; }
+        .finding-source.l3 { color: #f59e0b; }
         .finding-badges { display: flex; gap: 5px; flex-shrink: 0; }
         .badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 10px; background: rgba(255,255,255,0.08); color: #888; white-space: nowrap; }
+        .badge.l3-badge { background: rgba(245,158,11,0.15); color: #f59e0b; }
         .finding-content { font-size: 0.8rem; color: #bbb; line-height: 1.55; white-space: pre-wrap; }
 
-        .tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+        .tabs { display: flex; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
         .tab { padding: 6px 16px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); color: #888; background: transparent; transition: all 0.15s; }
         .tab.active { background: rgba(123,47,255,0.3); color: #e0e0f0; border-color: #7b2fff; }
+        .tab.l3-tab.active { background: rgba(245,158,11,0.2); border-color: #f59e0b; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+
+        .perf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+        .perf-row {
+            background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px 12px;
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        .perf-name { font-size: 0.72rem; font-family: monospace; color: #aaa; }
+        .perf-score { font-size: 0.78rem; font-weight: 700; }
+        .perf-bar-wrap { flex: 1; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; min-width: 40px; }
+        .perf-bar { height: 100%; background: #f59e0b; border-radius: 2px; transition: width 0.4s; }
+        .stagnation-warn { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: #fca5a5; margin-bottom: 14px; }
     </style>
 </head>
 <body>
@@ -1084,7 +1258,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </div>
         <p class="subtitle">
             <strong>10 parallel research channels</strong> · Real-time queries to Semantic Scholar, OpenAlex, PubMed, arXiv ·
-            LLM synthesis via GPT · Meta-layer emergent insight detection
+            LLM synthesis via GPT · Meta-layer emergent insight detection ·
+            <strong style="color:#f59e0b">Layer 3 recursive meta-cognition</strong>
         </p>
     </div>
 
@@ -1120,7 +1295,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <div class="loading-steps">
             Querying Semantic Scholar · OpenAlex · PubMed · arXiv databases<br>
             Running 10 parallel AI analysis channels<br>
-            Synthesizing findings with meta-layer integration<br>
+            Layer 2: meta-layer cross-channel synthesis<br>
+            Layer 3: recursive meta-cognitive strategy selection<br>
             Generating final paper sections...
         </div>
     </div>
@@ -1132,6 +1308,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('paper')">Paper</button>
                 <button class="tab" onclick="switchTab('channels')">Channel Analyses</button>
+                <button class="tab l3-tab" onclick="switchTab('layer3')" id="tab-btn-layer3">Layer 3 ✦</button>
                 <button class="tab" onclick="switchTab('citations')">Citations</button>
             </div>
 
@@ -1158,6 +1335,21 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <div class="findings-grid" id="channelFindings"></div>
             </div>
 
+            <div id="tab-layer3" class="tab-content">
+                <div id="layer3Stagnation" style="display:none" class="stagnation-warn">
+                    ⚠ Stagnation detected — no strategy improved over the last 5 iterations. System would trigger restart with mutated parameters on a subsequent run.
+                </div>
+                <div class="section">
+                    <div class="section-title">Meta-Cognitive Insights</div>
+                    <div class="findings-grid" id="layer3Findings"></div>
+                </div>
+                <div class="section" style="margin-top:20px">
+                    <div class="section-title">Strategy Performance</div>
+                    <p style="font-size:0.75rem;color:#666;margin-bottom:10px">Scores reflect novelty × confidence × response length. Higher is better. Strategies adapt on multi-iteration runs.</p>
+                    <div class="perf-grid" id="layer3Perf"></div>
+                </div>
+            </div>
+
             <div id="tab-citations" class="tab-content">
                 <div class="section">
                     <div class="section-title">APA References</div>
@@ -1170,9 +1362,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
 <script>
 const BASE = 'BASE_PATH_PLACEHOLDER';
+const TAB_NAMES = ['paper', 'channels', 'layer3', 'citations'];
 
 function switchTab(name) {
-    document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['paper','channels','citations'][i] === name));
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', TAB_NAMES[i] === name));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
 }
@@ -1204,12 +1397,28 @@ async function startResearch() {
     }
 }
 
+function findingCard(f, extraClass, sourceClass) {
+    const content = (f.content || '').substring(0, 700);
+    return `<div class="finding-card ${extraClass}">
+        <div class="finding-header">
+            <span class="finding-source ${sourceClass}">${escapeHtml(f.source)}</span>
+            <div class="finding-badges">
+                <span class="badge ${sourceClass === 'l3' ? 'l3-badge' : ''}">conf ${(f.confidence || 0).toFixed(2)}</span>
+                ${f.novelty != null ? `<span class="badge ${sourceClass === 'l3' ? 'l3-badge' : ''}">novelty ${Number(f.novelty).toFixed(1)}</span>` : ''}
+            </div>
+        </div>
+        <div class="finding-content">${escapeHtml(content)}${(f.content || '').length > 700 ? '...' : ''}</div>
+    </div>`;
+}
+
 function displayResults(data) {
+    const l3Count = (data.layer3_findings || []).length;
     document.getElementById('metaBar').innerHTML =
         `<span>Iterations: <strong>${data.iterations}</strong></span>` +
         `<span>Duration: <strong>${data.duration_seconds.toFixed(1)}s</strong></span>` +
-        `<span>Papers retrieved: <strong>${data.paper_count || 0}</strong></span>` +
-        `<span>Channel analyses: <strong>${data.findings.length}</strong></span>`;
+        `<span>Papers: <strong>${data.paper_count || 0}</strong></span>` +
+        `<span>Channel analyses: <strong>${data.findings.length}</strong></span>` +
+        `<span>Layer 3 insights: <strong style="color:#f59e0b">${l3Count}</strong></span>`;
 
     document.getElementById('abstract').textContent = data.paper.abstract || '';
     document.getElementById('keyFindings').textContent = data.paper.findings || '';
@@ -1217,22 +1426,44 @@ function displayResults(data) {
     document.getElementById('fullSynthesis').textContent = data.paper.full_synthesis || '';
     document.getElementById('citations').textContent = data.citations || 'No citations extracted.';
 
+    // Channel findings (L1 + L2)
     const channelColors = { 'Evidence Acquisition': 'real-data', 'Meta-Layer': 'meta' };
-    const grid = document.getElementById('channelFindings');
-    grid.innerHTML = data.findings.map(f => {
-        const cls = channelColors[f.source] || '';
-        const content = (f.content || '').substring(0, 600);
-        return `<div class="finding-card ${cls}">
-            <div class="finding-header">
-                <span class="finding-source">${escapeHtml(f.source)}</span>
-                <div class="finding-badges">
-                    <span class="badge">conf ${(f.confidence || 0).toFixed(2)}</span>
-                    ${f.novelty != null ? `<span class="badge">novelty ${Number(f.novelty).toFixed(1)}</span>` : ''}
-                </div>
-            </div>
-            <div class="finding-content">${escapeHtml(content)}${(f.content || '').length > 600 ? '...' : ''}</div>
+    document.getElementById('channelFindings').innerHTML = data.findings.map(f =>
+        findingCard(f, channelColors[f.source] || '', '')
+    ).join('');
+
+    // Layer 3 insights
+    const l3Grid = document.getElementById('layer3Findings');
+    if (l3Count > 0) {
+        l3Grid.innerHTML = (data.layer3_findings || []).map(f => findingCard(f, 'layer3', 'l3')).join('');
+    } else {
+        l3Grid.innerHTML = '<p style="color:#666;font-size:0.82rem">No Layer 3 findings in this run.</p>';
+    }
+
+    // Strategy performance
+    const perf = data.layer3_performance || {};
+    const perfEntries = Object.entries(perf).sort((a, b) => (b[1].avg_score || 0) - (a[1].avg_score || 0));
+    document.getElementById('layer3Perf').innerHTML = perfEntries.map(([name, p]) => {
+        const score = p.avg_score != null ? p.avg_score : null;
+        const pct = score != null ? Math.round(score * 100) : 0;
+        const color = score == null ? '#555' : score > 0.7 ? '#22c55e' : score > 0.4 ? '#f59e0b' : '#ef4444';
+        const label = score != null ? score.toFixed(3) : 'not run';
+        const trend = p.trend > 0.05 ? '↑' : p.trend < -0.05 ? '↓' : '→';
+        return `<div class="perf-row">
+            <span class="perf-name">${escapeHtml(name)}</span>
+            <div class="perf-bar-wrap"><div class="perf-bar" style="width:${pct}%;background:${color}"></div></div>
+            <span class="perf-score" style="color:${color}">${label}</span>
+            <span style="font-size:0.75rem;color:#666">${p.times_used > 0 ? trend : ''}</span>
         </div>`;
     }).join('');
+
+    // Stagnation banner
+    document.getElementById('layer3Stagnation').style.display = data.layer3_stagnation ? 'block' : 'none';
+
+    // Highlight Layer 3 tab badge if findings exist
+    if (l3Count > 0) {
+        document.getElementById('tab-btn-layer3').textContent = `Layer 3 ✦ (${l3Count})`;
+    }
 
     document.getElementById('results').style.display = 'block';
     switchTab('paper');

@@ -1,0 +1,232 @@
+# ============================================================
+# LAYER 3: RECURSIVE META-COGNITIVE AGENT
+# Add this to your existing code base
+# ============================================================
+
+from typing import List, Dict, Any, Tuple
+from collections import defaultdict
+import json
+import random
+
+class MetaCognitiveLayer:
+    """
+    Layer 3: Self-improving meta-cognition.
+    Monitors Layer 2 (Meta-Layer) performance and evolves strategies.
+    """
+    
+    def __init__(self):
+        # Track performance of different analysis strategies
+        self.strategy_performance: Dict[str, List[float]] = defaultdict(list)
+        
+        # Available meta-queries (from our earlier discussion)
+        self.strategies = [
+            "cross_domain_analogy_mapping",
+            "residual_anomaly_clustering", 
+            "absence_as_signal",
+            "isomorphic_graph_mismatch",
+            "hidden_moderator_chain",
+            "boundary_condition_inversion",
+            "semantic_drift_bridge",
+            "unused_constraint_exploitation",
+            "temporal_sequential_echo",
+            "meta_pattern_of_channel_biases"
+        ]
+        
+        # Track which strategies were used in each iteration
+        self.iteration_strategies: List[List[str]] = []
+        self.iteration_outcomes: List[float] = []  # success scores
+        
+        # Strategy mutation parameters
+        self.strategy_prompts: Dict[str, str] = self._initialize_prompts()
+        
+        # Performance threshold for strategy deprecation
+        self.performance_threshold = 0.3
+        
+    def _initialize_prompts(self) -> Dict[str, str]:
+        """Base prompts for each meta-query strategy"""
+        return {
+            "cross_domain_analogy_mapping": "Find two findings from different channels that share abstract relational form but use different vocabularies. Propose transfer hypothesis.",
+            "residual_anomaly_clustering": "Cluster low-confidence, contradictory, or outlier claims around entities, methods, or assumptions. Propose hidden common cause.",
+            "absence_as_signal": "List what the combined research surprisingly does not contain. Rank absences by explanatory power.",
+            "isomorphic_graph_mismatch": "Compare causal maps across sub-domains. Where are graphs structurally identical but node labels different?",
+            "hidden_moderator_chain": "Trace variables that appear as outcomes in one channel and inputs in another with no direct connection. Test as hidden moderator.",
+            "boundary_condition_inversion": "Find findings that hold under narrow conditions. Search for opposite condition. Does inverse relationship hold?",
+            "semantic_drift_bridge": "Track same concept defined across channels. Where definitions diverge, treat as data correlated with outcomes.",
+            "unused_constraint_exploitation": "Identify constraints set aside as out-of-scope. Check if multiple channels violate or solve them if reintroduced.",
+            "temporal_sequential_echo": "Find claims rejected early that later evidence supports. Propose delayed-validation hypothesis.",
+            "meta_pattern_of_channel_biases": "Audit which channels most often agree vs. disagree. Hypothesize systemic blind spots."
+        }
+    
+    def select_strategies(self, context: Dict[str, Any], budget: int = 3) -> List[str]:
+        """
+        Select which meta-queries to run based on past performance.
+        Implements exploration vs. exploitation.
+        """
+        iteration = context.get("iteration", 1)
+        previous_findings = context.get("previous_findings", [])
+        
+        # First iteration: explore all strategies (random sample)
+        if iteration == 1 or not self.strategy_performance:
+            return random.sample(self.strategies, min(budget, len(self.strategies)))
+        
+        # Later iterations: exploit high-performing strategies + explore some
+        strategy_scores = {}
+        for strategy in self.strategies:
+            scores = self.strategy_performance.get(strategy, [0.5])
+            strategy_scores[strategy] = sum(scores) / len(scores)
+        
+        # Sort by performance
+        sorted_strategies = sorted(strategy_scores.items(), key=lambda x: x[1], reverse=True)
+        
+        # Select top performers, leave room for exploration
+        selected = [s[0] for s in sorted_strategies[:budget-1]]
+        
+        # Add one random strategy for exploration (if not already selected)
+        remaining = [s for s in self.strategies if s not in selected]
+        if remaining:
+            selected.append(random.choice(remaining))
+        
+        return selected
+    
+    async def execute_strategy(self, strategy: str, findings: List[Finding], query: str) -> Finding:
+        """Execute a specific meta-query strategy"""
+        
+        # Get the prompt template for this strategy
+        base_prompt = self.strategy_prompts.get(strategy, self.strategy_prompts["cross_domain_analogy_mapping"])
+        
+        # Prepare findings summary
+        findings_text = "\n\n".join([
+            f"[{f.source_channel}] (conf={f.confidence:.2f}): {f.content[:300]}"
+            for f in findings[:10]
+        ])
+        
+        # If this strategy has been mutated, use the mutated prompt
+        prompt = self._get_mutated_prompt(strategy, base_prompt, findings_text, query)
+        
+        # Execute (using your existing call_llm)
+        response = await call_llm(prompt, system_prompt="You are a meta-analyst finding hidden patterns.")
+        
+        # Calculate confidence based on strategy's historical performance
+        historical_scores = self.strategy_performance.get(strategy, [0.5])
+        avg_performance = sum(historical_scores) / len(historical_scores)
+        confidence = 0.5 + (avg_performance * 0.3)  # Range: 0.5 to 0.8
+        
+        finding = Finding(
+            content=f"[LAYER 3 - {strategy}]\n{response}",
+            source_channel=f"Meta-Cognitive-{strategy[:20]}",
+            confidence=min(0.85, confidence),
+            evidence=[f"Strategy: {strategy}"],
+            epistemic_modality=Modality.BELIEF
+        )
+        finding.novelty_score = 4.0  # Layer 3 findings are inherently novel
+        
+        return finding
+    
+    def evaluate_outcome(self, strategy: str, finding: Finding, user_feedback: float = None) -> float:
+        """
+        Evaluate how successful a strategy was.
+        user_feedback: 0-1 score from user (or simulated based on finding properties)
+        """
+        if user_feedback is not None:
+            score = user_feedback
+        else:
+            # Automatic heuristic: novelty + confidence + length
+            novelty_score = finding.novelty_score if finding.novelty_score else 2.5
+            confidence_score = finding.confidence
+            length_score = min(1.0, len(finding.content) / 500)
+            
+            score = (novelty_score / 5.0) * 0.5 + confidence_score * 0.3 + length_score * 0.2
+        
+        self.strategy_performance[strategy].append(score)
+        
+        # Keep only last 10 performances
+        if len(self.strategy_performance[strategy]) > 10:
+            self.strategy_performance[strategy] = self.strategy_performance[strategy][-10:]
+        
+        return score
+    
+    def _get_mutated_prompt(self, strategy: str, base_prompt: str, findings_text: str, query: str) -> str:
+        """
+        Mutate the prompt based on successful past variations.
+        This is how Layer 3 self-improves.
+        """
+        # Check if we have successful mutations for this strategy
+        mutation_key = f"{strategy}_mutation"
+        
+        # Simple mutation: add emphasis based on what worked before
+        avg_score = sum(self.strategy_performance.get(strategy, [0.5])) / len(self.strategy_performance.get(strategy, [0.5]))
+        
+        if avg_score > 0.7:
+            # High-performing strategy: add reinforcement
+            return f"{base_prompt}\n\nPrevious applications of this strategy were highly successful. Apply it with extra care and depth."
+        elif avg_score < 0.3:
+            # Low-performing strategy: mutate significantly
+            mutations = [
+                f"{base_prompt}\n\nPrevious attempts found nothing. Look for inverse, negative, or absent patterns.",
+                f"{base_prompt}\n\nIgnore surface content. Focus only on structural relationships.",
+                f"{base_prompt}\n\nApply this strategy to the contradictions between channels, not the findings themselves."
+            ]
+            return random.choice(mutations)
+        
+        return base_prompt
+    
+    def should_restart(self) -> bool:
+        """
+        Determine if the system is stuck in a local optimum (zombie agents).
+        Returns True if no strategy has improved over last 5 iterations.
+        """
+        if len(self.iteration_outcomes) < 5:
+            return False
+        
+        recent = self.iteration_outcomes[-5:]
+        if all(recent[i] <= recent[i-1] for i in range(1, len(recent))):
+            return True  # Plateau or decline
+        
+        return False
+    
+    def get_performance_report(self) -> Dict[str, Any]:
+        """Generate report on strategy performance"""
+        report = {}
+        for strategy in self.strategies:
+            scores = self.strategy_performance.get(strategy, [])
+            if scores:
+                report[strategy] = {
+                    "avg_score": sum(scores) / len(scores),
+                    "times_used": len(scores),
+                    "trend": scores[-1] - scores[0] if len(scores) > 1 else 0
+                }
+            else:
+                report[strategy] = {"avg_score": None, "times_used": 0, "trend": 0}
+        
+        return report
+
+
+# ============================================================
+# INTEGRATION INTO YOUR EXISTING ORCHESTRATOR
+# ============================================================
+# 
+# Add this to your ResearchOrchestrator class:
+#
+# def __init__(self, ...):
+#     ...
+#     self.layer3 = MetaCognitiveLayer()
+#
+# async def research(self, query: str):
+#     ...
+#     # After Layer 2 (meta-layer) processes findings:
+#     layer3_strategies = self.layer3.select_strategies(self.context)
+#     layer3_findings = []
+#     for strategy in layer3_strategies:
+#         finding = await self.layer3.execute_strategy(strategy, processed_findings, query)
+#         self.layer3.evaluate_outcome(strategy, finding)
+#         layer3_findings.append(finding)
+#     
+#     # Add Layer 3 findings to context
+#     all_findings = processed_findings + layer3_findings
+#     
+#     # Check for stagnation
+#     if self.layer3.should_restart():
+#         # Trigger restart with mutated parameters
+#         self.context["restart_triggered"] = True
+# 
+# ============================================================

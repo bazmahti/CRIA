@@ -71,10 +71,16 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 **File**: `artifacts/cria-deepseek/main.py`
 
 ### Architecture
-- 10 parallel research channels (Scoping, Evidence, Contradiction, Synthesis, Causal, Critic, Serendipity, Quality, Cultural, Steering)
-- Meta-layer for cross-channel pattern detection
+- **Layer 1**: 10 parallel research channels (Scoping, Evidence, Contradiction, Synthesis, Causal, Critic, Serendipity, Quality, Cultural, Steering)
+- **Layer 2**: Meta-layer for cross-channel emergent insight detection
+- **Layer 3**: `MetaCognitiveLayer` — recursive self-improving meta-cognition
+  - 10 meta-query strategies (cross_domain_analogy_mapping, absence_as_signal, etc.)
+  - Selects 3 strategies per iteration via exploration/exploitation
+  - Evaluates outcomes, mutates prompts for low-performers
+  - Tracks stagnation across iterations; triggers restart signal if plateau detected
+  - Results appear in the "Layer 3 ✦" tab with strategy performance bars
 - Real free-tier API connections: Semantic Scholar, OpenAlex, PubMed, arXiv, re3data
-- Simulated LLM calls (replace `call_llm()` with real API if desired)
+- Real LLM calls via Replit AI Integrations (`AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY`)
 - Self-contained HTML dashboard served by FastAPI
 - Runs as workflow: `artifacts/cria-dashboard: cria-v2` on port 8001
 
@@ -82,9 +88,9 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 | | Claude v1 | DeepSeek v2 |
 |---|---|---|
 | Stack | React + Express + PostgreSQL | Python FastAPI (single file) |
-| Architecture | YAML artefact management | Multi-agent channel system |
+| Architecture | YAML artefact management | Multi-agent channel system (3 layers) |
 | Database | PostgreSQL (Drizzle ORM) | None (stateless) |
-| LLM | Simulated | Simulated (pluggable) |
+| LLM | Simulated | Real (Replit AI Integrations) |
 | External APIs | None | Semantic Scholar, OpenAlex, PubMed, arXiv |
 
 ## Important Notes
