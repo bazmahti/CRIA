@@ -4,12 +4,13 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
-## Project: CRIA — Two Versions for Comparison
+## Project: CRIA — Three Parallel Research Instruments
 
-Two parallel CRIA implementations for architecture comparison:
+Three CRIA implementations running in parallel for architecture comparison:
 
 ### CRIA v1 (Claude build) — at path `/`
-### CRIA v2 (DeepSeek build) — at path `/cria-v2/`
+### CRIA v2 (CLIA 2 / DeepSeek build) — at path `/cria-v2/`
+### CRIA v4 (Frame-Critical Research Instrument) — at path `/cria-v4/`
 
 ---
 
@@ -92,6 +93,59 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 | Database | PostgreSQL (Drizzle ORM) | None (stateless) |
 | LLM | Simulated | Real (Replit AI Integrations) |
 | External APIs | None | Semantic Scholar, OpenAlex, PubMed, arXiv |
+
+## Project: CRIA v4 (Frame-Critical Research Instrument)
+
+**Path**: `/cria-v4/`
+**Stack**: Python + FastAPI + uvicorn (single-file, no database)
+**File**: `artifacts/cria-v4/main.py`
+**Author**: Dr Barry Ferrier with Claude (Anthropic), April 2026
+
+### Architecture
+- **10 epistemic-mode channels** (vs CLIA 2's cognitive-role channels):
+  - C1: Empirical/Quantitative — numerical evidence, effect sizes
+  - C2: Phenomenological/Qualitative — lived experience, narrative
+  - C3: Historical/Archaeological — frame archaeology, frame extinction
+  - C4: Philosophical/Theoretical — apparatus development, second-order cybernetics
+  - C5: Critical/Counter-corpus — decolonial, critical AI, refusal-aware
+  - C6: Civilisational/Systemic — long timescales, v2 nine-pattern framework
+  - C7: Cross-cultural/Comparative — Buddhist, Ubuntu, Confucian, Indigenous-relational
+  - C8: Computational/Modelling — formal models, ABM, complex systems
+  - C9: Adversarial/Falsificationist — steel-mans counter-positions
+  - C10: Experimental/Wildcard — Atlan noise principle, codelets, slippability
+- **Two-stream metagent**: Academic stream + Experimental (Juniper-influenced) stream
+- **Hofstadter discipline**: Strange Loop Validator, Gödelian gap detection, Eliza Effect warning
+- **Layer 3 meta-cognitive learning** (v4-distinctive — different from CLIA 2's layer):
+  - 7 frame-critical strategies: position_privilege_rebalancing, dissonance_budget_calibration,
+    refusal_precedence_detection, frame_extinction_tracking, sovereign_aggregation_audit,
+    strange_loop_validation_tuning, two_voice_fidelity_check
+  - Longitudinal logs: frame extinction, refusal patterns, dissonance calibration
+- **40 connectors** (34 active, 6 partnership-gated):
+  - 5 shared mainstream (overlap with CLIA 2 for comparison)
+  - 7 theoretical-tradition specialist (PhilPapers, SEP, Constructivist Foundations, etc.)
+  - 8 critical/counter-corpus (Big Data & Society, STS journals, Hypatia, etc.)
+  - 8 Indigenous sovereignty (6 partnership-gated: AIATSIS, Lowitja, NACCHO, etc.)
+  - 7 Australian institutional (AustLII, data.gov.au, ARDC, AHRC, etc.)
+  - 5 international institutional (UN PFII, UNDRIP, World Bank, ILO, UNESCO)
+- **Two-voice prose filter**: Academic + Ferrier popular voices
+- **Comparison layer**: accepts optional `clia2_result` for structured dual-pipeline comparison
+- **Sovereign-source non-aggregation discipline**: Indigenous scholarship appears but is NOT aggregated for triangulation
+- **LLM**: Replit AI Integrations (OpenAI-compatible, `gpt-5-mini`)
+- Runs as workflow: `artifacts/cria-dashboard: cria-v4` on port 8002
+
+### Key differences from CLIA 2 (v2)
+| Aspect | CLIA 2 (v2) | CRIA v4 |
+|--------|-------------|---------|
+| Channel taxonomy | 10 cognitive-role | 10 epistemic-mode |
+| Optimised for | Converging on findings | Excavating frames, refusal-aware |
+| Layer 2 metagent | Single stream | Two streams (academic + experimental) |
+| Layer 3 | General pattern-detection | v4-distinctive frame-critical strategies |
+| Source treatment | By relevance + citation | Position-privilege + dissonance-role tagged |
+| Sovereign material | Standard evidence | Non-aggregation discipline |
+| Output voice | Single paper format | Two-voice (academic + Ferrier popular) |
+| Hofstadter discipline | Not implemented | Strange Loop Validator, Gödelian reset |
+| Refusal handling | Not first-class | First-class output |
+| Stagnation recovery | Random mutation | Raise dissonance, re-weight to counter-corpus |
 
 ## Important Notes
 

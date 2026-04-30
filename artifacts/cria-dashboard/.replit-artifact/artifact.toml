@@ -40,3 +40,14 @@ run = "python /home/runner/workspace/artifacts/cria-deepseek/main.py"
 
 [services.env]
 PORT = "8001"
+
+[[services]]
+name = "cria-v4"
+paths = [ "/cria-v4" ]
+localPort = 8002
+
+[services.development]
+run = "python /home/runner/workspace/artifacts/cria-v4/main.py"
+
+[services.env]
+PORT = "8002"
