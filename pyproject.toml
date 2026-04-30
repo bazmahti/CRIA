@@ -9,6 +9,7 @@ dependencies = [
     "fastapi==0.104.1",
     "httpx==0.25.1",
     "lxml==4.9.3",
+    "openai>=2.33.0",
     "pydantic==2.5.0",
     "python-dotenv==1.0.0",
     "uvicorn==0.24.0",

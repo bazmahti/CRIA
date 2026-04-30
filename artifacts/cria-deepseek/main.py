@@ -1,9 +1,7 @@
 import asyncio
 import httpx
-import random
 import uuid
 import xml.etree.ElementTree as ET
-import re
 import os
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
@@ -14,8 +12,27 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import uvicorn
 from datetime import datetime
+from openai import AsyncOpenAI
 
 BASE_PATH = "/cria-v2"
+
+_openai_client: Optional[AsyncOpenAI] = None
+
+def get_openai_client() -> AsyncOpenAI:
+    global _openai_client
+    if _openai_client is None:
+        base_url = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL")
+        api_key = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "dummy")
+        if base_url:
+            _openai_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        else:
+            _openai_client = AsyncOpenAI(api_key=api_key)
+    return _openai_client
+
+
+# ============================================================
+# DATA STRUCTURES
+# ============================================================
 
 class Modality(Enum):
     KNOWLEDGE = "knows"
@@ -35,11 +52,38 @@ class Finding:
     def to_dict(self) -> dict:
         return {
             "id": self.finding_id,
-            "content": self.content[:500],
+            "content": self.content[:1000],
             "source": self.source_channel,
             "confidence": self.confidence,
             "novelty": self.novelty_score
         }
+
+
+# ============================================================
+# LLM UTILITY — REAL CALLS
+# ============================================================
+
+async def call_llm(prompt: str, system_prompt: str = "", model: str = "gpt-5-mini") -> str:
+    """Real LLM caller using Replit AI Integrations (OpenAI-compatible)."""
+    client = get_openai_client()
+    system = system_prompt or "You are an expert multi-disciplinary research analyst. Provide rigorous, evidence-based analysis. Be specific, cite reasoning, and avoid vague generalities."
+    try:
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt}
+            ],
+            max_completion_tokens=800,
+        )
+        return response.choices[0].message.content or ""
+    except Exception as e:
+        return f"[LLM error: {e}]"
+
+
+# ============================================================
+# DATABASE INTEGRATIONS (FREE TIER APIs)
+# ============================================================
 
 class SemanticScholarAPI:
     def __init__(self, api_key: Optional[str] = None):
@@ -63,8 +107,7 @@ class SemanticScholarAPI:
 
 class OpenAlexAPI:
     def __init__(self, email: Optional[str] = None):
-        self.email = email
-        self.headers = {"User-Agent": f"ResearchTool/1.0 (mailto:{email})"} if email else {}
+        self.headers = {"User-Agent": f"CRIA-Research/1.0 (mailto:{email})"} if email else {}
 
     async def search(self, query: str, limit: int = 10) -> List[Dict]:
         async with httpx.AsyncClient() as client:
@@ -128,14 +171,7 @@ class PubMedAPI:
                     journal = journal_elem.text if journal_elem is not None else ""
                     year_elem = article.find(".//PubDate/Year")
                     year = year_elem.text if year_elem is not None else ""
-                    results.append({
-                        "title": title,
-                        "abstract": abstract,
-                        "authors": authors[:5],
-                        "journal": journal,
-                        "year": year,
-                        "source": "PubMed"
-                    })
+                    results.append({"title": title, "abstract": abstract, "authors": authors[:5], "journal": journal, "year": year, "source": "PubMed"})
                 return results
             except Exception as e:
                 print(f"PubMed error: {e}")
@@ -164,13 +200,7 @@ class ArxivAPI:
                             authors.append(author.text)
                     published_elem = entry.find("atom:published", ns)
                     year = published_elem.text[:4] if published_elem is not None else ""
-                    results.append({
-                        "title": title,
-                        "abstract": abstract[:500],
-                        "authors": authors[:5],
-                        "year": year,
-                        "source": "arXiv"
-                    })
+                    results.append({"title": title, "abstract": abstract[:500], "authors": authors[:5], "year": year, "source": "arXiv"})
                 return results
             except Exception as e:
                 print(f"arXiv error: {e}")
@@ -184,8 +214,12 @@ class Re3dataAPI:
                 response = await client.get(url, timeout=30.0)
                 return {"status": "available", "url": url, "repositories_found": True}
             except Exception as e:
-                print(f"re3data error: {e}")
                 return {"status": "error", "message": str(e)}
+
+
+# ============================================================
+# BASE CHANNEL
+# ============================================================
 
 class BaseChannel(ABC):
     def __init__(self, channel_id: int, name: str, description: str):
@@ -198,44 +232,49 @@ class BaseChannel(ABC):
     async def research(self, query: str, context: Dict[str, Any]) -> Finding:
         pass
 
-async def call_llm(prompt: str, system_prompt: str = "") -> str:
-    responses = [
-        f"Analysis of '{prompt[:80]}' reveals significant patterns and relationships across the literature.",
-        f"Based on available evidence, the research question requires consideration of multiple intersecting factors.",
-        f"Preliminary findings suggest important connections between key variables in this domain.",
-        f"Cross-referencing existing literature indicates several promising directions for future inquiry.",
-        f"Synthesis of available data points to actionable conclusions with important caveats."
-    ]
-    return random.choice(responses) + f"\n\n[Simulated LLM response for: {prompt[:100]}...]"
+
+# ============================================================
+# CHANNEL 1: SCOPING & ONTOLOGY
+# ============================================================
 
 class Channel1_Scoping(BaseChannel):
     def __init__(self):
         super().__init__(1, "Scoping & Ontology", "Defines research boundaries and entities")
 
     async def research(self, query: str, context: Dict[str, Any]) -> Finding:
-        prompt = f"""Define the research scope for: "{query}"
-        Output as JSON-like structure with:
-        - boundaries: what's included/excluded
-        - entities: key variables and concepts
-        - metrics: success criteria
-        - constraints: time, domain, cultural scope"""
+        prompt = f"""You are scoping a research investigation. For the question: "{query}"
+
+Define the research scope with precision:
+
+**Boundaries**: What is explicitly included vs. excluded? What time periods, populations, contexts apply?
+**Key Entities**: List the 4-6 most important variables, constructs, and concepts. Define each briefly.
+**Measurable Outcomes**: What would constitute evidence that answers this question?
+**Epistemic Constraints**: What methodological limitations apply? What can and cannot be known here?
+**Related Questions**: Name 2-3 adjacent questions this investigation connects to.
+
+Be concrete and specific to this exact research question."""
+
         response = await call_llm(prompt)
         return Finding(
             content=response,
             source_channel=self.name,
             confidence=0.85,
-            evidence=["Scoping methodology"],
+            evidence=["Conceptual scoping analysis"],
             epistemic_modality=Modality.KNOWLEDGE
         )
 
+
+# ============================================================
+# CHANNEL 2: EVIDENCE ACQUISITION (REAL DATABASE CONNECTIONS)
+# ============================================================
+
 class Channel2_Evidence(BaseChannel):
-    def __init__(self, semantic_key: str = None, email: str = None):
+    def __init__(self):
         super().__init__(2, "Evidence Acquisition", "Searches academic databases")
-        self.semantic = SemanticScholarAPI(api_key=semantic_key)
-        self.openalex = OpenAlexAPI(email=email)
+        self.semantic = SemanticScholarAPI()
+        self.openalex = OpenAlexAPI()
         self.pubmed = PubMedAPI()
         self.arxiv = ArxivAPI()
-        self.re3data = Re3dataAPI()
 
     async def research(self, query: str, context: Dict[str, Any]) -> Finding:
         results = await asyncio.gather(
@@ -243,50 +282,78 @@ class Channel2_Evidence(BaseChannel):
             self.openalex.search(query, limit=8),
             self.pubmed.search(query, retmax=5),
             self.arxiv.search(query, max_results=5),
-            self.re3data.search(),
             return_exceptions=True
         )
-        semantic_results, openalex_results, pubmed_results, arxiv_results, re3data_result = results
+        semantic_results, openalex_results, pubmed_results, arxiv_results = results
+
         all_papers = []
-        if isinstance(semantic_results, list):
-            for p in semantic_results:
-                p["source"] = "Semantic Scholar"
-                all_papers.append(p)
-        if isinstance(openalex_results, list):
-            all_papers.extend(openalex_results)
-        if isinstance(pubmed_results, list):
-            all_papers.extend(pubmed_results)
-        if isinstance(arxiv_results, list):
-            all_papers.extend(arxiv_results)
+        for result_set in [semantic_results, openalex_results, pubmed_results, arxiv_results]:
+            if isinstance(result_set, list):
+                all_papers.extend(result_set)
+
         seen_titles = set()
         unique_papers = []
         for p in all_papers:
-            title = p.get("title", "")[:50].lower() if p.get("title") else ""
+            title = (p.get("title") or "")[:60].lower().strip()
             if title and title not in seen_titles:
                 seen_titles.add(title)
                 unique_papers.append(p)
-        output = "## 📚 Evidence from Academic Databases\n\n"
-        output += f"**Found {len(unique_papers)} unique papers across Semantic Scholar, OpenAlex, PubMed, and arXiv.**\n\n"
-        for i, p in enumerate(unique_papers[:15], 1):
+
+        unique_papers.sort(key=lambda p: p.get("citationCount") or 0, reverse=True)
+
+        papers_text = ""
+        for i, p in enumerate(unique_papers[:12], 1):
             title = p.get("title", "Untitled")
             authors = p.get("authors", [])
-            author_str = ", ".join(authors[:3]) if authors else "Unknown"
+            author_str = ", ".join(str(a) for a in authors[:3]) if authors else "Unknown"
             year = p.get("year", "n.d.")
             source = p.get("source", "Unknown")
-            abstract = p.get("abstract", "")[:200] if p.get("abstract") else ""
-            output += f"**{i}. {title}**\n"
-            output += f"   *{author_str} ({year}) - {source}*\n"
+            abstract = (p.get("abstract") or "")[:300]
+            cites = p.get("citationCount")
+            cite_str = f" | {cites} citations" if cites else ""
+            papers_text += f"\n[{i}] {title}\n    {author_str} ({year}) — {source}{cite_str}\n"
             if abstract:
-                output += f"   > {abstract}...\n"
-            output += "\n"
-        citations = [p.get("title", "") for p in unique_papers[:5] if p.get("title")]
+                papers_text += f"    Abstract: {abstract}...\n"
+
+        if not unique_papers:
+            summary = "No papers retrieved from academic databases for this query."
+        else:
+            prompt = f"""You have retrieved {len(unique_papers)} papers from Semantic Scholar, OpenAlex, PubMed, and arXiv for the query: "{query}"
+
+Here are the most relevant papers:
+{papers_text}
+
+Provide a structured evidence summary:
+1. **Overall Literature Landscape**: What does this body of evidence collectively address? How mature is the field?
+2. **Key Findings**: What are the 3-4 most important empirical findings evident from these titles/abstracts?
+3. **Methodological Approaches**: What methods dominate this literature?
+4. **Temporal Trends**: Are there clear recent vs. older patterns?
+5. **Evidence Gaps**: What important aspects of the query are NOT covered by the retrieved papers?
+
+Be specific — refer to actual papers by author/year when possible."""
+            summary = await call_llm(prompt)
+
+        output = f"## Evidence Acquisition: {len(unique_papers)} Papers Retrieved\n\n"
+        output += f"**Sources**: Semantic Scholar, OpenAlex, PubMed, arXiv\n\n"
+        output += summary
+        output += f"\n\n---\n### Retrieved Papers\n{papers_text}"
+
+        citations = [p.get("title", "") for p in unique_papers[:8] if p.get("title")]
+
+        context["raw_papers"] = unique_papers[:15]
+
         return Finding(
             content=output,
             source_channel=self.name,
-            confidence=0.80,
+            confidence=0.85,
             evidence=citations,
             epistemic_modality=Modality.BELIEF
         )
+
+
+# ============================================================
+# CHANNEL 3: CONTRADICTION & ANOMALY DETECTION
+# ============================================================
 
 class Channel3_Contradiction(BaseChannel):
     def __init__(self):
@@ -294,12 +361,43 @@ class Channel3_Contradiction(BaseChannel):
 
     async def research(self, query: str, context: Dict[str, Any]) -> Finding:
         previous_findings = context.get("previous_findings", [])
-        if not previous_findings:
-            return Finding(content="No previous findings to analyze for contradictions.", source_channel=self.name, confidence=1.0, evidence=[], epistemic_modality=Modality.KNOWLEDGE)
-        findings_text = "\n".join([f.content[:300] for f in previous_findings[:5]])
-        prompt = f"Analyze these research findings for contradictions and anomalies:\n\n{findings_text}\n\nList any contradictions found. If none, state findings are consistent."
+        raw_papers = context.get("raw_papers", [])
+
+        papers_summary = ""
+        for p in raw_papers[:8]:
+            title = p.get("title", "")
+            abstract = (p.get("abstract") or "")[:200]
+            if title:
+                papers_summary += f"- {title}: {abstract}\n"
+
+        prompt = f"""You are a contradiction and anomaly detector analyzing research on: "{query}"
+
+{"Retrieved literature includes:" + chr(10) + papers_summary if papers_summary else "No retrieved literature yet."}
+
+Identify and analyze:
+
+**Direct Contradictions**: Are there competing claims or findings that directly contradict each other in the literature? Name specific tensions.
+**Methodological Inconsistencies**: Do different studies use incompatible methods that make their results non-comparable?
+**Definitional Conflicts**: Are key terms defined differently across studies, causing apparent contradictions?
+**Anomalous Findings**: What outlier results exist that don't fit the dominant narrative?
+**Publication Bias Concerns**: Are there systematic gaps suggesting unpublished null results?
+**Boundary Conditions**: Do certain findings only hold under specific conditions that are often ignored?
+
+Prioritize specific, concrete contradictions over vague generalities."""
+
         response = await call_llm(prompt)
-        return Finding(content=response, source_channel=self.name, confidence=0.75, evidence=[f.source_channel for f in previous_findings[:3]], epistemic_modality=Modality.BELIEF)
+        return Finding(
+            content=response,
+            source_channel=self.name,
+            confidence=0.75,
+            evidence=[f.source_channel for f in previous_findings[:3]],
+            epistemic_modality=Modality.BELIEF
+        )
+
+
+# ============================================================
+# CHANNEL 4: SYNTHESIS & ABSTRACTION
+# ============================================================
 
 class Channel4_Synthesis(BaseChannel):
     def __init__(self):
@@ -307,21 +405,88 @@ class Channel4_Synthesis(BaseChannel):
 
     async def research(self, query: str, context: Dict[str, Any]) -> Finding:
         previous_findings = context.get("previous_findings", [])
-        if not previous_findings:
-            return Finding(content="No findings yet to synthesize.", source_channel=self.name, confidence=1.0, evidence=[], epistemic_modality=Modality.KNOWLEDGE)
-        findings_text = "\n".join([f"{f.source_channel}: {f.content[:200]}" for f in previous_findings[:8]])
-        prompt = f'Synthesize these research findings into a coherent summary for: "{query}"\n\nFindings:\n{findings_text}\n\nProvide:\n1. Main consensus findings\n2. Areas of disagreement\n3. Gaps in current knowledge\n4. Tentative conclusions'
-        response = await call_llm(prompt)
-        return Finding(content=response, source_channel=self.name, confidence=0.70, evidence=[f.source_channel for f in previous_findings], epistemic_modality=Modality.BELIEF)
+        raw_papers = context.get("raw_papers", [])
+
+        papers_digest = ""
+        for p in raw_papers[:10]:
+            title = p.get("title", "")
+            abstract = (p.get("abstract") or "")[:250]
+            year = p.get("year", "")
+            if title:
+                papers_digest += f"• {title} ({year}): {abstract}\n"
+
+        prior_analyses = ""
+        for f in previous_findings[:4]:
+            prior_analyses += f"\n[{f.source_channel}]:\n{f.content[:400]}\n"
+
+        prompt = f"""Synthesize research on: "{query}"
+
+{"Evidence base:" + chr(10) + papers_digest if papers_digest else ""}
+{"Prior channel analyses:" + prior_analyses if prior_analyses else ""}
+
+Produce a rigorous synthesis:
+
+**Convergent Evidence**: What do multiple independent sources agree on? This is your strongest ground.
+**Theoretical Frameworks**: What explanatory models best account for the evidence?
+**Effect Sizes & Magnitudes**: Where known, what is the practical significance (not just statistical)?
+**Moderating Factors**: Under what conditions do findings hold or break down?
+**Causal vs. Correlational**: Which claims have causal evidence and which are associational?
+**Current Consensus**: What does the research community broadly agree on vs. debate?
+**Confidence Level**: Rate your overall confidence in this synthesis (Low/Medium/High) and explain why.
+
+Aim for a synthesis a doctoral committee would find credible."""
+
+        response = await call_llm(prompt, model="gpt-5-mini")
+        return Finding(
+            content=response,
+            source_channel=self.name,
+            confidence=0.78,
+            evidence=[f.source_channel for f in previous_findings],
+            epistemic_modality=Modality.BELIEF
+        )
+
+
+# ============================================================
+# CHANNEL 5: CAUSAL & RELATIONAL MAPPING
+# ============================================================
 
 class Channel5_Causal(BaseChannel):
     def __init__(self):
         super().__init__(5, "Causal & Relational", "Infers causal dependencies")
 
     async def research(self, query: str, context: Dict[str, Any]) -> Finding:
-        prompt = f'For the research question: "{query}"\n\nIdentify potential causal relationships:\n- Independent variables\n- Dependent variables\n- Confounders or mediators\n- Direction of causality'
+        raw_papers = context.get("raw_papers", [])
+        papers_hint = ", ".join([p.get("title", "")[:60] for p in raw_papers[:5] if p.get("title")])
+
+        prompt = f"""Analyze causal and relational structure for: "{query}"
+
+{"Related literature touches on: " + papers_hint if papers_hint else ""}
+
+Map the causal architecture:
+
+**Proposed Causal Mechanisms**: What are the specific pathways proposed in the literature? (X → Y via Z)
+**Confounders**: What third variables could explain apparent relationships without true causality?
+**Mediators vs. Moderators**: Which variables transmit the effect vs. change its magnitude/direction?
+**Reverse Causality Risks**: Where might causality run in the opposite direction to the assumed one?
+**Network Effects**: Are there feedback loops or reciprocal relationships?
+**Intervention Points**: If we wanted to change outcomes, what are the most tractable leverage points?
+**Strength of Causal Evidence**: For each major proposed mechanism, what type of evidence supports it? (RCT, natural experiment, observational, etc.)
+
+Use precise causal language (→, ↔, moderates, mediates)."""
+
         response = await call_llm(prompt)
-        return Finding(content=response, source_channel=self.name, confidence=0.65, evidence=["Causal inference methodology"], epistemic_modality=Modality.BELIEF)
+        return Finding(
+            content=response,
+            source_channel=self.name,
+            confidence=0.68,
+            evidence=["Causal inference analysis"],
+            epistemic_modality=Modality.BELIEF
+        )
+
+
+# ============================================================
+# CHANNEL 6: CRITIC & FALSIFICATION
+# ============================================================
 
 class Channel6_Critic(BaseChannel):
     def __init__(self):
@@ -330,11 +495,38 @@ class Channel6_Critic(BaseChannel):
     async def research(self, query: str, context: Dict[str, Any]) -> Finding:
         previous_findings = context.get("previous_findings", [])
         synthesis = next((f for f in previous_findings if f.source_channel == "Synthesis & Abstraction"), None)
-        if not synthesis:
-            return Finding(content="No synthesis available to critique. Run synthesis channel first.", source_channel=self.name, confidence=1.0, evidence=[], epistemic_modality=Modality.KNOWLEDGE)
-        prompt = f"Critique this synthesis for flaws and hidden assumptions:\n\n{synthesis.content[:800]}\n\nProvide:\n1. At least 2-3 plausible counterarguments\n2. Hidden assumptions worth questioning\n3. Evidence that would disprove main conclusions"
+        best_content = synthesis.content[:800] if synthesis else "\n".join([f.content[:200] for f in previous_findings[:3]])
+
+        prompt = f"""You are a rigorous academic critic evaluating research on: "{query}"
+
+Current synthesis/findings:
+{best_content}
+
+Apply systematic falsification:
+
+**Steelman Then Attack**: First state the strongest version of the main claim, then attack it.
+**Null Hypothesis Case**: What evidence would we expect to see if there were NO real effect? Does the literature rule this out?
+**Alternative Explanations**: Provide 3 specific alternative explanations for the same observations.
+**Methodological Fatal Flaws**: Identify the single most serious methodological problem in this literature.
+**Replication Crisis Risk**: Based on typical effect sizes, sample sizes, and field norms, how replicable are these findings?
+**Motivated Reasoning Red Flags**: Are there funding sources, ideological pressures, or academic incentives that could bias the literature?
+**What Would Change Your Mind**: State the specific evidence that would falsify the main conclusions.
+
+Be genuinely critical, not superficially critical."""
+
         response = await call_llm(prompt)
-        return Finding(content=response, source_channel=self.name, confidence=0.80, evidence=["Critical analysis"], epistemic_modality=Modality.BELIEF)
+        return Finding(
+            content=response,
+            source_channel=self.name,
+            confidence=0.82,
+            evidence=["Critical analysis"],
+            epistemic_modality=Modality.BELIEF
+        )
+
+
+# ============================================================
+# CHANNEL 7: SERENDIPITY & DISCOVERY
+# ============================================================
 
 class Channel7_Serendipity(BaseChannel):
     def __init__(self):
@@ -342,40 +534,141 @@ class Channel7_Serendipity(BaseChannel):
 
     async def research(self, query: str, context: Dict[str, Any]) -> Finding:
         previous_findings = context.get("previous_findings", [])
-        topics = [f.content[:100] for f in previous_findings[:5]] if previous_findings else [query]
-        topics_text = "\n".join(topics)
-        prompt = f"Looking at these research elements:\n\n{topics_text}\n\nGenerate 3 unexpected connections, analogies, or serendipitous insights that are not obvious but potentially valuable."
-        response = await call_llm(prompt)
-        finding = Finding(content=response, source_channel=self.name, confidence=0.45, evidence=["Creative exploration"], epistemic_modality=Modality.BELIEF)
-        finding.novelty_score = random.uniform(3.5, 4.8)
+        raw_papers = context.get("raw_papers", [])
+
+        paper_titles = [p.get("title", "") for p in raw_papers[:8] if p.get("title")]
+        findings_digest = "\n".join([f"{f.source_channel}: {f.content[:150]}" for f in previous_findings[:4]])
+
+        prompt = f"""You are a creative research analyst finding unexpected connections for: "{query}"
+
+Papers retrieved: {', '.join(paper_titles[:6])}
+{"Analytical findings so far:" + chr(10) + findings_digest if findings_digest else ""}
+
+Generate genuinely surprising intellectual value:
+
+**Cross-Disciplinary Analogues**: What phenomenon from a completely different field maps structurally onto this problem? (e.g., physics → economics, biology → sociology)
+**Inverted Assumptions**: What if the dominant framing is exactly backwards? Argue for the inversion.
+**Hidden Stakeholder**: Who is systematically absent from this literature who should be central to it?
+**Second-Order Effects**: What are the overlooked downstream consequences of the main findings?
+**The Boring Finding That's Actually Revolutionary**: Is there a mundane result in this literature that has been underappreciated?
+**Methodological Import**: What research method from another field could transform how we study this?
+
+Each insight should be genuinely non-obvious and intellectually surprising. Avoid generic observations."""
+
+        finding = Finding(
+            content=await call_llm(prompt),
+            source_channel=self.name,
+            confidence=0.50,
+            evidence=["Creative synthesis"],
+            epistemic_modality=Modality.BELIEF
+        )
+        finding.novelty_score = 4.2
         return finding
+
+
+# ============================================================
+# CHANNEL 8: QUALITY CONTROL
+# ============================================================
 
 class Channel8_Quality(BaseChannel):
     def __init__(self):
         super().__init__(8, "Quality Control", "Assesses source credibility and methodology")
 
     async def research(self, query: str, context: Dict[str, Any]) -> Finding:
+        raw_papers = context.get("raw_papers", [])
         previous_findings = context.get("previous_findings", [])
-        if not previous_findings:
-            return Finding(content="No findings to assess for quality.", source_channel=self.name, confidence=1.0, evidence=[], epistemic_modality=Modality.KNOWLEDGE)
-        confidences = [f.confidence for f in previous_findings if f.confidence < 1.0]
-        avg_conf = sum(confidences) / len(confidences) if confidences else 0.5
-        prompt = f"Assess research quality. Average confidence: {avg_conf:.2f}. Total findings: {len(previous_findings)}. Provide quality assessment."
+
+        papers_meta = ""
+        for p in raw_papers[:10]:
+            title = p.get("title", "")
+            year = p.get("year", "")
+            source = p.get("source", "")
+            cites = p.get("citationCount")
+            if title:
+                papers_meta += f"• {title[:70]} ({year}, {source}, {cites or '?'} citations)\n"
+
+        confidences = [f.confidence for f in previous_findings if 0 < f.confidence < 1]
+        avg_conf = round(sum(confidences) / len(confidences), 2) if confidences else 0.5
+
+        prompt = f"""Perform a quality assessment of the evidence base for: "{query}"
+
+Retrieved papers:
+{papers_meta if papers_meta else "No papers retrieved yet."}
+
+Current evidence confidence: {avg_conf} (average across {len(previous_findings)} channels)
+
+Assess:
+
+**Evidence Hierarchy**: What is the highest quality evidence available? (Systematic reviews > RCTs > cohort studies > case studies > opinion)
+**Sample Representativeness**: Are the studies' samples representative of the population the question applies to?
+**Publication Recency**: Is the literature current? Are there concerning lags in a fast-moving field?
+**Source Diversity**: Are findings from one database type or are they cross-validated across sources?
+**Citation Network Health**: Are the highly-cited papers building on each other or isolated?
+**Overall Evidence Quality Score**: Rate the evidence base (1-10) with justification.
+**What Would Strengthen This Evidence Base**: Name the most important missing study type."""
+
         response = await call_llm(prompt)
-        return Finding(content=response + f"\n\n**Quality Metrics:** Average confidence = {avg_conf:.2f}, Total findings = {len(previous_findings)}", source_channel=self.name, confidence=0.85, evidence=["Quality assessment framework"], epistemic_modality=Modality.BELIEF)
+        return Finding(
+            content=response + f"\n\n**Channel Metrics**: Avg confidence = {avg_conf}, Total analyses = {len(previous_findings)}",
+            source_channel=self.name,
+            confidence=0.88,
+            evidence=["Quality assessment"],
+            epistemic_modality=Modality.KNOWLEDGE
+        )
+
+
+# ============================================================
+# CHANNEL 9: CULTURAL CONTEXT
+# ============================================================
 
 class Channel9_Cultural(BaseChannel):
     def __init__(self):
         super().__init__(9, "Cultural Context", "Assesses cultural scope and validity")
 
     async def research(self, query: str, context: Dict[str, Any]) -> Finding:
-        previous_findings = context.get("previous_findings", [])
-        synthesis = next((f for f in previous_findings if f.source_channel == "Synthesis & Abstraction"), None)
-        if not synthesis:
-            return Finding(content="No synthesis to analyze for cultural context.", source_channel=self.name, confidence=1.0, evidence=[], epistemic_modality=Modality.KNOWLEDGE)
-        prompt = f"Analyze this research for cultural assumptions:\n\n{synthesis.content[:600]}\n\nAnswer:\n1. What cultural contexts are implicitly assumed?\n2. Which populations might this NOT generalize to?\n3. Are culture-specific vs universal claims distinguished?"
+        raw_papers = context.get("raw_papers", [])
+        synthesis = next((f for f in context.get("previous_findings", []) if f.source_channel == "Synthesis & Abstraction"), None)
+
+        authors_hint = []
+        for p in raw_papers[:8]:
+            authors = p.get("authors", [])
+            if authors:
+                authors_hint.extend([str(a) for a in authors[:2]])
+
+        base_content = synthesis.content[:600] if synthesis else f"Research question: {query}"
+
+        prompt = f"""Analyze cultural context and generalizability for: "{query}"
+
+Research synthesis:
+{base_content}
+
+{"Sample of researcher names (hint at geographic/cultural representation): " + ", ".join(authors_hint[:10]) if authors_hint else ""}
+
+Examine:
+
+**WEIRD Problem**: How Western, Educated, Industrialized, Rich, and Democratic is this research? What does that mean for generalizability?
+**Missing Geographies**: Which world regions or cultures are absent from the literature? Why might this matter?
+**Language Bias**: Is non-English research excluded? What might it add?
+**Historical Embeddedness**: Are findings specific to a particular historical moment that may not persist?
+**Power & Positionality**: Who is studying whom? What assumptions does the researcher-subject relationship embed?
+**Indigenous & Alternative Knowledge Systems**: Are there non-Western epistemological frameworks that address this differently?
+**Global South Perspectives**: How might the questions look different from a developing-world vantage point?
+
+Be specific about how these factors affect the conclusions."""
+
         response = await call_llm(prompt)
-        return Finding(content=response, source_channel=self.name, confidence=0.75, evidence=["Cross-cultural methodology"], epistemic_modality=Modality.BELIEF)
+        return Finding(
+            content=response,
+            source_channel=self.name,
+            confidence=0.72,
+            evidence=["Cross-cultural analysis"],
+            epistemic_modality=Modality.BELIEF
+        )
+
+
+# ============================================================
+# CHANNEL 10: PROCESS STEERING
+# ============================================================
 
 class Channel10_Steering(BaseChannel):
     def __init__(self):
@@ -384,11 +677,41 @@ class Channel10_Steering(BaseChannel):
     async def research(self, query: str, context: Dict[str, Any]) -> Finding:
         iteration = context.get("iteration", 1)
         previous_findings = context.get("previous_findings", [])
-        confidences = [f.confidence for f in previous_findings if f.confidence < 1.0]
-        avg_confidence = sum(confidences) / len(confidences) if confidences else 0.5
-        prompt = f"Research iteration {iteration} assessment:\n\nAverage confidence: {avg_confidence:.2f}\nNumber of findings: {len(previous_findings)}\n\nRecommend: Continue or stop? What strategic shift would help?"
+
+        channel_summaries = "\n".join([
+            f"- {f.source_channel} (confidence {f.confidence:.2f}): {f.content[:120]}..."
+            for f in previous_findings[:8]
+        ])
+
+        prompt = f"""You are the process steering meta-agent for research on: "{query}"
+This is iteration {iteration}.
+
+Current findings across channels:
+{channel_summaries if channel_summaries else "No findings yet — this is the first iteration."}
+
+Provide strategic research guidance:
+
+**Convergence Assessment**: Are channels converging on coherent answers or diverging? What does this signal?
+**Weakest Links**: Which channel's analysis is least convincing? What specific improvement would help most?
+**Emerging Answer**: Based on all channels so far, what is the most defensible answer to the research question?
+**Unanswered Sub-questions**: What specific sub-questions remain open that are critical to the main question?
+**Next Priority**: If we ran another iteration, what single thing should the research focus on?
+**Confidence Trajectory**: Is confidence in our findings increasing, stable, or decreasing across channels?
+**Stopping Rule**: Should we continue iterating or do we have sufficient evidence? Justify."""
+
         response = await call_llm(prompt)
-        return Finding(content=response + f"\n\n**Iteration {iteration} complete.**", source_channel=self.name, confidence=0.90, evidence=["Process metrics"], epistemic_modality=Modality.KNOWLEDGE)
+        return Finding(
+            content=response + f"\n\n**Iteration {iteration} complete.**",
+            source_channel=self.name,
+            confidence=0.90,
+            evidence=["Process meta-analysis"],
+            epistemic_modality=Modality.KNOWLEDGE
+        )
+
+
+# ============================================================
+# META-LAYER
+# ============================================================
 
 class MetaLayer:
     def __init__(self, novelty_threshold: float = 2.5):
@@ -399,49 +722,101 @@ class MetaLayer:
         for f in findings:
             if f.novelty_score is None:
                 f.novelty_score = 4.0 if "Serendipity" in f.source_channel else 2.5
+
         filtered = [f for f in findings if f.novelty_score >= self.novelty_threshold]
-        if len(filtered) >= 3:
+
+        if len(filtered) >= 4:
             hidden = await self._find_hidden_connections(filtered, query)
             if hidden:
                 filtered.append(hidden)
+
         self.iteration_history.append(filtered)
         return filtered
 
     async def _find_hidden_connections(self, findings: List[Finding], query: str) -> Finding:
-        findings_text = "\n\n".join([f"{f.source_channel}: {f.content[:200]}" for f in findings[:4]])
-        prompt = f'Looking across these findings about "{query}":\n\n{findings_text}\n\nIdentify ONE non-obvious connection or pattern that no single finding captures alone.'
-        response = await call_llm(prompt)
-        finding = Finding(content=f"[META-LAYER DISCOVERY] {response}", source_channel="Meta-Layer", confidence=0.60, evidence=[f.source_channel for f in findings[:3]], epistemic_modality=Modality.BELIEF)
-        finding.novelty_score = 4.5
+        findings_text = "\n\n".join([f"[{f.source_channel}]: {f.content[:300]}" for f in findings[:5]])
+
+        prompt = f"""You are the meta-layer synthesis agent for research on: "{query}"
+
+You have access to analyses from multiple specialized channels:
+{findings_text}
+
+Your task: identify ONE high-value emergent insight that NO SINGLE CHANNEL captured, but which becomes visible only when viewing all channels together.
+
+This should be:
+- A genuine emergent property of the whole analysis
+- Not a simple summary of what was said
+- Potentially paradigm-shifting for how we understand the question
+- Actionable for a researcher or policymaker
+
+State it boldly and explain why it only becomes visible at this integrative level."""
+
+        response = await call_llm(prompt, model="gpt-5-mini")
+        finding = Finding(
+            content=f"[META-LAYER EMERGENT INSIGHT]\n\n{response}",
+            source_channel="Meta-Layer",
+            confidence=0.65,
+            evidence=[f.source_channel for f in findings[:4]],
+            epistemic_modality=Modality.BELIEF
+        )
+        finding.novelty_score = 4.8
         return finding
+
+
+# ============================================================
+# CITATION MANAGER
+# ============================================================
 
 class CitationManager:
     def __init__(self):
         self.citations: Dict[str, Dict] = {}
 
-    def add(self, title: str, authors: List[str], year: str, source: str):
-        key = title.lower() if title else str(len(self.citations))
+    def add_from_paper(self, paper: Dict):
+        title = paper.get("title", "")
+        if not title:
+            return
+        key = title.lower()[:80]
         if key not in self.citations:
-            self.citations[key] = {"title": title, "authors": authors, "year": year, "source": source}
+            authors = paper.get("authors", [])
+            self.citations[key] = {
+                "title": title,
+                "authors": [str(a) for a in authors[:5]],
+                "year": str(paper.get("year", "n.d.")),
+                "source": paper.get("source", "Unknown"),
+                "citations": paper.get("citationCount"),
+                "journal": paper.get("journal", "")
+            }
 
     def format_apa(self) -> str:
         lines = []
-        for cit in self.citations.values():
-            authors_str = ", ".join(cit["authors"][:3]) if cit["authors"] else "Unknown"
-            if len(cit["authors"]) > 3:
+        for cit in sorted(self.citations.values(), key=lambda c: c.get("year", ""), reverse=True):
+            authors = cit.get("authors", [])
+            authors_str = ", ".join(authors[:3]) if authors else "Unknown"
+            if len(authors) > 3:
                 authors_str += ", et al."
-            lines.append(f"{authors_str} ({cit['year']}). {cit['title']}. {cit['source']}.")
-        return "\n\n".join(lines) if lines else "No citations extracted."
+            year = cit.get("year", "n.d.")
+            title = cit.get("title", "")
+            source = cit.get("source") or cit.get("journal") or "Academic Source"
+            cites = cit.get("citations")
+            cite_note = f" [{cites} citations]" if cites else ""
+            lines.append(f"{authors_str} ({year}). {title}. *{source}*.{cite_note}")
+        return "\n\n".join(lines) if lines else "No citations extracted from databases."
 
     def format_bibtex(self) -> str:
         lines = []
         for i, cit in enumerate(self.citations.values()):
-            key = f"{cit['authors'][0].replace(' ', '') if cit['authors'] else 'Author'}{cit['year']}" if cit['year'] else f"ref{i}"
-            lines.append(f"@article{{{key},\n  author = {{{', '.join(cit['authors']) if cit['authors'] else 'Unknown'}}},\n  title = {{{cit['title']}}},\n  year = {{{cit['year']}}}\n}}")
+            authors = cit.get("authors", [])
+            key = f"{authors[0].split()[-1] if authors else 'Author'}{cit.get('year', str(i))}"
+            lines.append(f"@article{{{key},\n  author = {{{' and '.join(authors) if authors else 'Unknown'}}},\n  title = {{{cit.get('title', '')}}},\n  year = {{{cit.get('year', 'n.d.')}}},\n  note = {{{cit.get('source', '')}}}\n}}")
         return "\n\n".join(lines) if lines else "% No citations extracted."
 
+
+# ============================================================
+# RESEARCH ORCHESTRATOR
+# ============================================================
+
 class ResearchOrchestrator:
-    def __init__(self, max_iterations: int = 3):
+    def __init__(self, max_iterations: int = 1):
         self.channels = [
             Channel1_Scoping(),
             Channel2_Evidence(),
@@ -457,24 +832,27 @@ class ResearchOrchestrator:
         self.meta_layer = MetaLayer()
         self.citation_manager = CitationManager()
         self.max_iterations = max_iterations
-        self.context = {"previous_findings": [], "iteration": 0}
+        self.context: Dict[str, Any] = {"previous_findings": [], "iteration": 0, "raw_papers": []}
 
     async def research(self, query: str) -> Dict[str, Any]:
         start_time = datetime.now()
+
         for iteration in range(self.max_iterations):
             self.context["iteration"] = iteration + 1
+
             tasks = [ch.research(query, self.context) for ch in self.channels]
             raw_findings = await asyncio.gather(*tasks)
-            processed_findings = await self.meta_layer.process(raw_findings, query)
+
+            processed_findings = await self.meta_layer.process(list(raw_findings), query)
             self.context["previous_findings"] = processed_findings
-        evidence = next((f for f in self.context["previous_findings"] if "Evidence" in f.source_channel), None)
-        if evidence and evidence.evidence:
-            for title in evidence.evidence[:5]:
-                if title:
-                    self.citation_manager.add(title, ["Unknown"], "2024", "Academic Source")
+
+        for paper in self.context.get("raw_papers", []):
+            self.citation_manager.add_from_paper(paper)
+
         final_synthesis = await self._final_synthesis(query)
         paper = await self._generate_paper(query, final_synthesis)
         duration = (datetime.now() - start_time).total_seconds()
+
         return {
             "query": query,
             "iterations": self.max_iterations,
@@ -482,28 +860,69 @@ class ResearchOrchestrator:
             "paper": paper,
             "citations": self.citation_manager.format_apa(),
             "citations_bibtex": self.citation_manager.format_bibtex(),
-            "findings": [f.to_dict() for f in self.context["previous_findings"]]
+            "findings": [f.to_dict() for f in self.context["previous_findings"]],
+            "paper_count": len(self.context.get("raw_papers", []))
         }
 
     async def _final_synthesis(self, query: str) -> str:
         all_findings = self.context["previous_findings"]
         if not all_findings:
             return "No findings to synthesize."
-        findings_text = "\n\n".join([f"{f.source_channel}: {f.content[:300]}" for f in all_findings[:8]])
-        prompt = f'Synthesize this research on "{query}":\n\n{findings_text}\n\nProvide a comprehensive synthesis covering main findings, consensus, contradictions, and novel insights.'
-        return await call_llm(prompt)
+
+        findings_text = "\n\n".join([
+            f"**{f.source_channel}** (confidence {f.confidence:.2f}):\n{f.content[:500]}"
+            for f in all_findings[:8]
+        ])
+
+        prompt = f"""Produce a comprehensive final synthesis for the research question: "{query}"
+
+You have the following channel analyses:
+{findings_text}
+
+Write a coherent, scholarly synthesis that:
+1. Directly answers the research question with the best current evidence
+2. Quantifies uncertainty honestly (what we know vs. believe vs. don't know)
+3. Integrates the causal, cultural, and critical perspectives
+4. Identifies the most important remaining uncertainty
+5. States practical implications for researchers or practitioners
+
+Write at doctoral seminar quality. Be substantive and specific."""
+
+        return await call_llm(prompt, model="gpt-5-mini")
 
     async def _generate_paper(self, query: str, synthesis: str) -> Dict[str, str]:
-        abstract = await call_llm(f'Write a 150-word abstract for research on: "{query}"\nBased on synthesis: {synthesis[:400]}')
-        findings_bullets = await call_llm(f"Extract 3-5 key findings from: {synthesis[:600]}")
-        conclusion = await call_llm(f"Write conclusion and limitations for: {query}\nSynthesis: {synthesis[:300]}")
-        return {"abstract": abstract, "findings": findings_bullets, "conclusion": conclusion, "full_synthesis": synthesis}
+        abstract, findings_bullets, conclusion = await asyncio.gather(
+            call_llm(
+                f'Write a structured 200-word research abstract for: "{query}"\n\nBased on this synthesis:\n{synthesis[:600]}\n\nInclude: background, methods (multi-database search + multi-agent analysis), key findings, and implications.',
+                model="gpt-5-mini"
+            ),
+            call_llm(
+                f'From this research synthesis on "{query}", extract 4-6 specific, falsifiable key findings as numbered bullet points. Each should include a confidence qualifier (e.g., "strong evidence", "limited evidence", "contested").\n\nSynthesis:\n{synthesis[:800]}',
+                model="gpt-5-mini"
+            ),
+            call_llm(
+                f'Write a research conclusion for "{query}" covering: (1) what we now know with confidence, (2) key limitations of this analysis, (3) most important next research steps, (4) practical recommendations.\n\nSynthesis:\n{synthesis[:600]}',
+                model="gpt-5-mini"
+            )
+        )
 
-app = FastAPI(title="CRIA v2 — DeepSeek Multi-Agent Research Tool", version="1.0.0")
+        return {
+            "abstract": abstract,
+            "findings": findings_bullets,
+            "conclusion": conclusion,
+            "full_synthesis": synthesis
+        }
+
+
+# ============================================================
+# FASTAPI APP
+# ============================================================
+
+app = FastAPI(title="CRIA v2 — DeepSeek Multi-Agent Research Tool", version="2.0.0")
 
 class ResearchRequest(BaseModel):
     query: str
-    max_iterations: int = 3
+    max_iterations: int = 1
 
 DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="en">
@@ -521,132 +940,138 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
         .container { max-width: 1100px; margin: 0 auto; }
 
-        .header { margin-bottom: 32px; }
-        .header-top { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
+        .header { margin-bottom: 28px; }
+        .header-top { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; flex-wrap: wrap; }
         .version-badge {
             background: linear-gradient(135deg, #00d4ff, #7b2fff);
-            color: white; font-size: 0.7rem; font-weight: 700;
+            color: white; font-size: 0.68rem; font-weight: 700;
+            padding: 4px 12px; border-radius: 20px; letter-spacing: 1px;
+            text-transform: uppercase; white-space: nowrap;
+        }
+        .real-badge {
+            background: linear-gradient(135deg, #00c853, #00897b);
+            color: white; font-size: 0.68rem; font-weight: 700;
             padding: 4px 12px; border-radius: 20px; letter-spacing: 1px;
             text-transform: uppercase;
         }
         h1 {
-            font-size: 2.2rem; font-weight: 800;
+            font-size: 2rem; font-weight: 800;
             background: linear-gradient(135deg, #00d4ff 0%, #7b2fff 50%, #ff6b9d 100%);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-        .subtitle { color: #888; font-size: 0.95rem; margin-top: 4px; }
+        .subtitle { color: #888; font-size: 0.88rem; margin-top: 6px; line-height: 1.5; }
+        .subtitle strong { color: #00d4ff; }
 
         .channels-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
             gap: 8px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
         .channel-pill {
             background: rgba(255,255,255,0.05);
             border: 1px solid rgba(255,255,255,0.1);
             border-radius: 8px; padding: 8px 10px;
-            font-size: 0.72rem; color: #aaa;
-            text-align: center;
+            font-size: 0.7rem; color: #aaa; text-align: center;
         }
-        .channel-pill strong { display: block; color: #00d4ff; font-size: 0.75rem; margin-bottom: 2px; }
+        .channel-pill strong { display: block; color: #00d4ff; font-size: 0.72rem; margin-bottom: 2px; }
+        .channel-pill.real { border-color: rgba(0, 200, 83, 0.3); }
+        .channel-pill.real strong { color: #00c853; }
+        .channel-pill.llm { border-color: rgba(123, 47, 255, 0.3); }
+        .channel-pill.llm strong { color: #a78bfa; }
 
         .card {
             background: rgba(255,255,255,0.04);
             backdrop-filter: blur(20px);
-            border-radius: 16px;
-            padding: 28px;
-            margin-bottom: 24px;
+            border-radius: 16px; padding: 24px; margin-bottom: 20px;
             border: 1px solid rgba(255,255,255,0.1);
         }
-        .card-label { font-size: 0.75rem; font-weight: 600; color: #00d4ff; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+        .card-label { font-size: 0.72rem; font-weight: 600; color: #00d4ff; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
 
         textarea {
-            width: 100%;
-            padding: 16px;
-            border-radius: 12px;
+            width: 100%; padding: 14px; border-radius: 10px;
             border: 1px solid rgba(255,255,255,0.15);
-            background: rgba(0,0,0,0.4);
-            color: #e0e0f0;
-            font-family: inherit;
-            font-size: 15px;
-            resize: vertical;
+            background: rgba(0,0,0,0.4); color: #e0e0f0;
+            font-family: inherit; font-size: 15px; resize: vertical;
             transition: border-color 0.2s;
         }
         textarea:focus { outline: none; border-color: #7b2fff; }
 
-        .controls { display: flex; align-items: center; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
-        .iter-label { color: #aaa; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
+        .controls { display: flex; align-items: center; gap: 16px; margin-top: 14px; flex-wrap: wrap; }
+        .iter-label { color: #aaa; font-size: 0.88rem; display: flex; align-items: center; gap: 8px; }
         input[type="number"] {
-            width: 64px; padding: 8px; border-radius: 8px;
+            width: 60px; padding: 7px; border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.2);
             background: rgba(0,0,0,0.4); color: white;
             font-size: 0.9rem; text-align: center;
         }
+        .warning-note { font-size: 0.75rem; color: #f59e0b; margin-left: 4px; }
         .run-btn {
             background: linear-gradient(135deg, #7b2fff 0%, #00d4ff 100%);
-            color: white; border: none; padding: 12px 32px;
-            border-radius: 30px; cursor: pointer; font-size: 1rem; font-weight: 600;
-            transition: opacity 0.2s, transform 0.2s;
-            margin-left: auto;
+            color: white; border: none; padding: 11px 30px;
+            border-radius: 30px; cursor: pointer; font-size: 0.95rem; font-weight: 600;
+            transition: opacity 0.2s, transform 0.2s; margin-left: auto;
         }
         .run-btn:hover { opacity: 0.9; transform: translateY(-1px); }
         .run-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-        .loading { display: none; text-align: center; padding: 48px 24px; }
+        .loading { display: none; text-align: center; padding: 40px 24px; }
         .spinner {
-            width: 52px; height: 52px;
-            border: 4px solid rgba(123,47,255,0.3);
-            border-top-color: #7b2fff;
-            border-radius: 50%;
-            animation: spin 0.9s linear infinite;
-            margin: 0 auto 20px;
+            width: 48px; height: 48px;
+            border: 4px solid rgba(123,47,255,0.3); border-top-color: #7b2fff;
+            border-radius: 50%; animation: spin 0.9s linear infinite;
+            margin: 0 auto 16px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .loading-text { color: #aaa; font-size: 0.9rem; }
+        .loading-steps { color: #888; font-size: 0.82rem; line-height: 1.8; margin-top: 8px; }
 
         .results { display: none; }
         .meta-bar {
-            display: flex; gap: 24px; margin-bottom: 20px;
-            font-size: 0.85rem; color: #888;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-            padding-bottom: 16px;
+            display: flex; gap: 20px; margin-bottom: 18px;
+            font-size: 0.82rem; color: #888;
+            border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 14px;
+            flex-wrap: wrap;
         }
         .meta-bar span strong { color: #00d4ff; }
 
-        .section { margin-bottom: 24px; }
+        .section { margin-bottom: 20px; }
         .section-title {
-            font-size: 0.8rem; font-weight: 700; color: #7b2fff;
-            text-transform: uppercase; letter-spacing: 1px;
-            margin-bottom: 12px;
+            font-size: 0.75rem; font-weight: 700; color: #7b2fff;
+            text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
             display: flex; align-items: center; gap: 8px;
         }
         .section-title::after { content: ''; flex: 1; height: 1px; background: rgba(123,47,255,0.3); }
 
         .content-block {
-            background: rgba(0,0,0,0.25); border-radius: 10px;
-            padding: 16px; line-height: 1.7; font-size: 0.9rem; color: #ccc;
-            white-space: pre-wrap;
+            background: rgba(0,0,0,0.2); border-radius: 10px;
+            padding: 16px; line-height: 1.75; font-size: 0.88rem; color: #ccc;
+            white-space: pre-wrap; word-break: break-word;
         }
         .citation-block {
             background: rgba(0,0,0,0.3); border-radius: 10px;
-            padding: 16px; font-family: 'Courier New', monospace;
-            font-size: 0.78rem; white-space: pre-wrap; color: #aaa;
+            padding: 14px; font-family: 'Courier New', monospace;
+            font-size: 0.75rem; white-space: pre-wrap; color: #aaa;
+            max-height: 300px; overflow-y: auto;
         }
         .findings-grid { display: grid; gap: 10px; }
         .finding-card {
             background: rgba(0,0,0,0.2); border-radius: 10px; padding: 14px;
             border-left: 3px solid #7b2fff;
         }
-        .finding-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .finding-source { font-size: 0.8rem; font-weight: 600; color: #00d4ff; }
-        .finding-badges { display: flex; gap: 6px; }
-        .badge {
-            font-size: 0.7rem; padding: 2px 8px; border-radius: 10px;
-            background: rgba(255,255,255,0.08); color: #888;
-        }
-        .finding-content { font-size: 0.82rem; color: #bbb; line-height: 1.5; }
+        .finding-card.real-data { border-left-color: #00c853; }
+        .finding-card.meta { border-left-color: #ff6b9d; }
+        .finding-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 8px; }
+        .finding-source { font-size: 0.78rem; font-weight: 600; color: #00d4ff; }
+        .finding-badges { display: flex; gap: 5px; flex-shrink: 0; }
+        .badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 10px; background: rgba(255,255,255,0.08); color: #888; white-space: nowrap; }
+        .finding-content { font-size: 0.8rem; color: #bbb; line-height: 1.55; white-space: pre-wrap; }
+
+        .tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+        .tab { padding: 6px 16px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); color: #888; background: transparent; transition: all 0.15s; }
+        .tab.active { background: rgba(123,47,255,0.3); color: #e0e0f0; border-color: #7b2fff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
     </style>
 </head>
 <body>
@@ -654,60 +1079,90 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <div class="header">
         <div class="header-top">
             <div class="version-badge">DeepSeek Build</div>
+            <div class="real-badge">Live AI + Real Databases</div>
             <h1>CRIA v2 — Multi-Agent Research Tool</h1>
         </div>
-        <p class="subtitle">10 parallel research channels + Meta-layer synthesis · Real connections to Semantic Scholar, OpenAlex, PubMed, arXiv, re3data</p>
+        <p class="subtitle">
+            <strong>10 parallel research channels</strong> · Real-time queries to Semantic Scholar, OpenAlex, PubMed, arXiv ·
+            LLM synthesis via GPT · Meta-layer emergent insight detection
+        </p>
     </div>
 
     <div class="channels-grid">
-        <div class="channel-pill"><strong>Ch.1</strong>Scoping & Ontology</div>
-        <div class="channel-pill"><strong>Ch.2</strong>Evidence Acquisition</div>
-        <div class="channel-pill"><strong>Ch.3</strong>Contradiction</div>
-        <div class="channel-pill"><strong>Ch.4</strong>Synthesis</div>
-        <div class="channel-pill"><strong>Ch.5</strong>Causal & Relational</div>
-        <div class="channel-pill"><strong>Ch.6</strong>Critic & Falsification</div>
-        <div class="channel-pill"><strong>Ch.7</strong>Serendipity</div>
-        <div class="channel-pill"><strong>Ch.8</strong>Quality Control</div>
-        <div class="channel-pill"><strong>Ch.9</strong>Cultural Context</div>
-        <div class="channel-pill"><strong>Ch.10</strong>Process Steering</div>
+        <div class="channel-pill llm"><strong>Ch.1</strong>Scoping & Ontology</div>
+        <div class="channel-pill real"><strong>Ch.2</strong>Evidence Acquisition<br><small style="color:#6ee7b7;font-size:0.65rem">Live DB Search</small></div>
+        <div class="channel-pill llm"><strong>Ch.3</strong>Contradiction</div>
+        <div class="channel-pill llm"><strong>Ch.4</strong>Synthesis</div>
+        <div class="channel-pill llm"><strong>Ch.5</strong>Causal & Relational</div>
+        <div class="channel-pill llm"><strong>Ch.6</strong>Critic & Falsification</div>
+        <div class="channel-pill llm"><strong>Ch.7</strong>Serendipity</div>
+        <div class="channel-pill llm"><strong>Ch.8</strong>Quality Control</div>
+        <div class="channel-pill llm"><strong>Ch.9</strong>Cultural Context</div>
+        <div class="channel-pill llm"><strong>Ch.10</strong>Process Steering</div>
     </div>
 
     <div class="card">
         <div class="card-label">Research Question</div>
-        <textarea id="query" rows="4" placeholder="Enter your research problem...&#10;Example: 'What is the relationship between social media use and adolescent depression?'"></textarea>
+        <textarea id="query" rows="3" placeholder="Enter your research problem...&#10;Example: 'What is the relationship between social media use and adolescent depression?'"></textarea>
         <div class="controls">
-            <label class="iter-label">Iterations: <input type="number" id="iterations" value="2" min="1" max="3"></label>
+            <label class="iter-label">
+                Iterations:
+                <input type="number" id="iterations" value="1" min="1" max="2">
+                <span class="warning-note">(1 = ~30s, 2 = ~60s)</span>
+            </label>
             <button class="run-btn" id="runBtn" onclick="startResearch()">Run Research</button>
         </div>
     </div>
 
     <div id="loading" class="loading">
         <div class="spinner"></div>
-        <p class="loading-text">Running 10 channels in parallel · Querying live academic databases · Synthesizing findings...</p>
+        <p style="color:#ccc;font-size:0.95rem;margin-bottom:8px;">Research in progress...</p>
+        <div class="loading-steps">
+            Querying Semantic Scholar · OpenAlex · PubMed · arXiv databases<br>
+            Running 10 parallel AI analysis channels<br>
+            Synthesizing findings with meta-layer integration<br>
+            Generating final paper sections...
+        </div>
     </div>
 
     <div id="results" class="results">
         <div class="card">
             <div class="meta-bar" id="metaBar"></div>
-            <div class="section">
-                <div class="section-title">Abstract</div>
-                <div class="content-block" id="abstract"></div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('paper')">Paper</button>
+                <button class="tab" onclick="switchTab('channels')">Channel Analyses</button>
+                <button class="tab" onclick="switchTab('citations')">Citations</button>
             </div>
-            <div class="section">
-                <div class="section-title">Key Findings</div>
-                <div class="content-block" id="keyFindings"></div>
+
+            <div id="tab-paper" class="tab-content active">
+                <div class="section">
+                    <div class="section-title">Abstract</div>
+                    <div class="content-block" id="abstract"></div>
+                </div>
+                <div class="section">
+                    <div class="section-title">Key Findings</div>
+                    <div class="content-block" id="keyFindings"></div>
+                </div>
+                <div class="section">
+                    <div class="section-title">Conclusion & Limitations</div>
+                    <div class="content-block" id="conclusion"></div>
+                </div>
+                <div class="section">
+                    <div class="section-title">Full Synthesis</div>
+                    <div class="content-block" id="fullSynthesis"></div>
+                </div>
             </div>
-            <div class="section">
-                <div class="section-title">Conclusion</div>
-                <div class="content-block" id="conclusion"></div>
-            </div>
-            <div class="section">
-                <div class="section-title">Citations (APA)</div>
-                <div class="citation-block" id="citations"></div>
-            </div>
-            <div class="section">
-                <div class="section-title">Channel Findings</div>
+
+            <div id="tab-channels" class="tab-content">
                 <div class="findings-grid" id="channelFindings"></div>
+            </div>
+
+            <div id="tab-citations" class="tab-content">
+                <div class="section">
+                    <div class="section-title">APA References</div>
+                    <div class="citation-block" id="citations"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -715,6 +1170,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
 <script>
 const BASE = 'BASE_PATH_PLACEHOLDER';
+
+function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['paper','channels','citations'][i] === name));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+}
 
 async function startResearch() {
     const query = document.getElementById('query').value.trim();
@@ -729,7 +1190,10 @@ async function startResearch() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query, max_iterations: parseInt(document.getElementById('iterations').value) })
         });
-        if (!resp.ok) throw new Error('Server error: ' + resp.status);
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || 'Server error: ' + resp.status);
+        }
         const data = await resp.json();
         displayResults(data);
     } catch(e) {
@@ -742,28 +1206,36 @@ async function startResearch() {
 
 function displayResults(data) {
     document.getElementById('metaBar').innerHTML =
-        `<span><strong>${data.iterations}</strong> iterations</span>` +
-        `<span><strong>${data.duration_seconds.toFixed(2)}s</strong> duration</span>` +
-        `<span><strong>${data.findings.length}</strong> channel findings</span>` +
-        `<span>Query: <strong>${escapeHtml(data.query.substring(0,60))}${data.query.length > 60 ? '...' : ''}</strong></span>`;
+        `<span>Iterations: <strong>${data.iterations}</strong></span>` +
+        `<span>Duration: <strong>${data.duration_seconds.toFixed(1)}s</strong></span>` +
+        `<span>Papers retrieved: <strong>${data.paper_count || 0}</strong></span>` +
+        `<span>Channel analyses: <strong>${data.findings.length}</strong></span>`;
+
     document.getElementById('abstract').textContent = data.paper.abstract || '';
     document.getElementById('keyFindings').textContent = data.paper.findings || '';
     document.getElementById('conclusion').textContent = data.paper.conclusion || '';
+    document.getElementById('fullSynthesis').textContent = data.paper.full_synthesis || '';
     document.getElementById('citations').textContent = data.citations || 'No citations extracted.';
+
+    const channelColors = { 'Evidence Acquisition': 'real-data', 'Meta-Layer': 'meta' };
     const grid = document.getElementById('channelFindings');
-    grid.innerHTML = data.findings.map(f => `
-        <div class="finding-card">
+    grid.innerHTML = data.findings.map(f => {
+        const cls = channelColors[f.source] || '';
+        const content = (f.content || '').substring(0, 600);
+        return `<div class="finding-card ${cls}">
             <div class="finding-header">
                 <span class="finding-source">${escapeHtml(f.source)}</span>
                 <div class="finding-badges">
                     <span class="badge">conf ${(f.confidence || 0).toFixed(2)}</span>
-                    ${f.novelty != null ? `<span class="badge">novelty ${(f.novelty).toFixed(1)}</span>` : ''}
+                    ${f.novelty != null ? `<span class="badge">novelty ${Number(f.novelty).toFixed(1)}</span>` : ''}
                 </div>
             </div>
-            <div class="finding-content">${escapeHtml((f.content || '').substring(0, 280))}${(f.content || '').length > 280 ? '...' : ''}</div>
-        </div>
-    `).join('');
+            <div class="finding-content">${escapeHtml(content)}${(f.content || '').length > 600 ? '...' : ''}</div>
+        </div>`;
+    }).join('');
+
     document.getElementById('results').style.display = 'block';
+    switchTab('paper');
 }
 
 function escapeHtml(str) {
@@ -782,16 +1254,18 @@ async def serve_dashboard():
 
 @app.post(f"{BASE_PATH}/research")
 async def research_endpoint(request: ResearchRequest):
+    if not request.query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
     try:
-        orchestrator = ResearchOrchestrator(max_iterations=min(request.max_iterations, 3))
-        result = await orchestrator.research(request.query)
+        orchestrator = ResearchOrchestrator(max_iterations=min(request.max_iterations, 2))
+        result = await orchestrator.research(request.query.strip())
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get(f"{BASE_PATH}/health")
 async def health():
-    return {"status": "ok", "version": "deepseek-v2"}
+    return {"status": "ok", "version": "2.0.0-real", "llm": "active"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8001))
