@@ -520,7 +520,7 @@ class StubbedSpecialistConnector:
 # ============================================================
 
 async def call_llm(prompt: str, system_prompt: str = "",
-                   max_tokens: int = 1500, model: str = "gpt-5-mini") -> str:
+                   max_tokens: int = 800, model: str = "gpt-5-mini") -> str:
     """LLM caller using Replit AI Integrations (OpenAI-compatible).
     CRIA v4 frame-critical research instrument."""
     client = get_openai_client()
@@ -838,7 +838,7 @@ class C4_Philosophical(BaseChannel):
             f"that explains the question's persistence?"
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=1000)
 
         return Finding(
             content=analysis,
@@ -904,7 +904,7 @@ class C5_Critical(BaseChannel):
             f"rejected — say so plainly."
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=1000)
 
         refusal_keywords = ["refusal", "reject the premise", "should not be answered",
                             "question itself", "premise is wrong"]
@@ -976,7 +976,7 @@ class C6_Civilisational(BaseChannel):
             f"What is the post-AI meaning dimension of this question?"
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=1000)
 
         return Finding(
             content=analysis,
@@ -1031,7 +1031,7 @@ class C7_CrossCultural(BaseChannel):
             f"traditions; do not flatten them."
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=1000)
 
         refusal_flagged = "refus" in analysis.lower() or "reject" in analysis.lower()
 
@@ -1093,7 +1093,7 @@ class C8_Computational(BaseChannel):
             f"approaches reveal that empirical or qualitative methods miss?"
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=1000)
 
         return Finding(
             content=analysis,
@@ -1148,7 +1148,7 @@ class C9_Adversarial(BaseChannel):
             f"falsification challenge you can construct."
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=1000)
 
         return Finding(
             content=analysis,
@@ -1206,7 +1206,7 @@ class C10_Wildcard(BaseChannel):
             f"which moves are happening."
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=1500)
+                                  max_tokens=800)
 
         slippability = {
             "boundary_types_explored": ["cross_domain_analogy",
@@ -1285,7 +1285,7 @@ class AcademicMetagent:
         )
 
         reading = await call_llm(prompt, system_prompt=academic_system,
-                                 max_tokens=2500)
+                                 max_tokens=1200)
 
         return {
             "stream": "academic",
@@ -1342,7 +1342,7 @@ class ExperimentalMetagent:
         )
 
         reading = await call_llm(prompt, system_prompt=experimental_system,
-                                 max_tokens=2500)
+                                 max_tokens=1200)
 
         return {
             "stream": "experimental",
@@ -1400,7 +1400,7 @@ class StrangeLoopValidator:
         )
 
         validation = await call_llm(prompt, system_prompt=validation_system,
-                                    max_tokens=1500)
+                                    max_tokens=800)
 
         return {
             "strange_loop_check": "passed" if not godel_flagged else "flagged",
@@ -1552,7 +1552,7 @@ class MetaCognitiveLayer:
         )
 
         analysis = await call_llm(prompt, system_prompt=meta_system,
-                                  max_tokens=1500)
+                                  max_tokens=800)
 
         finding = Finding(
             content=analysis,
@@ -1765,7 +1765,7 @@ class ComparisonLayer:
         )
 
         comparison = await call_llm(prompt, system_prompt=comparison_system,
-                                    max_tokens=2500)
+                                    max_tokens=1200)
 
         return {
             "comparison": comparison,
@@ -1814,24 +1814,32 @@ class CRIAv4Orchestrator:
 
         all_findings = self.context["previous_findings"]
 
-        academic_reading = await self.academic_metagent.read(all_findings, artefact)
-        experimental_reading = await self.experimental_metagent.read(all_findings, artefact)
-
-        validation = await self.strange_loop_validator.validate(
-            all_findings, academic_reading, experimental_reading
+        # Run both metagent streams concurrently
+        academic_reading, experimental_reading = await asyncio.gather(
+            self.academic_metagent.read(all_findings, artefact),
+            self.experimental_metagent.read(all_findings, artefact),
         )
 
-        meta_cognitive_findings: List[Finding] = []
+        # Hofstadter validation and layer 3 strategy selection concurrently
         selected_strategies = self.meta_cognitive.select_strategies(
             self.context, budget=3
         )
-        for strategy in selected_strategies:
-            mc_finding = await self.meta_cognitive.execute_strategy(
-                strategy, all_findings, academic_reading,
-                experimental_reading, artefact
-            )
+        validation, *mc_results = await asyncio.gather(
+            self.strange_loop_validator.validate(
+                all_findings, academic_reading, experimental_reading
+            ),
+            *[
+                self.meta_cognitive.execute_strategy(
+                    strategy, all_findings, academic_reading,
+                    experimental_reading, artefact
+                )
+                for strategy in selected_strategies
+            ],
+        )
+
+        meta_cognitive_findings: List[Finding] = list(mc_results)
+        for strategy, mc_finding in zip(selected_strategies, meta_cognitive_findings):
             self.meta_cognitive.evaluate_outcome(strategy, mc_finding, validation)
-            meta_cognitive_findings.append(mc_finding)
 
         if meta_cognitive_findings:
             avg_outcome = sum(

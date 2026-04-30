@@ -68,7 +68,7 @@ async function callEngine(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(300_000),
+      signal: AbortSignal.timeout(480_000),
     });
     if (!resp.ok) {
       const text = await resp.text();
