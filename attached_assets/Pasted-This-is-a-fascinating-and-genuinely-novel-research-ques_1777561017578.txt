@@ -1,0 +1,181 @@
+This is a fascinating and genuinely novel research question that sits at the intersection of neurodiversity, anthropology, and sensory science. Your tool is perfectly designed for this.
+
+I will provide you with a complete experimental protocol that you can run using the Multi-Agent Research Tool we just built.
+
+---
+
+Experiment: Unrecognized Connections Between Autistic Stimming and Shamanic Rhythms/Frequencies
+
+Research Question (Formal)
+
+"Is there a measurable or phenomenological relationship between autistic repetitive behaviors (stimming), particularly rhythmic self-regulation, and the rhythmic/frequency-based techniques used in shamanic practice (drumming, chanting, trance induction) that has been unrecognized in existing cross-cultural literature?"
+
+Central Hypothesis
+
+Autistic individuals who engage in rhythmic stimming may share sensory processing patterns that are also induced by shamanic rhythmic techniques (e.g., 4-7 Hz theta-frequency drumming). What has been labeled "shamanic trance" phenomenologically may overlap with autistic sensory regulation, potentially explaining historical observations of autistic traits in shamans across cultures.
+
+---
+
+Experiment Protocol
+
+Phase 1: Baseline Literature Sweep
+
+Run this query in the tool first:
+
+"Cross-cultural studies of shamans and autism prevalence. What is the evidence for autistic traits among traditional healers and shamans across different cultures?"
+
+Expected output: Confirmation of literature suggesting shamans show elevated autistic traits (systemizing, sensory sensitivity, pattern recognition, altered states).
+
+---
+
+Phase 2: Core Research Query
+
+Run this as your main experiment:
+
+"Investigate unrecognized connections between autistic stimming rhythms and shamanic trance-inducing frequencies. Analyze:
+
+1. The frequency ranges used in shamanic drumming (typical BPM/hz ranges across cultures: Siberian, Sami, South American, African)
+2. The rhythm and repetition patterns reported by autistic individuals during stimming (self-report, observational studies)
+3. Neurophysiological correlates of both: brain wave entrainment (EEG/theta/delta) during rhythmic stimulation
+4. Overlap in reported phenomenological experience (flow states, sensory absorption, reduced self-other boundary)
+5. Cross-cultural cases where shamans were described as 'odd,' 'sensory sensitive,' or 'repetitive' in ways consistent with autism
+
+Identify emergent patterns, gaps, and novel hypotheses that suggest a hidden relationship."
+
+---
+
+Phase 3: Agent Configuration for This Experiment
+
+Based on your query, the tool should activate:
+
+Channel Role in This Experiment
+Channel 1 (Scoping) Define boundaries: exclude non-rhythmic shamanic practices; include only stimming involving repetition/rhythm
+Channel 2 (Evidence) Search anthropology, neuroscience, autism journals, ethnomusicology
+Channel 3 (Contradiction) Flag studies that deny shamanic trance has any sensory/physical basis
+Channel 4 (Synthesis) Build bridge between autism sensory research and shamanic studies
+Channel 5 (Causal) Test causal pathways: rhythmic entrainment → altered consciousness → perceived spiritual experience
+Channel 6 (Critic) Challenge: Is this just medicalizing spiritual experience? Is correlation causal?
+Channel 7 (Serendipity) Find wild connections: e.g., drumming used in autism therapy; Tibetan singing bowls; monotropic cognition
+Channel 9 (Cultural) Essential: Compare how autism is conceptualized in cultures where shamanism is practiced vs. WEIRD cultures
+Meta-Layer Watch for hidden patterns across all findings that no single channel sees
+
+---
+
+Phase 4: Specific Data Points Your Agents Should Extract
+
+Category Specific Search Terms
+Shamanic frequencies "shamanic drumming frequency," "theta rhythm shaman," "shamanic trance BPM" (typical: 3-7 Hz, 180-210 BPM)
+Autistic stimming rhythms "stimming rhythm frequency," "autism repetitive behavior pattern," "sensory regulation stimming"
+Neurophysiology "auditory driving theta," "rhythmic entrainment autism," "sensory over-responsivity shamanic trance"
+Phenomenology "flow state autism," "monotropic absorption," "shamanic journey phenomenology"
+Cross-cultural cases "shaman autism traits cross-cultural," "autistic shamans," "shamanic altered states sensory processing"
+
+---
+
+Phase 5: Expected Output Structure
+
+Your final paper should include:
+
+Abstract
+A synthesized claim: "Autistic rhythmic stimming and shamanic trance-inducing rhythms may share common neurophysiological mechanisms (theta entrainment, sensory absorption), suggesting that historical observations of autistic traits among shamans reflect genuine sensory processing overlaps, not coincidence."
+
+Key Findings (Example)
+
+Finding Confidence Novelty
+Shamanic drumming across cultures consistently falls in 3-7 Hz range (theta band) High Medium
+Autistic stimming involves repetitive rhythmic behavior that may self-induce similar brain states Medium High
+Cross-cultural literature contains multiple cases where shamans exhibited autistic traits Medium High
+No existing study directly compares shamanic trance induction with autistic stimming neurophysiology High Very High (gap)
+
+Contradictions to Flag
+
+· Some shamanic traditions emphasize non-rhythmic methods (e.g., plant medicine alone)
+· Autism is culturally constructed differently; some cultures may not recognize "stimming" as distinct
+
+Serendipity Discovery (potential)
+
+· Drumming is already used therapeutically for autism (emerging evidence)
+· Tibetan Buddhist chanting (monotone, repetitive) produces similar entrainment
+· The "flow state" in autism research may be identical to "shamanic journey" phenomenologically
+
+Limitations
+
+· Small sample sizes in shamanic neurophysiology studies
+· Autism research historically excludes spiritual/trance experiences
+· Cultural differences in describing both phenomena
+
+---
+
+Phase 6: Validation Test
+
+After running the tool, manually verify one specific claim:
+
+"Is there peer-reviewed evidence that shamanic drumming consistently falls within theta range (4-8 Hz)?"
+
+Search PubMed or Google Scholar yourself for:
+
+· "shamanic drumming EEG theta"
+· "acoustic driving shamanic trance"
+
+If the tool found this correctly, its evidence channel is working.
+
+---
+
+Phase 7: Next Iteration (If Findings Are Promising)
+
+Refine query to:
+
+"Compare neurophysiological studies of autistic rhythmic stimming (EEG during self-regulated repetitive behavior) with studies of shamanic drumming entrainment. Map overlapping neural signatures: theta power, default mode network deactivation, sensory gating. Propose a unified hypothesis for why both produce altered states."
+
+---
+
+Expected Breakthrough Potential
+
+Dimension Score (1-5) Reasoning
+Novelty 5 No existing direct link between stimming and shamanic rhythms
+Cross-disciplinary 5 Autism research + ethnomusicology + anthropology + neuroscience
+Practical implication 4 Could inform sensory therapies, destigmatize stimming
+Controversy 4 May provoke pushback from both medical AND spiritual communities
+Testability 3 Requires EEG studies directly comparing both groups
+
+---
+
+Running the Experiment
+
+To execute this in your tool:
+
+1. Start the server (python run.py on your computer, or click Run on Replit)
+2. Open the dashboard at http://localhost:8000
+3. Enter the Phase 2 query from above
+4. Set iterations to 3 (allows meta-layer to deepen)
+5. Click Start Research
+6. Review the output for:
+   · Real papers from Semantic Scholar/OpenAlex/PubMed on shamanic drumming frequencies
+   · Any links the meta-layer found between stimming and trance
+   · Gaps the contradiction channel identified
+
+---
+
+What Success Looks Like
+
+The tool will have succeeded if it produces:
+
+· At least 5 relevant academic sources on shamanic drumming frequencies
+· At least 3 sources on autistic stimming patterns
+· At least one meta-layer connection between the two domains
+· A contradiction or two that forces refinement of your hypothesis
+· A serendipity finding (e.g., connection to Tibetan chanting or flow state research)
+
+---
+
+What to Do After the First Run
+
+Outcome Action
+Strong connections found Run second iteration with refined query focusing on EEG studies
+Weak/no evidence Widen search terms; check if databases have relevant anthropology journals
+Contradictions dominate Run critic channel separately to test if hypothesis is falsifiable
+Serendipity hit Pursue that unexpected connection as a new research direction
+
+---
+
+Would you like me to provide a prompt template for manually searching specific databases if the tool's automated search returns limited results? Or shall we run a simulated version of this experiment here so you can see what the output might look like before deploying?
