@@ -519,8 +519,8 @@ class SemanticScholarAPI:
         self.headers = {"x-api-key": api_key} if api_key else {}
 
     async def search(self, query: str, limit: int = 8) -> List[Dict]:
-        async with httpx.AsyncClient() as client:
-            try:
+        try:
+            async with httpx.AsyncClient() as client:
                 response = await client.get(
                     "https://api.semanticscholar.org/graph/v1/paper/search",
                     params={"query": query, "limit": limit,
@@ -533,9 +533,11 @@ class SemanticScholarAPI:
                     p["source"] = "Semantic Scholar"
                     results.append(p)
                 return results
-            except Exception as e:
-                print(f"Semantic Scholar error: {e}")
-                return []
+        except BaseException as e:
+            if isinstance(e, (KeyboardInterrupt, SystemExit)):
+                raise
+            print(f"Semantic Scholar error: {e}")
+            return []
 
 
 class OpenAlexAPI:
@@ -544,8 +546,8 @@ class OpenAlexAPI:
         self.headers = {"User-Agent": f"CRIA/1.0 (mailto:{email})"} if email else {}
 
     async def search(self, query: str, limit: int = 8) -> List[Dict]:
-        async with httpx.AsyncClient() as client:
-            try:
+        try:
+            async with httpx.AsyncClient() as client:
                 response = await client.get(
                     "https://api.openalex.org/works",
                     params={"search": query, "per-page": limit,
@@ -566,9 +568,11 @@ class OpenAlexAPI:
                         "source": "OpenAlex",
                     })
                 return results
-            except Exception as e:
-                print(f"OpenAlex error: {e}")
-                return []
+        except BaseException as e:
+            if isinstance(e, (KeyboardInterrupt, SystemExit)):
+                raise
+            print(f"OpenAlex error: {e}")
+            return []
 
 
 class CrossrefAPI:
@@ -711,22 +715,24 @@ _llm_semaphore: asyncio.Semaphore | None = None
 def get_llm_semaphore() -> asyncio.Semaphore:
     global _llm_semaphore
     if _llm_semaphore is None:
-        _llm_semaphore = asyncio.Semaphore(5)
+        _llm_semaphore = asyncio.Semaphore(10)
     return _llm_semaphore
 
 
 def get_openai_client():
     global _openai_client
     if _openai_client is None:
+        import httpx as _httpx
         _openai_client = AsyncOpenAI(
             api_key=os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "replit"),
             base_url=os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "http://localhost/v1"),
+            timeout=_httpx.Timeout(timeout=120.0, connect=10.0),
         )
     return _openai_client
 
 
 async def call_llm(prompt: str, system_prompt: str = "",
-                   max_tokens: int = 800, retries: int = 2) -> str:
+                   max_tokens: int = 4000, retries: int = 2) -> str:
     client = get_openai_client()
     sem = get_llm_semaphore()
     default_system = (
@@ -744,17 +750,19 @@ async def call_llm(prompt: str, system_prompt: str = "",
         async with sem:
             try:
                 response = await client.chat.completions.create(
-                    model="gpt-5-mini",
+                    model="gpt-5.1",
                     max_completion_tokens=max_tokens,
                     messages=messages,
                 )
                 text = response.choices[0].message.content or ""
                 if text:
                     return text
-                # Empty response — retry if attempts remain
+                # Unexpected empty response — retry in case of transient issue
                 last_err = "empty response"
-            except Exception as e:
+            except BaseException as e:
                 last_err = f"{type(e).__name__}: {str(e)[:200]}"
+                if isinstance(e, (KeyboardInterrupt, SystemExit)):
+                    raise
         if attempt < retries:
             await asyncio.sleep(2 ** attempt)  # 1s, 2s backoff
     return f"[LLM error after {retries + 1} attempts: {last_err}]"
@@ -1308,7 +1316,7 @@ class EpiC4_Philosophical(BaseChannel):
             f"second-order cybernetics or phenomenology complicate it?"
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=4000)
         return Finding(
             content=analysis, source_channel=self.name,
             confidence=0.70,
@@ -1343,7 +1351,7 @@ class EpiC5_Critical(BaseChannel):
             f"current framing serve? If REFUSAL is appropriate, say so plainly."
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=4000)
         refusal_keywords = ["refusal", "reject the premise",
                             "should not be answered", "premise is wrong"]
         refusal_flagged = any(kw in analysis.lower() for kw in refusal_keywords)
@@ -1384,7 +1392,7 @@ class EpiC6_Civilisational(BaseChannel):
             f"What patterns at long timescales matter?"
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=4000)
         return Finding(
             content=analysis, source_channel=self.name,
             confidence=0.65,
@@ -1422,7 +1430,7 @@ class EpiC7_CrossCultural(BaseChannel):
             f"or refuse the question entirely?"
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=4000)
         refusal_flagged = ("refus" in analysis.lower() or "reject" in analysis.lower())
         return Finding(
             content=analysis, source_channel=self.name,
@@ -1462,7 +1470,7 @@ class EpiC8_Computational(BaseChannel):
             f"Model assumptions? Atlan/Schelling-style emergence?"
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=4000)
         return Finding(
             content=analysis, source_channel=self.name,
             confidence=0.65,
@@ -1501,7 +1509,7 @@ class EpiC9_Adversarial(BaseChannel):
             f"What would have to be true for emerging consensus to be wrong?"
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=2000)
+                                  max_tokens=4000)
         return Finding(
             content=analysis, source_channel=self.name,
             confidence=0.70,
@@ -1537,7 +1545,7 @@ class EpiC10_Wildcard(BaseChannel):
             f"identify which conceptual boundary was broken (SLIPPABILITY)."
         )
         analysis = await call_llm(prompt, system_prompt=self._system_prompt(),
-                                  max_tokens=1500)
+                                  max_tokens=4000)
         slippability = {"boundary_types_explored": ["cross_domain",
                                                      "wrong_assumption",
                                                      "grammatical_violation"]}
@@ -1732,7 +1740,7 @@ class CognitiveHofstadterValidator:
             "You apply Hofstadter discipline to evidence-aggregation output. "
             "Catch recursion that looks profound but says nothing. Be ruthless "
             "about the Eliza Effect in pseudo-convergence."
-        ), max_tokens=1500)
+        ), max_tokens=4000)
         return {
             "strange_loop_check": "passed" if not godel_flag else "flagged",
             "godel_gap_detected": godel_flag,
@@ -1782,7 +1790,7 @@ class AcademicMetagent:
             "synthesis with formal apparatus. Convergence requires "
             "falsification or downgrade. Sovereign sources never aggregated. "
             "Refusal first-class."
-        ), max_tokens=2500)
+        ), max_tokens=4000)
         return {"stream": "academic", "reading": reading,
                 "position_counts": position_counts, "refusal_count": len(refusals)}
 
@@ -1814,7 +1822,7 @@ class ExperimentalMetagent:
             "Atlan, von Foerster, Maturana-Varela, Bateson, Hofstadter, Eco, "
             "Peirce, Schelling. Speculative, marked clearly. Hofstadter "
             "discipline: reflexivity must produce concrete change."
-        ), max_tokens=2500)
+        ), max_tokens=4000)
         return {"stream": "experimental", "reading": reading}
 
 
@@ -1849,7 +1857,7 @@ class EpistemicHofstadterValidator:
         validation = await call_llm(prompt, system_prompt=(
             "You apply Hofstadter strange-loop discipline. Catch recursion "
             "that looks profound but says nothing. Ruthless about Eliza Effect."
-        ), max_tokens=1500)
+        ), max_tokens=4000)
         return {
             "strange_loop_check": "passed" if not godel_flag else "flagged",
             "godel_gap_detected": godel_flag,
@@ -1929,7 +1937,7 @@ class EpistemicLayer3:
             "You are CRIA-Epistemic Layer 3. Longitudinal learning about "
             "which frame-critical strategies earn their keep. Be ruthlessly "
             "honest. Don't produce content for content's sake."
-        ), max_tokens=1500)
+        ), max_tokens=4000)
         historical = self.strategy_performance.get(strategy, [0.5])
         confidence = 0.5 + (sum(historical) / len(historical) * 0.3)
         finding = Finding(
@@ -2064,7 +2072,7 @@ class ConvC1_ConvergenceTopology(ConvergentChannel):
         response = await call_llm(prompt, system_prompt=(
             "You are CRIA-Convergent's convergence topology channel. "
             "Identify cross-architectural convergence with specificity."
-        ), max_tokens=1800)
+        ), max_tokens=4000)
         return Finding(
             content=response, source_channel=self.name, confidence=0.75,
             evidence=["Cross-pipeline convergence"],
@@ -2096,7 +2104,7 @@ class ConvC2_DivergenceAnatomy(ConvergentChannel):
         response = await call_llm(prompt, system_prompt=(
             "You are CRIA-Convergent's divergence anatomy channel. "
             "Disagreement is data. Diagnose with precision."
-        ), max_tokens=1800)
+        ), max_tokens=4000)
         return Finding(
             content=response, source_channel=self.name, confidence=0.70,
             evidence=["Divergence diagnosis"],
@@ -2129,7 +2137,7 @@ class ConvC3_AbsenceMapping(ConvergentChannel):
         response = await call_llm(prompt, system_prompt=(
             "You are CRIA-Convergent's absence mapping channel. Find "
             "what both architectures cannot see. Specificity over generality."
-        ), max_tokens=1800)
+        ), max_tokens=4000)
         return Finding(
             content=response, source_channel=self.name, confidence=0.60,
             evidence=["Cross-pipeline absence detection"],
@@ -2166,7 +2174,7 @@ class ConvC4_FrameCollision(ConvergentChannel):
             "You are CRIA-Convergent's frame collision channel. Identify "
             "ontological assumptions invisible from inside either architecture "
             "but visible at their meeting point."
-        ), max_tokens=1800)
+        ), max_tokens=4000)
         return Finding(
             content=response, source_channel=self.name, confidence=0.65,
             evidence=["Frame collision analysis"],
@@ -2215,7 +2223,7 @@ class ConvC5_EvidenceEcologyComparison(ConvergentChannel):
         response = await call_llm(prompt, system_prompt=(
             "You are CRIA-Convergent's evidence ecology channel. The shape "
             "of what each pipeline can see is itself an epistemic finding."
-        ), max_tokens=1800)
+        ), max_tokens=4000)
         return Finding(
             content=response, source_channel=self.name, confidence=0.65,
             evidence=["Evidence ecology comparison"],
@@ -2285,7 +2293,7 @@ class ConvergentLayer3:
         response = await call_llm(prompt, system_prompt=(
             "You are CRIA-Convergent Layer 3. Find patterns invisible to "
             "either pipeline alone, visible only in comparison. Specificity."
-        ), max_tokens=1500)
+        ), max_tokens=4000)
         historical = self.strategy_performance.get(strategy, [0.5])
         confidence = 0.5 + (sum(historical) / len(historical) * 0.3)
         finding = Finding(
@@ -2378,7 +2386,7 @@ class ThreeVoiceRenderer:
             "You render findings in academic voice for peer-reviewed publication. "
             "Formal rigor, evidence-tier transparency, position-privilege accounting. "
             "Do not invent citations."
-        ), max_tokens=3000)
+        ), max_tokens=4000)
         return {"text": text, "audience": "Peer-reviewed scholarly community"}
 
     async def _render_editorial(self, cog, epi, conv, artefact):
@@ -2406,7 +2414,7 @@ class ThreeVoiceRenderer:
             "and educated general readers. Cool, contemporary, journalistic. "
             "Maintain rigor; drop apparatus. Help specialists in one field "
             "understand findings from another."
-        ), max_tokens=3000)
+        ), max_tokens=4000)
         return {"text": text, "audience": "Trade publications, quality magazines, podcasts, social media"}
 
     async def _render_practitioner(self, cog, epi, conv, artefact):
@@ -2435,7 +2443,7 @@ class ThreeVoiceRenderer:
             "You render findings in practitioner voice for clinicians, policy "
             "makers, community organisers, consultants. Actionable specificity. "
             "Confidence calibrated. Surface what would otherwise stay implicit."
-        ), max_tokens=3000)
+        ), max_tokens=4000)
         return {"text": text, "audience": "Clinicians, policy makers, community organisers, practitioners"}
 
 
@@ -2645,41 +2653,63 @@ class UnifiedOrchestrator:
             self.context["iteration"] = iteration + 1
             cog_tasks = [ch.research(artefact, self.context) for ch in self.cog_channels]
             epi_tasks = [ch.research(artefact, self.context) for ch in self.epi_channels]
-            results = await asyncio.gather(*cog_tasks, *epi_tasks)
-            self.context["previous_findings"] = list(results)
+            raw = await asyncio.gather(*cog_tasks, *epi_tasks, return_exceptions=True)
+            results = [r for r in raw if isinstance(r, Finding)]
+            self.context["previous_findings"] = results
 
         all_findings = self.context["previous_findings"]
         cog_findings = [f for f in all_findings if f.pipeline == Pipeline.COGNITIVE]
         epi_findings = [f for f in all_findings if f.pipeline == Pipeline.EPISTEMIC]
 
-        # Cognitive pipeline meta-layers
-        cog_meta_findings = await self.cog_meta.process(cog_findings, artefact)
-        cog_l3_strategies = self.cog_layer3.select_strategies(self.context, budget=3)
-        cog_l3_findings = []
-        for s in cog_l3_strategies:
-            f = await self.cog_layer3.execute_strategy(s, cog_meta_findings, artefact)
-            self.cog_layer3.evaluate(s, f)
-            cog_l3_findings.append(f)
-        cog_hofstadter_validation = await self.cog_hofstadter.validate(
-            cog_findings, cog_meta_findings, cog_l3_findings, artefact
-        )
+        # Cognitive and Epistemic meta-pipelines run in parallel
+        async def _run_cog_meta() -> tuple:
+            cog_meta = await self.cog_meta.process(cog_findings, artefact)
+            l3_strats = self.cog_layer3.select_strategies(self.context, budget=3)
+            l3_raw = await asyncio.gather(
+                *[self.cog_layer3.execute_strategy(s, cog_meta, artefact) for s in l3_strats],
+                return_exceptions=True,
+            )
+            l3_findings = [f for f in l3_raw if isinstance(f, Finding)]
+            for s, f in zip(l3_strats, l3_raw):
+                if isinstance(f, Finding):
+                    self.cog_layer3.evaluate(s, f)
+            hofstadter = await self.cog_hofstadter.validate(
+                cog_findings, cog_meta, l3_findings, artefact
+            )
+            return cog_meta, l3_findings, hofstadter
 
-        # Epistemic pipeline meta-layers
-        epi_academic, epi_experimental = await asyncio.gather(
-            self.epi_academic.read(epi_findings, artefact),
-            self.epi_experimental.read(epi_findings, artefact),
-        )
-        epi_hofstadter_validation = await self.epi_hofstadter.validate(
-            epi_findings, epi_academic, epi_experimental
-        )
-        epi_l3_strategies = self.epi_layer3.select_strategies(self.context, budget=3)
-        epi_l3_findings = []
-        for s in epi_l3_strategies:
-            f = await self.epi_layer3.execute_strategy(s, epi_findings,
-                                                        epi_academic, epi_experimental,
-                                                        artefact)
-            self.epi_layer3.evaluate(s, f, epi_hofstadter_validation)
-            epi_l3_findings.append(f)
+        async def _run_epi_meta() -> tuple:
+            epi_streams = await asyncio.gather(
+                self.epi_academic.read(epi_findings, artefact),
+                self.epi_experimental.read(epi_findings, artefact),
+                return_exceptions=True,
+            )
+            epi_acad = epi_streams[0] if not isinstance(epi_streams[0], BaseException) else {}
+            epi_exp = epi_streams[1] if not isinstance(epi_streams[1], BaseException) else {}
+            hofstadter = await self.epi_hofstadter.validate(epi_findings, epi_acad, epi_exp)
+            l3_strats = self.epi_layer3.select_strategies(self.context, budget=3)
+            l3_raw = await asyncio.gather(
+                *[self.epi_layer3.execute_strategy(s, epi_findings, epi_acad, epi_exp, artefact)
+                  for s in l3_strats],
+                return_exceptions=True,
+            )
+            l3_findings = [f for f in l3_raw if isinstance(f, Finding)]
+            for s, f in zip(l3_strats, l3_raw):
+                if isinstance(f, Finding):
+                    self.epi_layer3.evaluate(s, f, hofstadter)
+            return epi_acad, epi_exp, hofstadter, l3_findings
+
+        meta_results = await asyncio.gather(_run_cog_meta(), _run_epi_meta(), return_exceptions=True)
+
+        if isinstance(meta_results[0], BaseException):
+            cog_meta_findings, cog_l3_findings, cog_hofstadter_validation = [], [], {}
+        else:
+            cog_meta_findings, cog_l3_findings, cog_hofstadter_validation = meta_results[0]
+
+        if isinstance(meta_results[1], BaseException):
+            epi_academic, epi_experimental, epi_hofstadter_validation, epi_l3_findings = {}, {}, {}, []
+        else:
+            epi_academic, epi_experimental, epi_hofstadter_validation, epi_l3_findings = meta_results[1]
 
         # Convergent pipeline (after both pipelines complete)
         all_cog = cog_findings + cog_meta_findings + cog_l3_findings
@@ -2689,16 +2719,20 @@ class UnifiedOrchestrator:
         conv_tasks = [ch.analyse(all_cog, all_epi, cog_meta_summary,
                                   epi_academic, epi_experimental, artefact)
                       for ch in self.conv_channels]
-        conv_findings = await asyncio.gather(*conv_tasks)
+        conv_raw = await asyncio.gather(*conv_tasks, return_exceptions=True)
+        conv_findings = [r for r in conv_raw if isinstance(r, Finding)]
 
-        # Convergent Layer 3
+        # Convergent Layer 3 — run strategies in parallel
         conv_l3_strategies = self.conv_layer3.select_strategies(self.context, budget=2)
-        conv_l3_findings = []
-        for s in conv_l3_strategies:
-            f = await self.conv_layer3.execute_strategy(s, all_cog, all_epi,
-                                                         list(conv_findings), artefact)
-            self.conv_layer3.evaluate(s, f)
-            conv_l3_findings.append(f)
+        conv_l3_raw = await asyncio.gather(
+            *[self.conv_layer3.execute_strategy(s, all_cog, all_epi, list(conv_findings), artefact)
+              for s in conv_l3_strategies],
+            return_exceptions=True,
+        )
+        conv_l3_findings = [f for f in conv_l3_raw if isinstance(f, Finding)]
+        for s, f in zip(conv_l3_strategies, conv_l3_raw):
+            if isinstance(f, Finding):
+                self.conv_layer3.evaluate(s, f)
         all_conv = list(conv_findings) + conv_l3_findings
 
         # Three-voice rendering
@@ -2785,9 +2819,10 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
         result = await orchestrator.research(artefact)
         _research_jobs[job_id]["status"] = "complete"
         _research_jobs[job_id]["result"] = result
-    except Exception as e:
+    except BaseException as e:
         _research_jobs[job_id]["status"] = "failed"
-        _research_jobs[job_id]["error"] = str(e)
+        err_type = type(e).__name__
+        _research_jobs[job_id]["error"] = f"{err_type}: {e}" if str(e) else err_type
 
 
 @app.post(f"{BASE_PATH}/research")

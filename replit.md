@@ -157,7 +157,8 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 **File**: `artifacts/cria-unified/main.py` (adapted from `cria_unified.py` in ZIP)
 **Blueprint**: `docs/CRIA_MASTER_BLUEPRINT.md`
 **Author**: Dr Barry Ferrier with Claude (Anthropic), 30 April 2026
-**LLM**: Replit AI Integrations (OpenAI-compatible, `gpt-5-mini` via `AI_INTEGRATIONS_OPENAI_*`)
+**LLM**: Replit AI Integrations (OpenAI-compatible, `gpt-5.1` via `AI_INTEGRATIONS_OPENAI_*`)
+**Runtime**: ~4-5 minutes per research run (3 pipelines × 10 channels + meta/L3/voices)
 
 ### What it does
 
@@ -235,6 +236,15 @@ The `POST /cria-unified/research` → `GET /cria-unified/research/{job_id}` resu
 }
 ```
 `Finding.to_dict()` uses short keys: `source` (not `source_channel`), `tier` (not `evidence_tier`), `position` (not `position_privileged`), `refusal` (not `refusal_signal`), `id` (not `finding_id`).
+
+### Critical Bug Fixes (May 2026)
+- **`asyncio.gather` must have `return_exceptions=True`** — without it, a single channel failure kills the entire job. Applied to all three gather calls in `UnifiedOrchestrator.research()`.
+- **`_run_research_job` catches `BaseException`** (not just `Exception`) — ensures `CancelledError`/`TimeoutError` mark the job as "failed" rather than silently crashing.
+- **`call_llm` catches `BaseException`** (re-raises only `KeyboardInterrupt`/`SystemExit`) — prevents `CancelledError` escaping the LLM retry loop.
+- **Model: `gpt-5.1`** — reasoning models (`gpt-5-mini`, `gpt-5-nano`) consume all tokens internally for reasoning; they produce empty content. `gpt-5.1` is a non-reasoning model that produces real output in ~14s for complex prompts.
+- **Parallelism in meta-layers**: Cognitive and Epistemic meta-pipelines now run concurrently; all Layer3 strategies within each pipeline run concurrently via `asyncio.gather`. This reduced runtime from 7.6 min to 4.5 min.
+- **LLM semaphore**: 10 concurrent calls. Timeout: 120s. Max completion tokens: 4000.
+- **api-server**: `maxWaitMs=900_000` (15 min) for `callEnginePolling` — sufficient for 4-5 min jobs.
 
 ### Important Notes for Future Builds
 - Do NOT rename channel IDs (CogC1–C10, EpiC1–C10, ConvC1–C5) — referenced throughout metagent prompts, Layer 3, and publication guidance logic
