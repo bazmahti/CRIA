@@ -174,6 +174,7 @@ function PipelinePanel({
 }: { label: string; pipelineKey: "cognitive" | "epistemic" | "convergent"; result: Record<string, unknown> | null }) {
   const [voice, setVoice] = useState<VoiceTab>("academic");
   const [showFindings, setShowFindings] = useState(false);
+  const [showSynthesisVoices, setShowSynthesisVoices] = useState(false);
 
   if (!result) return (
     <div className="text-sm text-muted-foreground italic py-12 text-center">
@@ -181,15 +182,20 @@ function PipelinePanel({
     </div>
   );
 
-  // Python returns cognitive_pipeline / epistemic_pipeline / convergent_pipeline
-  const pipeline = (result[`${pipelineKey}_pipeline`] ?? result[pipelineKey] ?? {}) as Record<string, unknown>;
-  // voices = { academic: {text, audience}, editorial: {text, audience}, practitioner: {text, audience} }
+  // Pipeline-specific paper (the primary content — distinct per pipeline)
+  const pipelinePapers = (result["pipeline_papers"] ?? {}) as Record<string, unknown>;
+  const paperObj = (pipelinePapers[pipelineKey] ?? {}) as Record<string, unknown>;
+  const paperText = typeof paperObj["text"] === "string" ? paperObj["text"] : "";
+  const paperAudience = typeof paperObj["audience"] === "string" ? paperObj["audience"] : "";
+
+  // Combined synthesis voices (secondary — audience renderings of all pipelines together)
   const voicesRaw = (result["voices"] ?? {}) as Record<string, unknown>;
   const voiceObj = (voicesRaw[voice] ?? {}) as Record<string, unknown>;
-  // extract text from nested object or fall back to string
   const voiceContent = typeof voiceObj["text"] === "string" ? voiceObj["text"]
     : typeof voicesRaw[voice] === "string" ? str(voicesRaw[voice]) : "";
-  // All findings across layers
+
+  // Per-pipeline findings for the channel inspector
+  const pipeline = (result[`${pipelineKey}_pipeline`] ?? result[pipelineKey] ?? {}) as Record<string, unknown>;
   const findings = [
     ...arr(pipeline["findings"]),
     ...arr(pipeline["meta_findings"]),
@@ -209,12 +215,30 @@ function PipelinePanel({
     practitioner: <Briefcase className="w-3 h-3" />,
   };
 
+  const pipelineColor = pipelineKey === "cognitive" ? "text-blue-400 border-blue-500/20 bg-blue-500/5"
+    : pipelineKey === "epistemic" ? "text-violet-400 border-violet-500/20 bg-violet-500/5"
+    : "text-emerald-400 border-emerald-500/20 bg-emerald-500/5";
+
   return (
     <div className="space-y-4">
-      <Tabs tabs={voiceTabs} active={voice} onChange={(t) => setVoice(t)} icons={voiceIcons} />
-      <div className="bg-card/20 rounded-xl border border-border/30 p-4">
-        <VoicePanel content={voiceContent} />
-      </div>
+
+      {/* Primary: pipeline-specific paper */}
+      {paperText ? (
+        <div className="space-y-2">
+          {paperAudience && (
+            <div className={cn("text-[10px] px-3 py-1.5 rounded-lg border w-fit", pipelineColor)}>
+              For: {paperAudience}
+            </div>
+          )}
+          <div className="bg-card/20 rounded-xl border border-border/30 p-4">
+            <VoicePanel content={paperText} />
+          </div>
+        </div>
+      ) : (
+        <div className="text-sm text-muted-foreground italic py-8 text-center bg-card/20 rounded-xl border border-border/30">
+          {label} paper rendering in progress…
+        </div>
+      )}
 
       {hofstadter && (
         <details className="group">
@@ -252,7 +276,7 @@ function PipelinePanel({
         <details className="group">
           <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1.5 list-none">
             <Layers className="w-3 h-3 text-blue-400" />
-            Layer 3 — Meta-Cognitive Report
+            Layer 3 Report
             <ChevronDown className="w-3 h-3 ml-auto group-open:rotate-180 transition-transform" />
           </summary>
           <pre className="mt-2 text-[10px] font-mono text-muted-foreground bg-muted/20 rounded-lg p-3 overflow-x-auto">
@@ -260,6 +284,31 @@ function PipelinePanel({
           </pre>
         </details>
       )}
+
+      {/* Secondary: combined synthesis voices */}
+      <div>
+        <button
+          onClick={() => setShowSynthesisVoices(!showSynthesisVoices)}
+          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+        >
+          <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showSynthesisVoices && "rotate-180")} />
+          <FileText className="w-3 h-3" />
+          {showSynthesisVoices ? "Hide" : "Show"} synthesis voices (combined-pipeline audience renderings)
+        </button>
+        {showSynthesisVoices && (
+          <div className="mt-3 space-y-3">
+            <p className="text-[10px] text-muted-foreground px-1">
+              These three renderings draw from all three pipelines combined — they are audience-differentiated,
+              not pipeline-differentiated. The paper above this section is the pipeline-specific output.
+            </p>
+            <Tabs tabs={voiceTabs} active={voice} onChange={(t) => setVoice(t)} icons={voiceIcons} />
+            <div className="bg-card/20 rounded-xl border border-border/30 p-4">
+              <VoicePanel content={voiceContent} />
+            </div>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

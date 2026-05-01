@@ -2631,6 +2631,259 @@ class ThreeVoiceRenderer:
 
 
 # ============================================================
+# PIPELINE PAPER RENDERER
+# ============================================================
+
+class PipelinePaperRenderer:
+    """Renders three genuinely distinct papers, one per pipeline.
+
+    Each paper draws only from its own pipeline's findings and uses
+    that pipeline's distinctive epistemic framing and structural logic.
+    This is NOT a voice renderer — it is a pipeline-differentiating renderer.
+    """
+
+    async def render_all(self,
+                         cog_findings: List[Finding],
+                         epi_findings: List[Finding],
+                         conv_findings: List[Finding],
+                         epi_academic: Dict[str, Any],
+                         artefact: ResearchArtefact) -> Dict[str, Dict[str, str]]:
+        results = await asyncio.gather(
+            self._render_cognitive_paper(cog_findings, artefact),
+            self._render_epistemic_paper(epi_findings, epi_academic, artefact),
+            self._render_convergent_paper(cog_findings, epi_findings, conv_findings, artefact),
+            return_exceptions=True,
+        )
+        keys = ["cognitive", "epistemic", "convergent"]
+        output: Dict[str, Any] = {}
+        for k, r in zip(keys, results):
+            if isinstance(r, Exception):
+                output[k] = {"text": f"[Pipeline paper render error: {r}]", "audience": ""}
+            else:
+                output[k] = r
+        return output
+
+    async def _render_cognitive_paper(self, cog: List[Finding],
+                                       artefact: ResearchArtefact) -> Dict:
+        findings_text = "\n".join(
+            f"[{f.source_channel}] [{f.evidence_tier.value}] {f.content[:400]}"
+            for f in cog[:12]
+        )
+        tier_dist: Dict[str, int] = {}
+        for f in cog:
+            tier_dist[f.evidence_tier.value] = tier_dist.get(f.evidence_tier.value, 0) + 1
+
+        prompt = (
+            f"Write the CRIA-COGNITIVE PAPER — a structured research synthesis paper "
+            f"produced exclusively from the Cognitive pipeline's findings.\n\n"
+            f"Research question: {artefact.research_question}\n"
+            f"Observer: {artefact.observer_note or 'Not declared'}\n"
+            f"Evidence tier distribution across {len(cog)} findings: {tier_dist}\n\n"
+            f"Cognitive pipeline findings:\n{findings_text}\n\n"
+            f"This paper's defining contribution: it demonstrates how a 10-channel "
+            f"evidence-aggregation architecture (Scoping, Evidence, Contradiction, Synthesis, "
+            f"Causal, Critic, Serendipity, Quality, Cultural, Steering) produces a more "
+            f"reliable synthesis than single-source literature review. The three evidence "
+            f"tiers are: T1=direct empirical, T2=theoretical/interpretive, T3=speculative.\n\n"
+            f"Structure:\n"
+            f"## Abstract\n"
+            f"(150-200 words: what question, what cognitive method, what was found, "
+            f"why multi-channel synthesis matters)\n\n"
+            f"## 1. The CRIA-Cognitive Architecture\n"
+            f"(Describe the 10-channel architecture as the methodological innovation. "
+            f"Name and explain each channel's role. Show how evidence tiers work "
+            f"and how contradiction and serendipity channels prevent convergence bias)\n\n"
+            f"## 2. Evidence Synthesis by Tier\n"
+            f"(Present the cognitive findings organised by T1/T2/T3. "
+            f"Be specific about what each tier found. "
+            f"Show where channels converge and where they diverge)\n\n"
+            f"## 3. Cross-Channel Patterns\n"
+            f"(What emerges when 10 cognitive channels process this question in parallel? "
+            f"What did the Contradiction channel surface? "
+            f"What did the Serendipity channel find that the others missed?)\n\n"
+            f"## 4. Discussion\n"
+            f"(Implications of the synthesis. Confidence calibration against evidence tiers. "
+            f"What the cognitive architecture supports vs what remains uncertain)\n\n"
+            f"## 5. Limitations\n"
+            f"(What the Cognitive pipeline cannot see. Where evidence was absent. "
+            f"What would require a different architecture)\n\n"
+            f"## 6. Conclusion\n"
+            f"(What this architecture demonstrates about machine-assisted evidence synthesis)\n\n"
+            f"Write as a substantive academic paper using these specific findings. "
+            f"Do not invent citations. Do not reference the Epistemic or Convergent pipelines."
+        )
+        text = await call_llm(prompt, system_prompt=(
+            "You write academic research synthesis papers specialising in "
+            "evidence-aggregation methodology. Formal rigor. Evidence-tier transparency. "
+            "Your paper uses only the findings provided. No invented citations."
+        ), max_tokens=4000)
+        return {
+            "text": text,
+            "audience": "Evidence synthesis researchers, systematic review specialists, methodology journals"
+        }
+
+    async def _render_epistemic_paper(self, epi: List[Finding],
+                                       epi_academic: Dict[str, Any],
+                                       artefact: ResearchArtefact) -> Dict:
+        findings_text = "\n".join(
+            f"[{f.source_channel}] "
+            f"[pos:{f.position_privileged.value}] "
+            f"[dissonance:{f.dissonance_role.value}] "
+            f"{'[REFUSAL] ' if f.refusal_signal else ''}"
+            f"{f.content[:400]}"
+            for f in epi[:12]
+        )
+        refusal_count = sum(1 for f in epi if f.refusal_signal)
+        pos_dist: Dict[str, int] = {}
+        for f in epi:
+            pos_dist[f.position_privileged.value] = pos_dist.get(f.position_privileged.value, 0) + 1
+        academic_synthesis = ""
+        if epi_academic and isinstance(epi_academic.get("synthesis"), str):
+            academic_synthesis = epi_academic["synthesis"][:600]
+
+        prompt = (
+            f"Write the CRIA-EPISTEMIC PAPER — a frame-critical research paper "
+            f"produced exclusively from the Epistemic pipeline's findings.\n\n"
+            f"Research question: {artefact.research_question}\n"
+            f"Observer declared position: {artefact.observer_note or 'Not declared'}\n"
+            f"Position-privilege distribution: {pos_dist}\n"
+            f"Refusal signals fired: {refusal_count}\n\n"
+            f"Epistemic pipeline findings ({len(epi)} total):\n{findings_text}\n\n"
+            f"Academic metagent synthesis: {academic_synthesis or '[Not available]'}\n\n"
+            f"This paper does NOT aggregate evidence — it excavates the epistemic frames "
+            f"through which knowledge about this question has been constructed, who has been "
+            f"privileged to construct it, and where sovereign-source non-aggregation must be "
+            f"honoured. The 10 channels are: Empirical, Phenomenological, Historical, "
+            f"Philosophical, Critical, Civilisational, Cross-Cultural, Computational, "
+            f"Adversarial, Wildcard.\n\n"
+            f"Structure:\n"
+            f"## Abstract\n"
+            f"(150-200 words: what question, what frame-critical approach, what frames were excavated)\n\n"
+            f"## 1. The CRIA-Epistemic Architecture\n"
+            f"(Describe the 10 epistemic channels. Explain position-privilege accounting: "
+            f"why declaring the observer's position is a methodological requirement, not a courtesy. "
+            f"Explain dissonance roles and why maintaining productive dissonance is built into the architecture)\n\n"
+            f"## 2. Frame Archaeology\n"
+            f"(What frames dominate the literature on this question? "
+            f"Which traditions are structurally absent or underrepresented? "
+            f"What does the dissonance-role distribution reveal about how knowledge "
+            f"conflicts are typically resolved — or suppressed?)\n\n"
+            f"## 3. Position-Privilege Analysis\n"
+            f"(Map the {pos_dist} distribution across findings. "
+            f"Name which epistemological positions are producing most of the knowledge "
+            f"on this question. Name which are counter-corpus or absent. "
+            f"What does that distribution mean for what gets counted as evidence?)\n\n"
+            f"## 4. Refusal Signals and Sovereign Sources\n"
+            f"({'No' if refusal_count == 0 else str(refusal_count)} refusal signal(s) fired. "
+            f"Explain what the pipeline refuses to aggregate and why. "
+            f"Which sources require genuine partnership rather than extraction? "
+            f"What does responsible non-aggregation look like here?)\n\n"
+            f"## 5. What Frame-Critical Reading Changes\n"
+            f"(Specifically: what conclusions differ when you apply the Epistemic pipeline's "
+            f"frame-critical methodology vs a standard literature review on this question? "
+            f"What does this pipeline see that others structurally cannot?)\n\n"
+            f"## 6. The Epistemic Pipeline's Own Frame\n"
+            f"(What frames does THIS pipeline carry? What is its own blind spot? "
+            f"This section demonstrates the self-reflexivity built into the architecture)\n\n"
+            f"Write as a substantive critical theory / philosophy of research paper. "
+            f"Use the actual findings. Be specific about which channels fired what. "
+            f"Do not invent citations. Do not reference the Cognitive or Convergent pipelines."
+        )
+        text = await call_llm(prompt, system_prompt=(
+            "You write frame-critical academic papers in the tradition of critical theory, "
+            "philosophy of science, and decolonial methodology. Position-privilege accounting. "
+            "Sovereign-source awareness. Refusal as a legitimate methodological move. "
+            "Your paper uses only the findings provided. No invented citations."
+        ), max_tokens=4000)
+        return {
+            "text": text,
+            "audience": "Critical theorists, decolonial methodology researchers, philosophy of science, STS"
+        }
+
+    async def _render_convergent_paper(self, cog: List[Finding],
+                                        epi: List[Finding],
+                                        conv: List[Finding],
+                                        artefact: ResearchArtefact) -> Dict:
+        conv_text = "\n".join(
+            f"[{f.source_channel}] {f.content[:400]}"
+            for f in conv[:10]
+        )
+        cog_summary = "\n".join(f"- {f.content[:200]}" for f in cog[:5])
+        epi_summary = "\n".join(f"- {f.content[:200]}" for f in epi[:5])
+        has_convergence = any("Convergence Topology" in f.source_channel for f in conv)
+        has_divergence = any("Divergence Anatomy" in f.source_channel for f in conv)
+        has_absence = any("Absence" in f.source_channel for f in conv)
+        has_collision = any("Frame Collision" in f.source_channel for f in conv)
+
+        prompt = (
+            f"Write the CRIA-CONVERGENT PAPER — a meta-architectural paper about what "
+            f"dual-pipeline research reveals that neither pipeline could see alone.\n\n"
+            f"Research question: {artefact.research_question}\n\n"
+            f"Cognitive pipeline produced {len(cog)} findings (evidence-aggregation approach).\n"
+            f"Sample cognitive findings:\n{cog_summary}\n\n"
+            f"Epistemic pipeline produced {len(epi)} findings (frame-critical approach).\n"
+            f"Sample epistemic findings:\n{epi_summary}\n\n"
+            f"Convergent pipeline cross-architectural analysis ({len(conv)} findings):\n{conv_text}\n\n"
+            f"Active analytical modes: "
+            f"convergence_topology={has_convergence}, "
+            f"divergence_anatomy={has_divergence}, "
+            f"absence_mapping={has_absence}, "
+            f"frame_collision={has_collision}\n\n"
+            f"This paper is the meta-layer. It does not synthesise the other two pipelines' "
+            f"findings — it analyses the RELATIONSHIP between them. "
+            f"Where they converge = cross-architectural robustness. "
+            f"Where they diverge = the question is frame-dependent. "
+            f"What both miss = structural absence in the knowledge ecology.\n\n"
+            f"Structure:\n"
+            f"## Abstract\n"
+            f"(150-200 words: what the dual-pipeline architecture demonstrates about the "
+            f"epistemology of this specific question)\n\n"
+            f"## 1. Why Dual-Pipeline Architecture\n"
+            f"(Why run two architecturally distinct pipelines in parallel rather than one better one? "
+            f"Explain what Cognitive optimises for, what Epistemic optimises for, "
+            f"and why the Convergent layer exists as an independent analytical layer — "
+            f"not a synthesis but a topology analysis)\n\n"
+            f"## 2. Cross-Pipeline Convergence\n"
+            f"(Where did both pipelines reach similar conclusions about this question? "
+            f"What does agreement between an evidence-aggregation architecture and a "
+            f"frame-critical architecture mean for knowledge robustness? "
+            f"Be specific to the convergent findings above)\n\n"
+            f"## 3. Cross-Pipeline Divergence\n"
+            f"(Where did the two pipelines reach different conclusions? "
+            f"What does this reveal about the frame-dependence of this specific question? "
+            f"Is the divergence resolvable or is it constitutive?)\n\n"
+            f"## 4. Structural Absences\n"
+            f"(What did NEITHER pipeline find? "
+            f"What does that absence mean — missing data, methodological blind spot, "
+            f"sovereign knowledge requiring different engagement, "
+            f"or questions this architecture cannot yet ask?)\n\n"
+            f"## 5. Frame Collision Analysis\n"
+            f"(Where do epistemic frames from different traditions collide in the findings? "
+            f"What does the collision reveal? Is resolution possible or is "
+            f"the collision itself the finding?)\n\n"
+            f"## 6. Epistemological Implications\n"
+            f"(What does running these two architectures in parallel on this question "
+            f"demonstrate about the epistemology of the domain itself? "
+            f"What would a researcher need to know before designing further inquiry here?)\n\n"
+            f"Write as a methodological innovation paper using this question as the demonstration case. "
+            f"Use the actual convergent findings. The audience is researchers interested in "
+            f"what machine-assisted dual-pipeline methodology reveals. "
+            f"Do not invent citations."
+        )
+        text = await call_llm(prompt, system_prompt=(
+            "You write papers about research methodology and epistemology. "
+            "Your specialty is analysing what happens when epistemically distinct "
+            "research architectures run in parallel — convergence as robustness, "
+            "divergence as frame-dependence, absence as structural gap. "
+            "Your paper uses only the findings provided. No invented citations."
+        ), max_tokens=4000)
+        return {
+            "text": text,
+            "audience": "Research methodologists, epistemologists, computational research design specialists"
+        }
+
+
+# ============================================================
 # PUBLICATION GUIDANCE ENGINE
 # ============================================================
 
@@ -2823,6 +3076,7 @@ class UnifiedOrchestrator:
 
         # Output components
         self.voice_renderer = ThreeVoiceRenderer()
+        self.pipeline_paper_renderer = PipelinePaperRenderer()
         self.publication_engine = PublicationGuidanceEngine()
 
         self.max_iterations = max_iterations
@@ -2918,9 +3172,16 @@ class UnifiedOrchestrator:
                 self.conv_layer3.evaluate(s, f)
         all_conv = list(conv_findings) + conv_l3_findings
 
-        # Three-voice rendering
-        voices = await self.voice_renderer.render_all(
-            all_cog, all_epi, all_conv, epi_academic, epi_experimental, artefact
+        # Pipeline-differentiated papers (one per pipeline — the core architectural fix)
+        # and three-voice synthesis (audience rendering of combined findings) run in parallel
+        pipeline_papers, voices = await asyncio.gather(
+            self.pipeline_paper_renderer.render_all(
+                all_cog, all_epi, all_conv, epi_academic, artefact
+            ),
+            self.voice_renderer.render_all(
+                all_cog, all_epi, all_conv, epi_academic, epi_experimental, artefact
+            ),
+            return_exceptions=False,
         )
 
         # Publication guidance
@@ -2958,6 +3219,7 @@ class UnifiedOrchestrator:
                 "layer3_findings": [f.to_dict() for f in conv_l3_findings],
                 "layer3_report": self.conv_layer3.report(),
             },
+            "pipeline_papers": pipeline_papers,
             "voices": voices,
             "publication_guidance": guidance,
             "active_connectors": len(active_connectors()),
