@@ -2651,7 +2651,7 @@ class PipelinePaperRenderer:
         results = await asyncio.gather(
             self._render_cognitive_paper(cog_findings, artefact),
             self._render_epistemic_paper(epi_findings, epi_academic, artefact),
-            self._render_convergent_paper(cog_findings, epi_findings, conv_findings, artefact),
+            self._render_convergent_paper(conv_findings, artefact),
             return_exceptions=True,
         )
         keys = ["cognitive", "epistemic", "convergent"]
@@ -2800,86 +2800,119 @@ class PipelinePaperRenderer:
             "audience": "Critical theorists, decolonial methodology researchers, philosophy of science, STS"
         }
 
-    async def _render_convergent_paper(self, cog: List[Finding],
-                                        epi: List[Finding],
-                                        conv: List[Finding],
+    async def _render_convergent_paper(self, conv: List[Finding],
                                         artefact: ResearchArtefact) -> Dict:
-        conv_text = "\n".join(
+        """Composed exclusively from the five convergent-channel findings.
+        No cognitive or epistemic findings enter this paper."""
+
+        # Group findings by their source channel so each channel speaks separately
+        channels: Dict[str, List[Finding]] = {}
+        for f in conv:
+            ch = f.source_channel
+            channels.setdefault(ch, []).append(f)
+
+        def channel_block(name_fragment: str) -> str:
+            matches = [f for ch, fs in channels.items()
+                       if name_fragment.lower() in ch.lower()
+                       for f in fs]
+            if not matches:
+                return "(no findings from this channel)"
+            return "\n".join(f"  • {f.content[:500]}" for f in matches[:4])
+
+        topology_block   = channel_block("Convergence Topology")
+        divergence_block = channel_block("Divergence Anatomy")
+        absence_block    = channel_block("Absence")
+        collision_block  = channel_block("Frame Collision")
+        ecology_block    = channel_block("Evidence Ecology")
+
+        all_conv_text = "\n".join(
             f"[{f.source_channel}] {f.content[:400]}"
-            for f in conv[:10]
+            for f in conv[:15]
         )
-        cog_summary = "\n".join(f"- {f.content[:200]}" for f in cog[:5])
-        epi_summary = "\n".join(f"- {f.content[:200]}" for f in epi[:5])
-        has_convergence = any("Convergence Topology" in f.source_channel for f in conv)
-        has_divergence = any("Divergence Anatomy" in f.source_channel for f in conv)
-        has_absence = any("Absence" in f.source_channel for f in conv)
-        has_collision = any("Frame Collision" in f.source_channel for f in conv)
 
         prompt = (
-            f"Write the CRIA-CONVERGENT PAPER — a meta-architectural paper about what "
-            f"dual-pipeline research reveals that neither pipeline could see alone.\n\n"
-            f"Research question: {artefact.research_question}\n\n"
-            f"Cognitive pipeline produced {len(cog)} findings (evidence-aggregation approach).\n"
-            f"Sample cognitive findings:\n{cog_summary}\n\n"
-            f"Epistemic pipeline produced {len(epi)} findings (frame-critical approach).\n"
-            f"Sample epistemic findings:\n{epi_summary}\n\n"
-            f"Convergent pipeline cross-architectural analysis ({len(conv)} findings):\n{conv_text}\n\n"
-            f"Active analytical modes: "
-            f"convergence_topology={has_convergence}, "
-            f"divergence_anatomy={has_divergence}, "
-            f"absence_mapping={has_absence}, "
-            f"frame_collision={has_collision}\n\n"
-            f"This paper is the meta-layer. It does not synthesise the other two pipelines' "
-            f"findings — it analyses the RELATIONSHIP between them. "
-            f"Where they converge = cross-architectural robustness. "
-            f"Where they diverge = the question is frame-dependent. "
-            f"What both miss = structural absence in the knowledge ecology.\n\n"
-            f"Structure:\n"
+            f"Write the CRIA-CONVERGENT PAPER.\n\n"
+            f"This paper is composed exclusively from the findings of the five "
+            f"CRIA-Convergent channels. It does not summarise or quote from the "
+            f"Cognitive or Epistemic pipelines. The convergent channels ARE the "
+            f"cross-pipeline meta-analysis — their findings already encode what "
+            f"the meta-layer detected. Your paper presents and interprets those "
+            f"findings as its primary evidence.\n\n"
+            f"Research question: {artefact.research_question}\n"
+            f"Observer: {artefact.observer_note or 'Not declared'}\n\n"
+            f"━━━ CONVERGENT CHANNEL FINDINGS ({len(conv)} total) ━━━\n\n"
+            f"Channel 1 — Convergence Topology "
+            f"(detects where cross-architectural agreement exists):\n"
+            f"{topology_block}\n\n"
+            f"Channel 2 — Divergence Anatomy "
+            f"(dissects where and why cross-architectural disagreement occurs):\n"
+            f"{divergence_block}\n\n"
+            f"Channel 3 — Absence Mapping "
+            f"(identifies what neither architecture found and why):\n"
+            f"{absence_block}\n\n"
+            f"Channel 4 — Frame Collision "
+            f"(analyses collisions between epistemic traditions in the findings):\n"
+            f"{collision_block}\n\n"
+            f"Channel 5 — Evidence Ecology Comparison "
+            f"(compares the knowledge ecosystems each architecture drew from):\n"
+            f"{ecology_block}\n\n"
+            f"All convergent findings:\n{all_conv_text}\n\n"
+            f"━━━ PAPER STRUCTURE ━━━\n\n"
             f"## Abstract\n"
-            f"(150-200 words: what the dual-pipeline architecture demonstrates about the "
-            f"epistemology of this specific question)\n\n"
-            f"## 1. Why Dual-Pipeline Architecture\n"
-            f"(Why run two architecturally distinct pipelines in parallel rather than one better one? "
-            f"Explain what Cognitive optimises for, what Epistemic optimises for, "
-            f"and why the Convergent layer exists as an independent analytical layer — "
-            f"not a synthesis but a topology analysis)\n\n"
-            f"## 2. Cross-Pipeline Convergence\n"
-            f"(Where did both pipelines reach similar conclusions about this question? "
-            f"What does agreement between an evidence-aggregation architecture and a "
-            f"frame-critical architecture mean for knowledge robustness? "
-            f"Be specific to the convergent findings above)\n\n"
-            f"## 3. Cross-Pipeline Divergence\n"
-            f"(Where did the two pipelines reach different conclusions? "
-            f"What does this reveal about the frame-dependence of this specific question? "
-            f"Is the divergence resolvable or is it constitutive?)\n\n"
-            f"## 4. Structural Absences\n"
-            f"(What did NEITHER pipeline find? "
-            f"What does that absence mean — missing data, methodological blind spot, "
-            f"sovereign knowledge requiring different engagement, "
-            f"or questions this architecture cannot yet ask?)\n\n"
-            f"## 5. Frame Collision Analysis\n"
-            f"(Where do epistemic frames from different traditions collide in the findings? "
-            f"What does the collision reveal? Is resolution possible or is "
-            f"the collision itself the finding?)\n\n"
-            f"## 6. Epistemological Implications\n"
-            f"(What does running these two architectures in parallel on this question "
-            f"demonstrate about the epistemology of the domain itself? "
-            f"What would a researcher need to know before designing further inquiry here?)\n\n"
-            f"Write as a methodological innovation paper using this question as the demonstration case. "
-            f"Use the actual convergent findings. The audience is researchers interested in "
-            f"what machine-assisted dual-pipeline methodology reveals. "
+            f"(150-200 words: what the Convergent pipeline found about this specific question — "
+            f"where the architectures agreed, where they diverged, what was absent, "
+            f"what frame collisions appeared. Ground this in the actual channel findings above.)\n\n"
+            f"## 1. The CRIA-Convergent Architecture\n"
+            f"(Describe the five-channel convergent methodology. Each channel has a distinct "
+            f"analytical function: Convergence Topology does not do the same work as "
+            f"Divergence Anatomy, and Absence Mapping is different again. "
+            f"Explain what each channel is designed to detect and why these five together "
+            f"constitute a complete meta-layer analysis.)\n\n"
+            f"## 2. Convergence Topology: Where Agreement Was Found\n"
+            f"(Present what Channel 1 detected — specific areas of cross-architectural agreement "
+            f"on this question. What does that agreement indicate? "
+            f"What kinds of claims are robust across different analytical approaches?)\n\n"
+            f"## 3. Divergence Anatomy: Where and Why Disagreement Occurs\n"
+            f"(Present what Channel 2 detected — the structure of cross-architectural disagreement. "
+            f"Is the divergence in conclusions, in framing, in which evidence is counted, "
+            f"or in the questions being asked? What does the anatomy of the disagreement reveal?)\n\n"
+            f"## 4. Absence Mapping: What the Architecture Did Not Find\n"
+            f"(Present what Channel 3 detected — the structured absences. "
+            f"What knowledge is missing? Is it missing because it does not exist, "
+            f"because the architecture cannot reach it, or because it is held in "
+            f"sovereign sources that cannot be aggregated? "
+            f"What would a researcher need to do to address each type of absence?)\n\n"
+            f"## 5. Frame Collision: Where Epistemic Traditions Meet\n"
+            f"(Present what Channel 4 detected — the collisions between epistemic frames. "
+            f"Name the frames in collision. Is the collision resolvable through more evidence, "
+            f"or is it constitutive — the collision itself is what the question looks like "
+            f"when examined from incompatible traditions?)\n\n"
+            f"## 6. Evidence Ecology: The Knowledge Landscape\n"
+            f"(Present what Channel 5 detected — the comparative evidence ecology. "
+            f"What does the knowledge landscape look like for this question? "
+            f"Where is evidence dense, where sparse, where structured by particular institutions "
+            f"or traditions? What does the ecology suggest about the history of this question?)\n\n"
+            f"## 7. Convergent Findings: Implications for Inquiry\n"
+            f"(Drawing only on what the five convergent channels produced: "
+            f"what should a researcher know before designing further inquiry into this question? "
+            f"Which directions are epistemically robust? Which require foundational work first? "
+            f"What would be a category error — pursuing more evidence when the issue is framing, "
+            f"or pursuing frame-critique when the issue is missing evidence?)\n\n"
+            f"Write as a paper whose entire evidential base is the five convergent channel findings. "
+            f"Do not summarise what the Cognitive or Epistemic papers found — those are separate documents. "
             f"Do not invent citations."
         )
         text = await call_llm(prompt, system_prompt=(
-            "You write papers about research methodology and epistemology. "
-            "Your specialty is analysing what happens when epistemically distinct "
-            "research architectures run in parallel — convergence as robustness, "
-            "divergence as frame-dependence, absence as structural gap. "
-            "Your paper uses only the findings provided. No invented citations."
+            "You write the CRIA-Convergent paper. Your entire evidential base is "
+            "the five convergent channel findings provided: Convergence Topology, "
+            "Divergence Anatomy, Absence Mapping, Frame Collision, Evidence Ecology Comparison. "
+            "You do not summarise or quote the Cognitive or Epistemic pipelines — "
+            "those are separate papers. You present and interpret only what the "
+            "convergent meta-layer itself detected. No invented citations."
         ), max_tokens=4000)
         return {
             "text": text,
-            "audience": "Research methodologists, epistemologists, computational research design specialists"
+            "audience": "Research methodologists, epistemologists, meta-analytical researchers"
         }
 
 
