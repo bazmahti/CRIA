@@ -159,7 +159,8 @@ async def db_fail_job(job_id: str, error_text: str) -> None:
 
 async def db_get_job(job_id: str) -> Optional[Dict[str, Any]]:
     row = await _db_pool.fetchrow(
-        """SELECT status, result_json, error_text
+        """SELECT status, result_json, error_text,
+                  started_at, completed_at, question_text
            FROM research_jobs WHERE job_id=$1""",
         job_id,
     )
@@ -169,6 +170,9 @@ async def db_get_job(job_id: str) -> Optional[Dict[str, Any]]:
         "status": row["status"],
         "result": json.loads(row["result_json"]) if row["result_json"] else None,
         "error": row["error_text"],
+        "started_at": row["started_at"],
+        "completed_at": row["completed_at"],
+        "question_text": row["question_text"],
     }
 
 
@@ -3028,6 +3032,68 @@ async def research_status(job_id: str):
         "status": job["status"],
         "result": job.get("result"),
         "error": job.get("error"),
+    }
+
+
+# ---------------------------------------------------------------------------
+# /api/research/unified — production shim (single-port autoscale mode)
+#
+# In production, autoscale only allows ONE exposed port.  The api-server
+# (Node/Express) is therefore not deployed; these routes replace the two
+# endpoints the React dashboard calls so everything works through this
+# single FastAPI process.
+#
+# Contract must match api-server/src/routes/parallel.ts exactly:
+#   POST response  → { jobId, status }          (camelCase jobId)
+#   GET  response  → { jobId, query, status, startedAt, completedAt,
+#                      engine: { status, startedAt, completedAt,
+#                                result, error } }
+# ---------------------------------------------------------------------------
+
+@app.post("/api/research/unified")
+async def api_unified_post(
+    request: ResearchRequest, background_tasks: BackgroundTasks
+):
+    all_voices = ["academic", "editorial", "practitioner"]
+    voices = (all_voices if request.voice == "all"
+              else [request.voice] if request.voice in all_voices
+              else all_voices)
+    artefact = ResearchArtefact(
+        research_question=request.query,
+        observer_note=request.observer_note,
+        dissonance_budget=request.dissonance_budget,
+        voices=voices,
+        profile=request.profile,
+        max_iterations=request.max_iterations,
+    )
+    job_id = str(uuid.uuid4())
+    await db_create_job(job_id, question_text=request.query, mode=request.profile)
+    background_tasks.add_task(_run_research_job, job_id, artefact)
+    log.info("Unified-API job %s queued — %r", job_id, request.query[:80])
+    return {"jobId": job_id, "status": "running"}
+
+
+@app.get("/api/research/unified/{job_id}")
+async def api_unified_get(job_id: str):
+    job = await db_get_job(job_id)
+    if not job:
+        log.warning("Unified-API poll for unknown job_id: %s", job_id)
+        raise HTTPException(status_code=404, detail="Job not found")
+    # "queued" is invisible to the frontend — treat as "running"
+    fe_status = job["status"] if job["status"] in ("complete", "failed") else "running"
+    return {
+        "jobId": job_id,
+        "query": job.get("question_text", ""),
+        "status": fe_status,
+        "startedAt": job.get("started_at"),
+        "completedAt": job.get("completed_at"),
+        "engine": {
+            "status": job["status"],
+            "startedAt": job.get("started_at"),
+            "completedAt": job.get("completed_at"),
+            "result": job.get("result"),
+            "error": job.get("error"),
+        },
     }
 
 
