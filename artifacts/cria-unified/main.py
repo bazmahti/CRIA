@@ -2666,8 +2666,8 @@ class PipelinePaperRenderer:
     async def _render_cognitive_paper(self, cog: List[Finding],
                                        artefact: ResearchArtefact) -> Dict:
         findings_text = "\n".join(
-            f"[{f.source_channel}] [{f.evidence_tier.value}] {f.content[:400]}"
-            for f in cog[:12]
+            f"[{f.source_channel}] [{f.evidence_tier.value}] {f.content[:600]}"
+            for f in cog
         )
         tier_dist: Dict[str, int] = {}
         for f in cog:
@@ -2716,7 +2716,7 @@ class PipelinePaperRenderer:
             "You write academic research synthesis papers specialising in "
             "evidence-aggregation methodology. Formal rigor. Evidence-tier transparency. "
             "Your paper uses only the findings provided. No invented citations."
-        ), max_tokens=4000)
+        ), max_tokens=6000)
         return {
             "text": text,
             "audience": "Evidence synthesis researchers, systematic review specialists, methodology journals"
@@ -2730,8 +2730,8 @@ class PipelinePaperRenderer:
             f"[pos:{f.position_privileged.value}] "
             f"[dissonance:{f.dissonance_role.value}] "
             f"{'[REFUSAL] ' if f.refusal_signal else ''}"
-            f"{f.content[:400]}"
-            for f in epi[:12]
+            f"{f.content[:600]}"
+            for f in epi
         )
         refusal_count = sum(1 for f in epi if f.refusal_signal)
         pos_dist: Dict[str, int] = {}
@@ -2794,7 +2794,7 @@ class PipelinePaperRenderer:
             "philosophy of science, and decolonial methodology. Position-privilege accounting. "
             "Sovereign-source awareness. Refusal as a legitimate methodological move. "
             "Your paper uses only the findings provided. No invented citations."
-        ), max_tokens=4000)
+        ), max_tokens=6000)
         return {
             "text": text,
             "audience": "Critical theorists, decolonial methodology researchers, philosophy of science, STS"
@@ -2909,7 +2909,7 @@ class PipelinePaperRenderer:
             "You do not summarise or quote the Cognitive or Epistemic pipelines — "
             "those are separate papers. You present and interpret only what the "
             "convergent meta-layer itself detected. No invented citations."
-        ), max_tokens=4000)
+        ), max_tokens=6000)
         return {
             "text": text,
             "audience": "Research methodologists, epistemologists, meta-analytical researchers"

@@ -214,7 +214,20 @@ function PipelinePanel({
     ...arr(pipeline["layer3_findings"]),
   ] as Record<string, unknown>[];
   const layer3 = pipeline["layer3_report"] as Record<string, unknown> | undefined;
-  const hofstadter = str(pipeline["hofstadter_validation"] ?? pipeline["hofstadter"] ?? pipeline["validation"]);
+  const hofstadterRaw = pipeline["hofstadter_validation"] ?? pipeline["hofstadter"] ?? pipeline["validation"];
+  // Extract the LLM-generated validation text from the dict; fall back to str() for plain strings
+  const hofstadterText: string = hofstadterRaw == null ? "" :
+    typeof hofstadterRaw === "string" ? hofstadterRaw :
+    typeof (hofstadterRaw as Record<string, unknown>)["validation_text"] === "string"
+      ? str((hofstadterRaw as Record<string, unknown>)["validation_text"])
+      : "";
+  const hofstadterMeta: Record<string, unknown> | null =
+    hofstadterRaw != null && typeof hofstadterRaw === "object"
+      ? Object.fromEntries(
+          Object.entries(hofstadterRaw as Record<string, unknown>)
+            .filter(([k]) => k !== "validation_text")
+        )
+      : null;
 
   const voiceTabs: { key: VoiceTab; label: string }[] = [
     { key: "academic", label: "Academic" },
@@ -261,15 +274,37 @@ function PipelinePanel({
         </div>
       )}
 
-      {hofstadter && (
+      {hofstadterText && (
         <details className="group">
           <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1.5 list-none">
             <AlertTriangle className="w-3 h-3 text-amber-400" />
             Hofstadter Validation
+            {hofstadterMeta && (
+              <span className="flex items-center gap-1 ml-2">
+                {hofstadterMeta["godel_gap_detected"] === true && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">Gödel gap</span>
+                )}
+                {typeof hofstadterMeta["strange_loop_check"] === "string" && (
+                  <span className={cn(
+                    "text-[9px] px-1.5 py-0.5 rounded border",
+                    hofstadterMeta["strange_loop_check"] === "passed"
+                      ? "bg-green-500/10 text-green-400 border-green-500/30"
+                      : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                  )}>
+                    loop: {String(hofstadterMeta["strange_loop_check"])}
+                  </span>
+                )}
+                {typeof hofstadterMeta["actionable_count"] === "number" && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/40">
+                    {hofstadterMeta["actionable_count"]} actionable
+                  </span>
+                )}
+              </span>
+            )}
             <ChevronDown className="w-3 h-3 ml-auto group-open:rotate-180 transition-transform" />
           </summary>
-          <div className="mt-2 text-xs text-foreground/80 bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 leading-relaxed">
-            {hofstadter}
+          <div className="mt-2 text-xs text-foreground/80 bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 leading-relaxed whitespace-pre-wrap">
+            {hofstadterText}
           </div>
         </details>
       )}

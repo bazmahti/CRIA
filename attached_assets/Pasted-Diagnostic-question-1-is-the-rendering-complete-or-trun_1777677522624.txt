@@ -1,0 +1,20 @@
+Diagnostic question 1 — is the rendering complete or truncated?
+When the LLM that renders each paper completes its generation, what does the output actually contain? Specifically:
+
+Does the LLM-generated paper text complete its sections (with full Limitations, full conclusions) or does the LLM itself stop mid-sentence?
+If the LLM completes generation, where does the truncation happen — at storage, at retrieval, at display in the dashboard, or somewhere else?
+Check the actual stored output in the database or filesystem (whatever the runtime uses) for one of the three papers. Compare its byte length and final sentences against what is displayed in the dashboard. Are they the same?
+
+Diagnostic question 2 — what are the three trailing elements supposed to be?
+The three trailing headings ("Hofstadter Validation," "Show N channel findings," "Layer 3 Report") appear in every paper. I need to understand:
+
+Are these meant to be inline content rendered into the paper itself, or are they meant to be separate elements (collapsible sections, links to other views, footer metadata)?
+If they're meant to be inline content, what populates them? Where does that content come from — a separate function call, a stored data structure, a database query?
+If they're meant to be separate elements (e.g., expandable disclosure widgets), is the dashboard rendering them as inert headings because the disclosure functionality isn't wired up, or because the underlying data isn't available?
+
+Diagnostic question 3 — what does the channel-findings count refer to?
+The Cognitive paper for Study 19 shows "Show 24 channel findings." The Epistemic paper shows "Show 13 channel findings." The Convergent paper shows "Show 7 channel findings." For each paper:
+
+What are these counts counting? Findings produced by channels in that paper's pipeline? Per-channel finding counts summed across channels?
+Are the underlying findings stored somewhere accessible — readable text per channel, with channel-of-origin tags?
+If yes, why aren't they being surfaced into the paper text? If no, what is the count counting if not readable findings?
