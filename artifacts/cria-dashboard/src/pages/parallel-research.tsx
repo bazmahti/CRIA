@@ -3,6 +3,7 @@ import { Zap, Brain, Microscope, Loader2, CheckCircle2, XCircle, Clock, ChevronD
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import ResearchDropZone from "@/components/ResearchDropZone";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -580,15 +581,17 @@ export default function ParallelResearch() {
       <div className="px-8 py-6 space-y-6">
         {/* Input Form */}
         <div className="rounded-xl border border-border/50 bg-card/30 p-6 space-y-4">
-          <div>
+          <div className="pb-9">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-2">
               Research Question
+              <span className="ml-2 normal-case font-normal text-muted-foreground/50">— or drop a brief (.txt, .md, .pdf)</span>
             </label>
-            <textarea
+            <ResearchDropZone
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={setQuery}
               placeholder="What does post-AI work-meaning collapse look like across cultural traditions?"
               rows={3}
+              disabled={launching || running}
               className="w-full rounded-lg bg-background border border-border/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
             />
           </div>

@@ -7,6 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import ResearchDropZone from "@/components/ResearchDropZone";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -443,15 +444,17 @@ export default function UnifiedResearch() {
         {/* Research form */}
         <div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-2xl p-6 mb-6">
           <div className="space-y-4">
-            <div>
+            <div className="pb-9">
               <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
                 Research Question
+                <span className="ml-2 normal-case font-normal text-muted-foreground/50">— or drop a brief (.txt, .md, .pdf)</span>
               </label>
-              <textarea
+              <ResearchDropZone
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={setQuery}
                 placeholder="What does post-AI work-meaning collapse look like across cultural traditions?"
                 rows={3}
+                disabled={loading || job?.status === "running"}
                 className="w-full bg-background/50 border border-border/50 rounded-xl px-4 py-3 text-sm placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
             </div>
