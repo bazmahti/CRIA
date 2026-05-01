@@ -31,6 +31,7 @@
 
 import asyncio
 import httpx
+import json
 import os
 import random
 import uuid
@@ -40,15 +41,112 @@ from dataclasses import dataclass, field
 from enum import Enum
 from abc import ABC, abstractmethod
 from collections import defaultdict
-import uuid
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+import psycopg2
+import psycopg2.extras
 import uvicorn
 from datetime import datetime
 BASE_PATH = os.environ.get("BASE_PATH", "/cria-unified")
 
 from openai import AsyncOpenAI
+
+# ============================================================
+# JOB STORE — PostgreSQL-backed so autoscale pods share state
+# ============================================================
+
+_DB_URL = os.environ.get("DATABASE_URL", "")
+_db_executor = ThreadPoolExecutor(max_workers=4)
+
+
+def _get_conn():
+    return psycopg2.connect(_DB_URL)
+
+
+def _db_init():
+    """Create the research_jobs table if it doesn't exist."""
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS research_jobs (
+                    job_id     TEXT PRIMARY KEY,
+                    status     TEXT NOT NULL DEFAULT 'running',
+                    result     JSONB,
+                    error      TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+        conn.commit()
+
+
+def _db_create_job(job_id: str) -> None:
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO research_jobs (job_id, status) VALUES (%s, 'running')",
+                (job_id,),
+            )
+        conn.commit()
+
+
+def _db_complete_job(job_id: str, result: dict) -> None:
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """UPDATE research_jobs
+                   SET status='complete', result=%s, updated_at=NOW()
+                   WHERE job_id=%s""",
+                (json.dumps(result), job_id),
+            )
+        conn.commit()
+
+
+def _db_fail_job(job_id: str, error: str) -> None:
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """UPDATE research_jobs
+                   SET status='failed', error=%s, updated_at=NOW()
+                   WHERE job_id=%s""",
+                (error, job_id),
+            )
+        conn.commit()
+
+
+def _db_get_job(job_id: str) -> Optional[Dict[str, Any]]:
+    with _get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT status, result, error FROM research_jobs WHERE job_id=%s",
+                (job_id,),
+            )
+            row = cur.fetchone()
+    if row is None:
+        return None
+    return {
+        "status": row["status"],
+        "result": row["result"],  # already dict (JSONB auto-decoded by psycopg2)
+        "error": row["error"],
+    }
+
+
+async def _db_init_async():
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(_db_executor, _db_init)
+
+
+# Initialise table at import time (blocking — fast, runs once on startup)
+try:
+    _db_init()
+except Exception as _db_init_err:
+    print(f"[WARN] DB init failed: {_db_init_err} — jobs will degrade to in-memory fallback")
+    _DB_URL = ""  # disable DB, fall back below
+
+# In-memory fallback (used only when DB is unavailable)
+_research_jobs_fallback: Dict[str, Any] = {}
 
 
 # ============================================================
@@ -2805,10 +2903,8 @@ async def serve_dashboard():
     return HTMLResponse(DASHBOARD_HTML)
 
 
-_research_jobs: Dict[str, Any] = {}
-
-
 async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
+    loop = asyncio.get_event_loop()
     try:
         email = os.environ.get("CRIA_CONTACT_EMAIL")
         semantic_key = os.environ.get("SEMANTIC_SCHOLAR_KEY")
@@ -2817,12 +2913,17 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
             email=email, semantic_key=semantic_key,
         )
         result = await orchestrator.research(artefact)
-        _research_jobs[job_id]["status"] = "complete"
-        _research_jobs[job_id]["result"] = result
+        if _DB_URL:
+            await loop.run_in_executor(_db_executor, _db_complete_job, job_id, result)
+        else:
+            _research_jobs_fallback[job_id] = {"status": "complete", "result": result, "error": None}
     except BaseException as e:
-        _research_jobs[job_id]["status"] = "failed"
         err_type = type(e).__name__
-        _research_jobs[job_id]["error"] = f"{err_type}: {e}" if str(e) else err_type
+        err_msg = f"{err_type}: {e}" if str(e) else err_type
+        if _DB_URL:
+            await loop.run_in_executor(_db_executor, _db_fail_job, job_id, err_msg)
+        else:
+            _research_jobs_fallback[job_id] = {"status": "failed", "result": None, "error": err_msg}
 
 
 @app.post(f"{BASE_PATH}/research")
@@ -2838,14 +2939,22 @@ async def research_endpoint(request: ResearchRequest, background_tasks: Backgrou
         max_iterations=request.max_iterations,
     )
     job_id = str(uuid.uuid4())
-    _research_jobs[job_id] = {"status": "running", "result": None, "error": None}
+    loop = asyncio.get_event_loop()
+    if _DB_URL:
+        await loop.run_in_executor(_db_executor, _db_create_job, job_id)
+    else:
+        _research_jobs_fallback[job_id] = {"status": "running", "result": None, "error": None}
     background_tasks.add_task(_run_research_job, job_id, artefact)
     return {"job_id": job_id, "status": "running"}
 
 
 @app.get(f"{BASE_PATH}/research/{{job_id}}")
 async def research_status(job_id: str):
-    job = _research_jobs.get(job_id)
+    loop = asyncio.get_event_loop()
+    if _DB_URL:
+        job = await loop.run_in_executor(_db_executor, _db_get_job, job_id)
+    else:
+        job = _research_jobs_fallback.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return {
