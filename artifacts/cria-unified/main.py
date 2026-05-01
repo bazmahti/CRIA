@@ -674,14 +674,33 @@ class OpenAlexAPI:
 
 
 class CrossrefAPI:
-    async def search(self, query: str, rows: int = 8) -> List[Dict]:
-        async with httpx.AsyncClient() as client:
+    # Crossref polite-pool: send User-Agent with project URL + contact email.
+    # Without this header Crossref routes via the un-throttled pool which
+    # has lower rate limits and no SLA guarantee.
+    _CONTACT_EMAIL = os.environ.get("CRIA_CONTACT_EMAIL", "research@example.org")
+    _USER_AGENT = (
+        f"CRIA/2.0 (https://replit.com; mailto:{_CONTACT_EMAIL})"
+    )
+
+    async def search(
+        self,
+        query: str,
+        rows: int = 8,
+        filter_str: Optional[str] = None,
+    ) -> List[Dict]:
+        params: Dict[str, Any] = {
+            "query": query,
+            "rows": rows,
+            "select": "title,author,published,DOI,abstract,is-referenced-by-count",
+        }
+        if filter_str:
+            params["filter"] = filter_str
+        headers = {"User-Agent": self._USER_AGENT}
+        async with httpx.AsyncClient(headers=headers, timeout=30.0) as client:
             try:
                 response = await client.get(
                     "https://api.crossref.org/works",
-                    params={"query": query, "rows": rows,
-                            "select": "title,author,published,DOI,abstract"},
-                    timeout=30.0
+                    params=params,
                 )
                 data = response.json()
                 results = []
@@ -698,8 +717,12 @@ class CrossrefAPI:
                         if date_parts and date_parts[0]:
                             year = str(date_parts[0][0])
                     results.append({
-                        "title": title, "authors": authors[:5], "year": year,
-                        "doi": item.get("DOI", ""), "abstract": item.get("abstract", ""),
+                        "title": title,
+                        "authors": authors[:5],
+                        "year": year,
+                        "doi": item.get("DOI", ""),
+                        "abstract": item.get("abstract", ""),
+                        "cited_by": item.get("is-referenced-by-count", 0),
                         "source": "Crossref",
                     })
                 return results
@@ -955,11 +978,14 @@ class CogC2_Evidence(BaseChannel):
                 seen.add(key)
                 unique.append(p)
 
+        unique.sort(key=lambda p: p.get("cited_by", 0) or 0, reverse=True)
         output = f"## Evidence: {len(unique)} unique papers\n\n"
         for i, p in enumerate(unique[:12], 1):
+            cited_by = p.get("cited_by", 0) or 0
+            cite_str = f" · cited {cited_by}×" if cited_by else ""
             output += (f"**{i}. {p.get('title', 'Untitled')}** "
                        f"({p.get('year', 'n.d.')}) - "
-                       f"{p.get('source', '?')}\n"
+                       f"{p.get('source', '?')}{cite_str}\n"
                        f"   {(p.get('abstract') or '')[:200]}\n\n")
 
         citations = [p.get("title", "") for p in unique[:5] if p.get("title")]
