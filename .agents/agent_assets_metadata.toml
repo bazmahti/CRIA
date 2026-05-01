@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "6ppFEGfzM049magcGQlP0"
+uri = "file://docs/CRIA_UNIFIED_CODE_CHANGES.md"
+type = "text"
+title = "CRIA Unified — Code Changes for Senior Developer Review"
