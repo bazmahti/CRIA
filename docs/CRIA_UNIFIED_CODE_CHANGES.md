@@ -359,11 +359,78 @@ The `execute_strategy` calls are independent — each takes fixed inputs (`findi
 
 ---
 
+## Fix 7 — PostgreSQL job store (asyncpg, senior dev spec) *(autoscale fix)*
+
+**File:** `main.py`  
+**Date:** 1 May 2026
+
+### Root cause
+
+`deploymentTarget = "autoscale"` in `.replit` means production traffic can be served by multiple pods simultaneously. Jobs were stored in a module-level Python dict (`_research_jobs`). A pod that didn't start the job would return 404 on every poll, causing the API server to time out even though the job was completing normally on another pod.
+
+### Changes
+
+**Schema** — new `research_jobs` table replaces the minimal first-pass version:
+
+```sql
+CREATE TABLE IF NOT EXISTS research_jobs (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id          TEXT NOT NULL UNIQUE,
+    status          TEXT NOT NULL DEFAULT 'queued',
+    question_text   TEXT,
+    mode            TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    started_at      TIMESTAMPTZ,
+    completed_at    TIMESTAMPTZ,
+    result_json     JSONB,
+    error_text      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_research_jobs_job_id ON research_jobs(job_id);
+CREATE INDEX IF NOT EXISTS idx_research_jobs_status ON research_jobs(status);
+```
+
+Old table was dropped and recreated at deploy time.
+
+**Pool** — `asyncpg.create_pool()` (min 2, max 10 connections). Initialised in a FastAPI `lifespan()` `@asynccontextmanager`, closed on shutdown. `sslmode=disable` stripped from the URL, `ssl=False` passed explicitly. No `ThreadPoolExecutor` — all DB calls are native coroutines.
+
+**State machine** — four states, four async helper functions:
+
+| Function | Transition | Sets |
+|---|---|---|
+| `db_create_job(job_id, question_text, mode)` | → `queued` | `created_at` |
+| `db_start_job(job_id)` | `queued` → `running` | `started_at` |
+| `db_complete_job(job_id, result)` | `running` → `complete` | `completed_at`, `result_json` |
+| `db_fail_job(job_id, error_text)` | `running` → `failed` | `completed_at`, `error_text` |
+
+**Logging** — per senior dev spec:
+
+```
+INFO  Job <id> queued — '<question[:80]>'
+INFO  Job <id> starting — question: '<question[:120]>'
+INFO  Job <id> complete — 277.1s — cog:10 epi:10 conv:5
+ERROR Job <id> failed — <ExcType>: <message>    (exc_info=True)
+WARN  Poll for unknown job_id: <id>
+```
+
+**POST response** — now returns `{"job_id": ..., "status": "queued"}` (was `"running"`). The API server polling loop treats any non-`complete`/non-`failed` status as "keep waiting", so this is backwards-compatible.
+
+### Testing
+
+Live job (`"What causes long-term memory consolidation?"`, `max_iterations=1`):
+
+- DB schema verified (10 columns, 2 indexes)
+- `queued` → `running` transition confirmed ≤1 s after POST
+- `running` → `complete` confirmed at 277.1 s
+- All five log lines emitted correctly
+- `completed_at` timestamp stored in DB
+
+---
+
 ## Files changed
 
 | File | Change type |
 |---|---|
-| `artifacts/cria-unified/main.py` | All fixes above |
+| `artifacts/cria-unified/main.py` | All fixes above (Fixes 1–7) |
 | `artifacts/api-server/src/routes/parallel.ts` | `maxWaitMs` raised to `900_000` (15 min) to accommodate full job runtime |
 | `replit.md` | Documentation updated to reflect model, runtime, and fix history |
 
@@ -371,13 +438,18 @@ The `execute_strategy` calls are independent — each takes fixed inputs (`findi
 
 ## Testing
 
-Each fix was validated by submitting a live research job (`POST /cria-unified/research`, query: `"What is consciousness?"`, `max_iterations: 1`) and polling to completion. Verified outputs:
+Each fix was validated by submitting a live research job and polling to completion.
 
+**Fix 1–6 baseline** (`"What is consciousness?"`, `max_iterations: 1`):
 - `status: complete` (no `failed`)
-- `cognitive_pipeline.findings`: 10 items, each with real LLM-generated content
+- `cognitive_pipeline.findings`: 10 items
 - `epistemic_pipeline.findings`: 10 items
 - `convergent_pipeline.findings`: 5 items
-- `voices.academic.text`: 19 781 characters of academic prose
-- `voices.editorial.text`: present and populated
-- `voices.practitioner.text`: present and populated
-- `duration_seconds`: 271.9 s on verified run
+- `voices.academic.text`: 19 781 characters
+- `duration_seconds`: 271.9 s
+
+**Fix 7 validation** (`"What causes long-term memory consolidation?"`, `max_iterations: 1`):
+- DB state machine: `queued → running → complete` confirmed
+- `completed_at` set, `result_json` stored in Postgres
+- All structured log lines emitted
+- `duration_seconds`: 277.1 s

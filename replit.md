@@ -245,6 +245,7 @@ The `POST /cria-unified/research` → `GET /cria-unified/research/{job_id}` resu
 - **Parallelism in meta-layers**: Cognitive and Epistemic meta-pipelines now run concurrently; all Layer3 strategies within each pipeline run concurrently via `asyncio.gather`. This reduced runtime from 7.6 min to 4.5 min.
 - **LLM semaphore**: 10 concurrent calls. Timeout: 120s. Max completion tokens: 4000.
 - **api-server**: `maxWaitMs=900_000` (15 min) for `callEnginePolling` — sufficient for 4-5 min jobs.
+- **PostgreSQL job store (autoscale fix)**: `.replit` has `deploymentTarget = "autoscale"`, meaning production pods are ephemeral. In-memory `_research_jobs` dict caused 404s on every poll from any pod that didn't start the job. Fixed by replacing the dict with an asyncpg pool (min 2, max 10 connections) backed by a `research_jobs` PostgreSQL table. Full four-state machine: `queued → running → complete/failed` with `started_at`, `completed_at`, `question_text`, `mode`, `result_json`, `error_text` columns and indexes on `job_id` and `status`. Pool initialised in FastAPI `lifespan()` handler. No `ThreadPoolExecutor` — all DB calls are native async. Validated 1 May 2026: state transitions confirmed in DB, completion log `Job ... complete — 277.1s — cog:10 epi:10 conv:5` emitted.
 
 ### Important Notes for Future Builds
 - Do NOT rename channel IDs (CogC1–C10, EpiC1–C10, ConvC1–C5) — referenced throughout metagent prompts, Layer 3, and publication guidance logic

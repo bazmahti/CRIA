@@ -30,23 +30,23 @@
 # ============================================================
 
 import asyncio
+import asyncpg
 import httpx
 import json
+import logging
 import os
 import random
 import uuid
 import xml.etree.ElementTree as ET
+from contextlib import asynccontextmanager
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-import psycopg2
-import psycopg2.extras
 import uvicorn
 from datetime import datetime
 BASE_PATH = os.environ.get("BASE_PATH", "/cria-unified")
@@ -54,99 +54,99 @@ BASE_PATH = os.environ.get("BASE_PATH", "/cria-unified")
 from openai import AsyncOpenAI
 
 # ============================================================
-# JOB STORE — PostgreSQL-backed so autoscale pods share state
+# LOGGING
+# ============================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
+log = logging.getLogger("cria-unified")
+
+# ============================================================
+# JOB STORE — asyncpg pool so autoscale pods share state
 # ============================================================
 
 _DB_URL = os.environ.get("DATABASE_URL", "")
-_db_executor = ThreadPoolExecutor(max_workers=4)
+_db_pool: Optional[asyncpg.Pool] = None
+
+_CREATE_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS research_jobs (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id         TEXT UNIQUE NOT NULL,
+    status         TEXT NOT NULL DEFAULT 'queued'
+                       CHECK (status IN ('queued','running','complete','failed')),
+    question_text  TEXT,
+    mode           TEXT,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    started_at     TIMESTAMPTZ,
+    completed_at   TIMESTAMPTZ,
+    result_json    JSONB,
+    error_text     TEXT
+);
+CREATE INDEX IF NOT EXISTS research_jobs_job_id_idx    ON research_jobs (job_id);
+CREATE INDEX IF NOT EXISTS research_jobs_created_at_idx ON research_jobs (created_at);
+"""
 
 
-def _get_conn():
-    return psycopg2.connect(_DB_URL)
+async def _init_db_pool() -> asyncpg.Pool:
+    """Create the asyncpg connection pool and ensure the table exists."""
+    # asyncpg needs the DSN without ?sslmode=... — pass ssl explicitly instead
+    dsn = _DB_URL.split("?")[0] if "?" in _DB_URL else _DB_URL
+    pool = await asyncpg.create_pool(dsn=dsn, ssl=False, min_size=2, max_size=10)
+    async with pool.acquire() as conn:
+        await conn.execute(_CREATE_TABLE_SQL)
+    log.info("DB pool ready — research_jobs table verified")
+    return pool
 
 
-def _db_init():
-    """Create the research_jobs table if it doesn't exist."""
-    with _get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS research_jobs (
-                    job_id     TEXT PRIMARY KEY,
-                    status     TEXT NOT NULL DEFAULT 'running',
-                    result     JSONB,
-                    error      TEXT,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-            """)
-        conn.commit()
+async def db_create_job(job_id: str, question_text: str, mode: str = "") -> None:
+    await _db_pool.execute(
+        """INSERT INTO research_jobs (job_id, status, question_text, mode)
+           VALUES ($1, 'queued', $2, $3)""",
+        job_id, question_text, mode,
+    )
 
 
-def _db_create_job(job_id: str) -> None:
-    with _get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO research_jobs (job_id, status) VALUES (%s, 'running')",
-                (job_id,),
-            )
-        conn.commit()
+async def db_start_job(job_id: str) -> None:
+    await _db_pool.execute(
+        "UPDATE research_jobs SET status='running', started_at=NOW() WHERE job_id=$1",
+        job_id,
+    )
 
 
-def _db_complete_job(job_id: str, result: dict) -> None:
-    with _get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """UPDATE research_jobs
-                   SET status='complete', result=%s, updated_at=NOW()
-                   WHERE job_id=%s""",
-                (json.dumps(result), job_id),
-            )
-        conn.commit()
+async def db_complete_job(job_id: str, result: dict) -> None:
+    await _db_pool.execute(
+        """UPDATE research_jobs
+           SET status='complete', result_json=$1, completed_at=NOW()
+           WHERE job_id=$2""",
+        json.dumps(result), job_id,
+    )
 
 
-def _db_fail_job(job_id: str, error: str) -> None:
-    with _get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """UPDATE research_jobs
-                   SET status='failed', error=%s, updated_at=NOW()
-                   WHERE job_id=%s""",
-                (error, job_id),
-            )
-        conn.commit()
+async def db_fail_job(job_id: str, error_text: str) -> None:
+    await _db_pool.execute(
+        """UPDATE research_jobs
+           SET status='failed', error_text=$1, completed_at=NOW()
+           WHERE job_id=$2""",
+        error_text, job_id,
+    )
 
 
-def _db_get_job(job_id: str) -> Optional[Dict[str, Any]]:
-    with _get_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                "SELECT status, result, error FROM research_jobs WHERE job_id=%s",
-                (job_id,),
-            )
-            row = cur.fetchone()
+async def db_get_job(job_id: str) -> Optional[Dict[str, Any]]:
+    row = await _db_pool.fetchrow(
+        """SELECT status, result_json, error_text
+           FROM research_jobs WHERE job_id=$1""",
+        job_id,
+    )
     if row is None:
         return None
     return {
         "status": row["status"],
-        "result": row["result"],  # already dict (JSONB auto-decoded by psycopg2)
-        "error": row["error"],
+        "result": json.loads(row["result_json"]) if row["result_json"] else None,
+        "error": row["error_text"],
     }
-
-
-async def _db_init_async():
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(_db_executor, _db_init)
-
-
-# Initialise table at import time (blocking — fast, runs once on startup)
-try:
-    _db_init()
-except Exception as _db_init_err:
-    print(f"[WARN] DB init failed: {_db_init_err} — jobs will degrade to in-memory fallback")
-    _DB_URL = ""  # disable DB, fall back below
-
-# In-memory fallback (used only when DB is unavailable)
-_research_jobs_fallback: Dict[str, Any] = {}
 
 
 # ============================================================
@@ -2884,8 +2884,25 @@ class UnifiedOrchestrator:
 # FASTAPI WEB SERVER — Unified Dashboard
 # ============================================================
 
-app = FastAPI(title="CRIA — Convergent Research Intelligence Architecture",
-              version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _db_pool
+    try:
+        _db_pool = await _init_db_pool()
+    except Exception as e:
+        log.error("Failed to initialise DB pool: %s", e, exc_info=True)
+        raise
+    yield
+    if _db_pool:
+        await _db_pool.close()
+        log.info("DB pool closed")
+
+
+app = FastAPI(
+    title="CRIA — Convergent Research Intelligence Architecture",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 
 class ResearchRequest(BaseModel):
@@ -2904,7 +2921,8 @@ async def serve_dashboard():
 
 
 async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
-    loop = asyncio.get_event_loop()
+    log.info("Job %s starting — question: %r", job_id, artefact.research_question[:120])
+    await db_start_job(job_id)
     try:
         email = os.environ.get("CRIA_CONTACT_EMAIL")
         semantic_key = os.environ.get("SEMANTIC_SCHOLAR_KEY")
@@ -2913,23 +2931,28 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
             email=email, semantic_key=semantic_key,
         )
         result = await orchestrator.research(artefact)
-        if _DB_URL:
-            await loop.run_in_executor(_db_executor, _db_complete_job, job_id, result)
-        else:
-            _research_jobs_fallback[job_id] = {"status": "complete", "result": result, "error": None}
+        await db_complete_job(job_id, result)
+        duration = result.get("duration_seconds", "?")
+        log.info(
+            "Job %s complete — %.1fs — cog:%d epi:%d conv:%d",
+            job_id, duration,
+            len(result.get("cognitive_pipeline", {}).get("findings", [])),
+            len(result.get("epistemic_pipeline", {}).get("findings", [])),
+            len(result.get("convergent_pipeline", {}).get("findings", [])),
+        )
     except BaseException as e:
         err_type = type(e).__name__
         err_msg = f"{err_type}: {e}" if str(e) else err_type
-        if _DB_URL:
-            await loop.run_in_executor(_db_executor, _db_fail_job, job_id, err_msg)
-        else:
-            _research_jobs_fallback[job_id] = {"status": "failed", "result": None, "error": err_msg}
+        log.error("Job %s failed — %s", job_id, err_msg, exc_info=True)
+        await db_fail_job(job_id, err_msg)
 
 
 @app.post(f"{BASE_PATH}/research")
 async def research_endpoint(request: ResearchRequest, background_tasks: BackgroundTasks):
     all_voices = ["academic", "editorial", "practitioner"]
-    voices = all_voices if request.voice == "all" else [request.voice] if request.voice in all_voices else all_voices
+    voices = (all_voices if request.voice == "all"
+              else [request.voice] if request.voice in all_voices
+              else all_voices)
     artefact = ResearchArtefact(
         research_question=request.query,
         observer_note=request.observer_note,
@@ -2939,23 +2962,17 @@ async def research_endpoint(request: ResearchRequest, background_tasks: Backgrou
         max_iterations=request.max_iterations,
     )
     job_id = str(uuid.uuid4())
-    loop = asyncio.get_event_loop()
-    if _DB_URL:
-        await loop.run_in_executor(_db_executor, _db_create_job, job_id)
-    else:
-        _research_jobs_fallback[job_id] = {"status": "running", "result": None, "error": None}
+    await db_create_job(job_id, question_text=request.query, mode=request.profile)
     background_tasks.add_task(_run_research_job, job_id, artefact)
-    return {"job_id": job_id, "status": "running"}
+    log.info("Job %s queued — %r", job_id, request.query[:80])
+    return {"job_id": job_id, "status": "queued"}
 
 
 @app.get(f"{BASE_PATH}/research/{{job_id}}")
 async def research_status(job_id: str):
-    loop = asyncio.get_event_loop()
-    if _DB_URL:
-        job = await loop.run_in_executor(_db_executor, _db_get_job, job_id)
-    else:
-        job = _research_jobs_fallback.get(job_id)
+    job = await db_get_job(job_id)
     if not job:
+        log.warning("Poll for unknown job_id: %s", job_id)
         raise HTTPException(status_code=404, detail="Job not found")
     return {
         "job_id": job_id,
