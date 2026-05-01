@@ -113,10 +113,42 @@ async def _migrate_research_jobs(conn: asyncpg.Connection) -> None:
 
 
 async def _init_db_pool() -> asyncpg.Pool:
-    """Create the asyncpg connection pool and ensure the table exists."""
-    # asyncpg needs the DSN without ?sslmode=... — pass ssl explicitly instead
-    dsn = _DB_URL.split("?")[0] if "?" in _DB_URL else _DB_URL
-    pool = await asyncpg.create_pool(dsn=dsn, ssl=False, min_size=2, max_size=10)
+    """Create the asyncpg connection pool and ensure the table exists.
+
+    asyncpg does not accept sslmode= in the DSN string, so we strip it and
+    pass ssl= explicitly.  We derive the value from the URL's sslmode param:
+      - sslmode=disable  → ssl=False  (local dev, no TLS)
+      - sslmode=require  → ssl=True   (managed cloud DB)
+      - missing          → try ssl=True first, fall back to ssl=False
+        (handles prod DB servers that require TLS even without explicit sslmode)
+    """
+    import urllib.parse as _up
+    base_dsn = _DB_URL.split("?")[0] if "?" in _DB_URL else _DB_URL
+    qs = _up.parse_qs(_DB_URL.split("?", 1)[1]) if "?" in _DB_URL else {}
+    sslmode = (qs.get("sslmode") or [None])[0]
+
+    if sslmode == "disable":
+        ssl_candidates = [False]
+    elif sslmode in ("require", "verify-ca", "verify-full"):
+        ssl_candidates = [True]
+    else:
+        # Unknown / absent — try TLS first (production), then plain (dev)
+        ssl_candidates = [True, False]
+
+    pool: asyncpg.Pool | None = None
+    last_exc: Exception | None = None
+    for ssl_val in ssl_candidates:
+        try:
+            pool = await asyncpg.create_pool(
+                dsn=base_dsn, ssl=ssl_val, min_size=2, max_size=10
+            )
+            log.info("DB pool connected ssl=%s", ssl_val)
+            break
+        except Exception as exc:
+            last_exc = exc
+            log.warning("DB pool attempt ssl=%s failed: %s", ssl_val, exc)
+    if pool is None:
+        raise RuntimeError(f"Could not connect to database: {last_exc}") from last_exc
     async with pool.acquire() as conn:
         await _migrate_research_jobs(conn)
         await conn.execute(_CREATE_TABLE_SQL)
