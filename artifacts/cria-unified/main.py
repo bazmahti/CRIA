@@ -40,7 +40,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from fastapi import FastAPI, HTTPException
+import uuid
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import uvicorn
@@ -704,6 +705,14 @@ class StubbedConnector:
 # ============================================================
 
 _openai_client = None
+_llm_semaphore: asyncio.Semaphore | None = None
+
+
+def get_llm_semaphore() -> asyncio.Semaphore:
+    global _llm_semaphore
+    if _llm_semaphore is None:
+        _llm_semaphore = asyncio.Semaphore(5)
+    return _llm_semaphore
 
 
 def get_openai_client():
@@ -719,25 +728,27 @@ def get_openai_client():
 async def call_llm(prompt: str, system_prompt: str = "",
                    max_tokens: int = 800) -> str:
     client = get_openai_client()
+    sem = get_llm_semaphore()
     default_system = (
         "You are a rigorous research analyst. Be specific and "
         "evidence-based. Name gaps rather than fabricating content. "
         "Do not invent citations. When evidence is contested or absent, "
         "say so plainly."
     )
-    try:
-        messages = []
-        if system_prompt or default_system:
-            messages.append({"role": "system", "content": system_prompt if system_prompt else default_system})
-        messages.append({"role": "user", "content": prompt})
-        response = await client.chat.completions.create(
-            model="gpt-5-mini",
-            max_completion_tokens=max_tokens,
-            messages=messages,
-        )
-        return response.choices[0].message.content or ""
-    except Exception as e:
-        return f"[LLM error: {type(e).__name__}: {str(e)[:200]}]"
+    async with sem:
+        try:
+            messages = []
+            if system_prompt or default_system:
+                messages.append({"role": "system", "content": system_prompt if system_prompt else default_system})
+            messages.append({"role": "user", "content": prompt})
+            response = await client.chat.completions.create(
+                model="gpt-5-mini",
+                max_completion_tokens=max_tokens,
+                messages=messages,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            return f"[LLM error: {type(e).__name__}: {str(e)[:200]}]"
 
 
 # ============================================================
@@ -2315,18 +2326,18 @@ class ThreeVoiceRenderer:
                          epi_academic: Dict[str, Any],
                          epi_experimental: Dict[str, Any],
                          artefact: ResearchArtefact) -> Dict[str, Dict[str, str]]:
-        if artefact.voice in ["academic", "all"]:
+        if "academic" in artefact.voices:
             academic = await self._render_academic(cog_findings, epi_findings,
                                                     conv_findings, epi_academic,
                                                     artefact)
         else:
             academic = {}
-        if artefact.voice in ["editorial", "all"]:
+        if "editorial" in artefact.voices:
             editorial = await self._render_editorial(cog_findings, epi_findings,
                                                       conv_findings, artefact)
         else:
             editorial = {}
-        if artefact.voice in ["practitioner", "all"]:
+        if "practitioner" in artefact.voices:
             practitioner = await self._render_practitioner(cog_findings, epi_findings,
                                                             conv_findings, artefact)
         else:
@@ -2750,17 +2761,11 @@ async def serve_dashboard():
     return HTMLResponse(DASHBOARD_HTML)
 
 
-@app.post(f"{BASE_PATH}/research")
-async def research_endpoint(request: ResearchRequest):
+_research_jobs: Dict[str, Any] = {}
+
+
+async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
     try:
-        artefact = ResearchArtefact(
-            research_question=request.query,
-            observer_note=request.observer_note,
-            dissonance_budget=request.dissonance_budget,
-            voice=request.voice,
-            profile=request.profile,
-            max_iterations=request.max_iterations,
-        )
         email = os.environ.get("CRIA_CONTACT_EMAIL")
         semantic_key = os.environ.get("SEMANTIC_SCHOLAR_KEY")
         orchestrator = UnifiedOrchestrator(
@@ -2768,9 +2773,42 @@ async def research_endpoint(request: ResearchRequest):
             email=email, semantic_key=semantic_key,
         )
         result = await orchestrator.research(artefact)
-        return result
+        _research_jobs[job_id]["status"] = "complete"
+        _research_jobs[job_id]["result"] = result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _research_jobs[job_id]["status"] = "failed"
+        _research_jobs[job_id]["error"] = str(e)
+
+
+@app.post(f"{BASE_PATH}/research")
+async def research_endpoint(request: ResearchRequest, background_tasks: BackgroundTasks):
+    all_voices = ["academic", "editorial", "practitioner"]
+    voices = all_voices if request.voice == "all" else [request.voice] if request.voice in all_voices else all_voices
+    artefact = ResearchArtefact(
+        research_question=request.query,
+        observer_note=request.observer_note,
+        dissonance_budget=request.dissonance_budget,
+        voices=voices,
+        profile=request.profile,
+        max_iterations=request.max_iterations,
+    )
+    job_id = str(uuid.uuid4())
+    _research_jobs[job_id] = {"status": "running", "result": None, "error": None}
+    background_tasks.add_task(_run_research_job, job_id, artefact)
+    return {"job_id": job_id, "status": "running"}
+
+
+@app.get(f"{BASE_PATH}/research/{{job_id}}")
+async def research_status(job_id: str):
+    job = _research_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {
+        "job_id": job_id,
+        "status": job["status"],
+        "result": job.get("result"),
+        "error": job.get("error"),
+    }
 
 
 @app.get(f"{BASE_PATH}/connectors")

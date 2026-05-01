@@ -99,6 +99,60 @@ async function callEngine(
   }
 }
 
+// Async polling variant: POST starts job, then polls GET /{job_id} until done
+async function callEnginePolling(
+  baseUrl: string,
+  body: Record<string, unknown>,
+  state: EngineState,
+  pollIntervalMs = 10_000,
+  maxWaitMs = 900_000,
+): Promise<void> {
+  state.status = "running";
+  state.startedAt = new Date();
+  try {
+    const startResp = await fetch(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!startResp.ok) {
+      const text = await startResp.text();
+      throw new Error(`HTTP ${startResp.status}: ${text.slice(0, 200)}`);
+    }
+    const { job_id } = (await startResp.json()) as { job_id: string; status: string };
+    if (!job_id) throw new Error("No job_id returned from engine");
+
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+      const pollResp = await fetch(`${baseUrl}/${job_id}`, {
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!pollResp.ok) continue;
+      const pollData = (await pollResp.json()) as {
+        status: string;
+        result?: Record<string, unknown>;
+        error?: string;
+      };
+      if (pollData.status === "complete") {
+        state.result = pollData.result ?? {};
+        state.status = "complete";
+        return;
+      }
+      if (pollData.status === "failed") {
+        throw new Error(pollData.error ?? "Engine reported failure");
+      }
+    }
+    throw new Error("Timed out waiting for engine result");
+  } catch (err) {
+    state.status = "failed";
+    state.error = err instanceof Error ? err.message : String(err);
+  } finally {
+    state.completedAt = new Date();
+  }
+}
+
 function updateJobStatus(job: ParallelJob): void {
   const both = [job.v2, job.v4];
   if (both.every((e) => e.status === "complete")) {
@@ -150,10 +204,10 @@ router.post("/research/parallel", async (req, res): Promise<void> => {
   };
 
   Promise.all([
-    callEngine("http://localhost:80/cria-v2/research", v2Body, job.v2).then(() =>
+    callEngine("http://localhost:8001/cria-v2/research", v2Body, job.v2).then(() =>
       updateJobStatus(job),
     ),
-    callEngine("http://localhost:80/cria-v4/research", v4Body, job.v4).then(() =>
+    callEngine("http://localhost:8002/cria-v4/research", v4Body, job.v4).then(() =>
       updateJobStatus(job),
     ),
   ]).catch(() => {
@@ -249,7 +303,7 @@ router.post("/research/unified", async (req, res): Promise<void> => {
     profile,
   };
 
-  callEngine("http://localhost:80/cria-unified/research", unifiedBody, job.engine)
+  callEnginePolling("http://localhost:8003/cria-unified/research", unifiedBody, job.engine)
     .then(() => {
       job.status = job.engine.status === "complete" ? "complete" : "failed";
       job.completedAt = new Date();
