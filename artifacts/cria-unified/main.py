@@ -726,7 +726,7 @@ def get_openai_client():
 
 
 async def call_llm(prompt: str, system_prompt: str = "",
-                   max_tokens: int = 800) -> str:
+                   max_tokens: int = 800, retries: int = 2) -> str:
     client = get_openai_client()
     sem = get_llm_semaphore()
     default_system = (
@@ -735,20 +735,29 @@ async def call_llm(prompt: str, system_prompt: str = "",
         "Do not invent citations. When evidence is contested or absent, "
         "say so plainly."
     )
-    async with sem:
-        try:
-            messages = []
-            if system_prompt or default_system:
-                messages.append({"role": "system", "content": system_prompt if system_prompt else default_system})
-            messages.append({"role": "user", "content": prompt})
-            response = await client.chat.completions.create(
-                model="gpt-5-mini",
-                max_completion_tokens=max_tokens,
-                messages=messages,
-            )
-            return response.choices[0].message.content or ""
-        except Exception as e:
-            return f"[LLM error: {type(e).__name__}: {str(e)[:200]}]"
+    messages = []
+    if system_prompt or default_system:
+        messages.append({"role": "system", "content": system_prompt if system_prompt else default_system})
+    messages.append({"role": "user", "content": prompt})
+    last_err = ""
+    for attempt in range(retries + 1):
+        async with sem:
+            try:
+                response = await client.chat.completions.create(
+                    model="gpt-5-mini",
+                    max_completion_tokens=max_tokens,
+                    messages=messages,
+                )
+                text = response.choices[0].message.content or ""
+                if text:
+                    return text
+                # Empty response — retry if attempts remain
+                last_err = "empty response"
+            except Exception as e:
+                last_err = f"{type(e).__name__}: {str(e)[:200]}"
+        if attempt < retries:
+            await asyncio.sleep(2 ** attempt)  # 1s, 2s backoff
+    return f"[LLM error after {retries + 1} attempts: {last_err}]"
 
 
 # ============================================================
@@ -2326,23 +2335,24 @@ class ThreeVoiceRenderer:
                          epi_academic: Dict[str, Any],
                          epi_experimental: Dict[str, Any],
                          artefact: ResearchArtefact) -> Dict[str, Dict[str, str]]:
-        if "academic" in artefact.voices:
-            academic = await self._render_academic(cog_findings, epi_findings,
-                                                    conv_findings, epi_academic,
-                                                    artefact)
-        else:
-            academic = {}
-        if "editorial" in artefact.voices:
-            editorial = await self._render_editorial(cog_findings, epi_findings,
-                                                      conv_findings, artefact)
-        else:
-            editorial = {}
-        if "practitioner" in artefact.voices:
-            practitioner = await self._render_practitioner(cog_findings, epi_findings,
-                                                            conv_findings, artefact)
-        else:
-            practitioner = {}
-        return {"academic": academic, "editorial": editorial, "practitioner": practitioner}
+        async def _skip() -> Dict:
+            return {}
+
+        coros = [
+            self._render_academic(cog_findings, epi_findings, conv_findings,
+                                   epi_academic, artefact)
+            if "academic" in artefact.voices else _skip(),
+            self._render_editorial(cog_findings, epi_findings, conv_findings, artefact)
+            if "editorial" in artefact.voices else _skip(),
+            self._render_practitioner(cog_findings, epi_findings, conv_findings, artefact)
+            if "practitioner" in artefact.voices else _skip(),
+        ]
+        results = await asyncio.gather(*coros, return_exceptions=True)
+        keys = ["academic", "editorial", "practitioner"]
+        output: Dict[str, Any] = {}
+        for k, r in zip(keys, results):
+            output[k] = r if not isinstance(r, Exception) else {}
+        return output
 
     async def _render_academic(self, cog, epi, conv, epi_academic, artefact):
         cog_t = "\n".join(f"- {f.content[:300]}" for f in cog[:6])

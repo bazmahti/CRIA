@@ -18,10 +18,10 @@ async function extractText(file: File): Promise<string> {
   if (ext === "pdf" || file.type === "application/pdf") {
     try {
       const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-        "pdfjs-dist/build/pdf.worker.min.mjs",
-        import.meta.url,
-      ).toString();
+      // Use a CDN worker URL that is reliable across all environments
+      if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+      }
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const parts: string[] = [];
@@ -35,9 +35,13 @@ async function extractText(file: File): Promise<string> {
         parts.push(pageText);
         total += pageText.length;
       }
-      return parts.join("\n\n").slice(0, MAX_CHARS);
-    } catch {
-      throw new Error("Could not extract text from PDF. Try copying and pasting the text instead.");
+      const extracted = parts.join("\n\n").slice(0, MAX_CHARS).trim();
+      if (!extracted) throw new Error("no-text");
+      return extracted;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg === "no-text") throw new Error("This PDF appears to be image-based (scanned). Copy and paste the text instead.");
+      throw new Error("Could not extract text from this PDF. Try copying and pasting the text instead.");
     }
   }
 

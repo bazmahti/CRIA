@@ -215,6 +215,27 @@ Runs three architecturally distinct research pipelines from one research questio
 - No fabrication: all voices instructed to name gaps rather than invent content
 - Observer note recommended for partnership-sensitive profile
 
+### Python Result Data Structure (DO NOT CHANGE KEY NAMES)
+The `POST /cria-unified/research` → `GET /cria-unified/research/{job_id}` result has this shape:
+```json
+{
+  "cognitive_pipeline": { "findings": [...], "meta_findings": [...], "layer3_findings": [...], "hofstadter_validation": "string", "layer3_report": {...} },
+  "epistemic_pipeline": { "findings": [...], "academic_stream": {...}, "experimental_stream": {...}, "hofstadter_validation": "string", "layer3_findings": [...], "layer3_report": {...} },
+  "convergent_pipeline": { "findings": [...], "layer3_findings": [...], "layer3_report": {...} },
+  "voices": {
+    "academic":     { "text": "...", "audience": "Peer-reviewed scholarly community" },
+    "editorial":    { "text": "...", "audience": "Trade publications, quality magazines, podcasts, social media" },
+    "practitioner": { "text": "...", "audience": "Clinicians, policy makers, community organisers, practitioners" }
+  },
+  "publication_guidance": {
+    "cognitive_paper":   { "suggested_venues": [{"name":"...", "type":"...", "rationale":"..."}], "paper_structure": "...", "estimated_length": "..." },
+    "epistemic_paper":   { "suggested_venues": [...], ... },
+    "convergent_paper":  { "suggested_venues": [...], ... }
+  }
+}
+```
+`Finding.to_dict()` uses short keys: `source` (not `source_channel`), `tier` (not `evidence_tier`), `position` (not `position_privileged`), `refusal` (not `refusal_signal`), `id` (not `finding_id`).
+
 ### Important Notes for Future Builds
 - Do NOT rename channel IDs (CogC1–C10, EpiC1–C10, ConvC1–C5) — referenced throughout metagent prompts, Layer 3, and publication guidance logic
 - Do NOT activate partnership-gated connectors without Troy gating process

@@ -106,12 +106,12 @@ function FindingCard({ finding, index }: { finding: Record<string, unknown>; ind
                 {(conf * 100).toFixed(0)}%
               </span>
             )}
-            {finding.dissonance_role && (
+            {Boolean(finding.dissonance_role) && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">
                 {String(finding.dissonance_role)}
               </span>
             )}
-            {finding.position_privileged && (
+            {Boolean(finding.position_privileged) && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
                 {String(finding.position_privileged)}
               </span>
@@ -125,7 +125,7 @@ function FindingCard({ finding, index }: { finding: Record<string, unknown>; ind
           {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
       </div>
-      {open && finding.sources && Array.isArray(finding.sources) && finding.sources.length > 0 && (
+      {open && Boolean(finding.sources) && Array.isArray(finding.sources) && finding.sources.length > 0 && (
         <div className="mt-2 pt-2 border-t border-border/30">
           <p className="text-[10px] text-muted-foreground mb-1">Sources</p>
           <div className="flex flex-wrap gap-1">
@@ -316,7 +316,7 @@ function V4Results({ result }: { result: Record<string, unknown> }) {
                   <span key={s} className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">{s.replace(/_/g, " ")}</span>
                 ))}
               </div>
-              {meta.stagnation_recovery_triggered && (
+              {Boolean(meta.stagnation_recovery_triggered) && (
                 <div className="mt-2 flex items-center gap-1.5 text-[11px] text-orange-400">
                   <AlertTriangle className="w-3 h-3" />
                   Stagnation recovery triggered — dissonance budget raised

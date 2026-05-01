@@ -46,6 +46,9 @@ export default defineConfig({
         ]
       : []),
   ],
+  optimizeDeps: {
+    include: ["pdfjs-dist"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),

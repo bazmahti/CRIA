@@ -104,11 +104,15 @@ function Tabs<T extends string>({
 function FindingCard({ finding, index }: { finding: Record<string, unknown>; index: number }) {
   const [open, setOpen] = useState(false);
   const content = str(finding["content"]);
-  const channel = str(finding["source_channel"] ?? finding["channel"] ?? "");
+  // to_dict() uses "source" key (from source_channel), fall back to legacy keys
+  const channel = str(finding["source"] ?? finding["source_channel"] ?? finding["channel"] ?? "");
   const confidence = typeof finding["confidence"] === "number" ? finding["confidence"] : null;
-  const tier = str(finding["evidence_tier"] ?? "");
-  const position = str(finding["position_privileged"] ?? "");
-  const refusal = finding["refusal_signal"] === true;
+  // to_dict() uses "tier" (from evidence_tier)
+  const tier = str(finding["tier"] ?? finding["evidence_tier"] ?? "");
+  // to_dict() uses "position" (from position_privileged)
+  const position = str(finding["position"] ?? finding["position_privileged"] ?? "");
+  // to_dict() uses "refusal" (from refusal_signal)
+  const refusal = finding["refusal"] === true || finding["refusal_signal"] === true;
 
   return (
     <div className={cn(
@@ -139,7 +143,9 @@ function FindingCard({ finding, index }: { finding: Record<string, unknown>; ind
       {open && (
         <div className="mt-3 pt-3 border-t border-border/30 text-[11px] text-muted-foreground space-y-1">
           {Object.entries(finding)
-            .filter(([k]) => !["content", "source_channel", "channel", "confidence", "evidence_tier", "position_privileged", "refusal_signal", "finding_id"].includes(k))
+            .filter(([k]) => !["content", "source", "source_channel", "channel", "confidence",
+              "tier", "evidence_tier", "position", "position_privileged",
+              "refusal", "refusal_signal", "id", "finding_id"].includes(k))
             .map(([k, v]) => v != null && str(v) && (
               <div key={k} className="flex gap-2">
                 <span className="font-mono text-primary/60 shrink-0">{k}:</span>
@@ -175,11 +181,22 @@ function PipelinePanel({
     </div>
   );
 
-  const pipeline = (result[pipelineKey] ?? result) as Record<string, unknown>;
-  const voices = (result["voices"] ?? pipeline["voices"] ?? {}) as Record<string, string>;
-  const findings = arr(pipeline["findings"] ?? result["findings"]) as Record<string, unknown>[];
+  // Python returns cognitive_pipeline / epistemic_pipeline / convergent_pipeline
+  const pipeline = (result[`${pipelineKey}_pipeline`] ?? result[pipelineKey] ?? {}) as Record<string, unknown>;
+  // voices = { academic: {text, audience}, editorial: {text, audience}, practitioner: {text, audience} }
+  const voicesRaw = (result["voices"] ?? {}) as Record<string, unknown>;
+  const voiceObj = (voicesRaw[voice] ?? {}) as Record<string, unknown>;
+  // extract text from nested object or fall back to string
+  const voiceContent = typeof voiceObj["text"] === "string" ? voiceObj["text"]
+    : typeof voicesRaw[voice] === "string" ? str(voicesRaw[voice]) : "";
+  // All findings across layers
+  const findings = [
+    ...arr(pipeline["findings"]),
+    ...arr(pipeline["meta_findings"]),
+    ...arr(pipeline["layer3_findings"]),
+  ] as Record<string, unknown>[];
   const layer3 = pipeline["layer3_report"] as Record<string, unknown> | undefined;
-  const hofstadter = str(pipeline["hofstadter"] ?? pipeline["validation"]);
+  const hofstadter = str(pipeline["hofstadter_validation"] ?? pipeline["hofstadter"] ?? pipeline["validation"]);
 
   const voiceTabs: { key: VoiceTab; label: string }[] = [
     { key: "academic", label: "Academic" },
@@ -191,9 +208,6 @@ function PipelinePanel({
     editorial: <Newspaper className="w-3 h-3" />,
     practitioner: <Briefcase className="w-3 h-3" />,
   };
-
-  const voiceKey = `${pipelineKey}_${voice}`;
-  const voiceContent = str(voices[voiceKey] ?? voices[voice] ?? voices[`${voice}_voice`] ?? "");
 
   return (
     <div className="space-y-4">
@@ -257,24 +271,60 @@ function PublicationPanel({ guidance }: { guidance: Record<string, unknown> | nu
     </div>
   );
 
-  const cogVenues = arr(guidance["cognitive_venues"]) as { venue: string; reasoning?: string }[];
-  const epiVenues = arr(guidance["epistemic_venues"]) as { venue: string; reasoning?: string }[];
-  const convVenues = arr(guidance["convergent_venues"]) as { venue: string; reasoning?: string }[];
-  const strategy = str(guidance["three_paper_strategy"] ?? guidance["strategy"]);
+  // Python returns { cognitive_paper: {suggested_venues, paper_structure, estimated_length, metadata}, ... }
+  // guidance is guaranteed non-null here (checked above)
+  const guidanceNN = guidance as Record<string, unknown>;
+  function getPaper(key: string) {
+    return (guidanceNN[key] ?? {}) as Record<string, unknown>;
+  }
+  type VenueItem = { name?: string; venue?: string; type?: string; rationale?: string; reasoning?: string };
+  function getVenues(key: string): VenueItem[] {
+    const paper = getPaper(key);
+    // venues may be at paper.suggested_venues OR directly at guidance.{key}_venues
+    return arr(paper["suggested_venues"] ?? guidanceNN[`${key}_venues`]) as VenueItem[];
+  }
 
-  function VenueList({ venues, label, color }: { venues: { venue: string; reasoning?: string }[]; label: string; color: string }) {
-    if (!venues.length) return null;
+  const cogPaper = getPaper("cognitive_paper");
+  const epiPaper = getPaper("epistemic_paper");
+  const convPaper = getPaper("convergent_paper");
+  const cogVenues = getVenues("cognitive");
+  const epiVenues = getVenues("epistemic");
+  const convVenues = getVenues("convergent");
+
+  function VenueList({ venues, label, color, paper }: {
+    venues: VenueItem[]; label: string; color: string; paper: Record<string, unknown>;
+  }) {
+    const paperStructure = str(paper["paper_structure"]);
+    const estimatedLength = str(paper["estimated_length"]);
     return (
       <div>
         <h4 className={cn("text-xs font-semibold mb-2", color)}>{label}</h4>
-        <ol className="space-y-2">
-          {venues.map((v, i) => (
-            <li key={i} className="text-xs">
-              <span className="font-medium text-foreground">{i + 1}. {str(v.venue ?? v)}</span>
-              {v.reasoning && <p className="text-muted-foreground mt-0.5 leading-relaxed">{v.reasoning}</p>}
-            </li>
-          ))}
-        </ol>
+        {venues.length > 0 ? (
+          <ol className="space-y-2 mb-3">
+            {venues.map((v, i) => {
+              const name = str(v.name ?? v.venue ?? "");
+              const detail = str(v.rationale ?? v.reasoning ?? v.type ?? "");
+              return (
+                <li key={i} className="text-xs">
+                  <span className="font-medium text-foreground">{i + 1}. {name}</span>
+                  {detail && <p className="text-muted-foreground mt-0.5 leading-relaxed">{detail}</p>}
+                </li>
+              );
+            })}
+          </ol>
+        ) : (
+          <p className="text-xs text-muted-foreground italic mb-3">No venues suggested.</p>
+        )}
+        {paperStructure && (
+          <p className="text-[10px] text-muted-foreground border-t border-border/30 pt-2 mt-1">
+            <span className="font-medium">Structure: </span>{paperStructure}
+          </p>
+        )}
+        {estimatedLength && (
+          <p className="text-[10px] text-muted-foreground">
+            <span className="font-medium">Length: </span>{estimatedLength}
+          </p>
+        )}
       </div>
     );
   }
@@ -283,25 +333,15 @@ function PublicationPanel({ guidance }: { guidance: Record<string, unknown> | nu
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-card/20 rounded-xl border border-border/30 p-4">
-          <VenueList venues={cogVenues} label="CRIA-Cognitive venues" color="text-blue-400" />
+          <VenueList venues={cogVenues} label="CRIA-Cognitive venues" color="text-blue-400" paper={cogPaper} />
         </div>
         <div className="bg-card/20 rounded-xl border border-border/30 p-4">
-          <VenueList venues={epiVenues} label="CRIA-Epistemic venues" color="text-violet-400" />
+          <VenueList venues={epiVenues} label="CRIA-Epistemic venues" color="text-violet-400" paper={epiPaper} />
         </div>
         <div className="bg-card/20 rounded-xl border border-border/30 p-4">
-          <VenueList venues={convVenues} label="CRIA-Convergent venues" color="text-emerald-400" />
+          <VenueList venues={convVenues} label="CRIA-Convergent venues" color="text-emerald-400" paper={convPaper} />
         </div>
       </div>
-      {strategy && (
-        <div className="bg-card/20 rounded-xl border border-border/30 p-4">
-          <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5 text-primary" /> Three-Paper Strategy
-          </h4>
-          <div className="prose prose-sm prose-invert max-w-none text-foreground/80">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{strategy}</ReactMarkdown>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
