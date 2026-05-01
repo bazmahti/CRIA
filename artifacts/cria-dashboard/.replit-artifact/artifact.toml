@@ -54,7 +54,7 @@ PORT = "8002"
 
 [[services]]
 name = "cria-unified"
-paths = [ "/cria-unified", "/api/research" ]
+paths = [ "/cria-unified" ]
 localPort = 8003
 
 [services.development]

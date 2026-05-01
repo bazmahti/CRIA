@@ -372,7 +372,7 @@ export default function UnifiedResearch() {
 
   const pollJob = useCallback(async (jobId: string) => {
     try {
-      const resp = await fetch(`/api/research/unified/${jobId}`);
+      const resp = await fetch(`/cria-unified/research/${jobId}`);
       if (!resp.ok) return;
       const data = (await resp.json()) as UnifiedJobState;
       setJob(data);
@@ -390,7 +390,7 @@ export default function UnifiedResearch() {
     stopPolling();
 
     try {
-      const resp = await fetch("/api/research/unified", {
+      const resp = await fetch("/cria-unified/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

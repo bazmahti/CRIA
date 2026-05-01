@@ -3050,7 +3050,7 @@ async def research_endpoint(request: ResearchRequest, background_tasks: Backgrou
     await db_create_job(job_id, question_text=request.query, mode=request.profile)
     background_tasks.add_task(_run_research_job, job_id, artefact)
     log.info("Job %s queued — %r", job_id, request.query[:80])
-    return {"job_id": job_id, "status": "queued"}
+    return {"jobId": job_id, "status": "running"}
 
 
 @app.get(f"{BASE_PATH}/research/{{job_id}}")
@@ -3059,11 +3059,25 @@ async def research_status(job_id: str):
     if not job:
         log.warning("Poll for unknown job_id: %s", job_id)
         raise HTTPException(status_code=404, detail="Job not found")
+    status = job["status"]
+    started_at = job.get("started_at")
+    completed_at = job.get("completed_at")
+    result = job.get("result")
+    error = job.get("error")
+    engine_status = status if status in ("running", "complete", "failed") else "running"
     return {
-        "job_id": job_id,
-        "status": job["status"],
-        "result": job.get("result"),
-        "error": job.get("error"),
+        "jobId": job_id,
+        "query": job.get("question_text", ""),
+        "status": status,
+        "startedAt": started_at.isoformat() if started_at else None,
+        "completedAt": completed_at.isoformat() if completed_at else None,
+        "engine": {
+            "status": engine_status,
+            "startedAt": started_at.isoformat() if started_at else None,
+            "completedAt": completed_at.isoformat() if completed_at else None,
+            "result": result,
+            "error": error,
+        },
     }
 
 
