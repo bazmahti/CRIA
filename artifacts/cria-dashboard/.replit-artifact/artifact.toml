@@ -51,3 +51,15 @@ run = "python /home/runner/workspace/artifacts/cria-v4/main.py"
 
 [services.env]
 PORT = "8002"
+
+[[services]]
+name = "cria-unified"
+paths = [ "/cria-unified" ]
+localPort = 8003
+
+[services.development]
+run = "python /home/runner/workspace/artifacts/cria-unified/main.py"
+
+[services.env]
+PORT = "8003"
+BASE_PATH = "/cria-unified"

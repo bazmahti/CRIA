@@ -28,7 +28,22 @@ interface ParallelJob {
   v4: EngineState;
 }
 
+interface UnifiedJob {
+  jobId: string;
+  query: string;
+  observerNote: string;
+  dissonanceBudget: number;
+  maxIterations: number;
+  voice: string;
+  profile: string;
+  startedAt: Date;
+  completedAt?: Date;
+  status: "running" | "complete" | "failed";
+  engine: EngineState;
+}
+
 const jobs = new Map<string, ParallelJob>();
+const unifiedJobs = new Map<string, UnifiedJob>();
 
 interface ParallelRequest {
   query: string;
@@ -197,6 +212,80 @@ router.get("/research/parallel", (_req, res): void => {
       v4Status: j.v4.status,
     }));
   res.json({ jobs: recent });
+});
+
+// POST /api/research/unified
+router.post("/research/unified", async (req, res): Promise<void> => {
+  const parsed = parseRequest(req.body);
+  if (!parsed.ok) {
+    res.status(400).json({ error: parsed.error });
+    return;
+  }
+
+  const { query, observer_note, dissonance_budget, max_iterations, voice, profile } = parsed.data;
+  const jobId = randomUUID();
+
+  const job: UnifiedJob = {
+    jobId,
+    query,
+    observerNote: observer_note,
+    dissonanceBudget: dissonance_budget,
+    maxIterations: max_iterations,
+    voice: voice === "both" ? "all" : voice,
+    profile,
+    startedAt: new Date(),
+    status: "running",
+    engine: { status: "pending" },
+  };
+
+  unifiedJobs.set(jobId, job);
+
+  const unifiedBody = {
+    query,
+    observer_note,
+    dissonance_budget,
+    max_iterations,
+    voice: job.voice,
+    profile,
+  };
+
+  callEngine("http://localhost:80/cria-unified/research", unifiedBody, job.engine)
+    .then(() => {
+      job.status = job.engine.status === "complete" ? "complete" : "failed";
+      job.completedAt = new Date();
+    })
+    .catch(() => {
+      job.status = "failed";
+      job.completedAt = new Date();
+    });
+
+  req.log.info({ jobId, query: query.slice(0, 80) }, "Unified research job started");
+  res.status(202).json({ jobId, status: "running" });
+});
+
+// GET /api/research/unified/:jobId
+router.get("/research/unified/:jobId", (req, res): void => {
+  const { jobId } = req.params;
+  const job = unifiedJobs.get(jobId ?? "");
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  res.json({
+    jobId: job.jobId,
+    query: job.query,
+    status: job.status,
+    startedAt: job.startedAt,
+    completedAt: job.completedAt ?? null,
+    engine: {
+      status: job.engine.status,
+      startedAt: job.engine.startedAt ?? null,
+      completedAt: job.engine.completedAt ?? null,
+      result: job.engine.result ?? null,
+      error: job.engine.error ?? null,
+    },
+  });
 });
 
 export default router;

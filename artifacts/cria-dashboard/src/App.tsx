@@ -11,6 +11,7 @@ import FindingsPage from "@/pages/findings";
 import ReflexivityPage from "@/pages/reflexivity";
 import TemplatesPage from "@/pages/templates";
 import ParallelResearch from "@/pages/parallel-research";
+import UnifiedResearch from "@/pages/unified-research";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -24,6 +25,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/research" component={ParallelResearch} />
+        <Route path="/unified" component={UnifiedResearch} />
         <Route path="/" component={DashboardPage} />
         <Route path="/experiments/new" component={NewExperimentPage} />
         <Route path="/experiments/:id" component={ExperimentDetailPage} />

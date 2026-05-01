@@ -4,13 +4,16 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
-## Project: CRIA — Three Parallel Research Instruments
+## Project: CRIA — Unified + Parallel Research Instruments
 
-Three CRIA implementations running in parallel for architecture comparison:
+**Authoritative blueprint**: `docs/CRIA_MASTER_BLUEPRINT.md` — all builds reference this document.
 
-### CRIA v1 (Claude build) — at path `/`
+Four CRIA services running in parallel:
+
+### CRIA v1 (Claude build) — React dashboard at path `/`
 ### CRIA v2 (CLIA 2 / DeepSeek build) — at path `/cria-v2/`
 ### CRIA v4 (Frame-Critical Research Instrument) — at path `/cria-v4/`
+### CRIA Unified (Three-Pipeline) — at path `/cria-unified/` ← CURRENT CANONICAL BUILD
 
 ---
 
@@ -146,6 +149,77 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 | Hofstadter discipline | Not implemented | Strange Loop Validator, Gödelian reset |
 | Refusal handling | Not first-class | First-class output |
 | Stagnation recovery | Random mutation | Raise dissonance, re-weight to counter-corpus |
+
+## Project: CRIA Unified (Three-Pipeline — Canonical Build)
+
+**Path**: `/cria-unified/`
+**Stack**: Python + FastAPI + uvicorn (single-file, no database)
+**File**: `artifacts/cria-unified/main.py` (adapted from `cria_unified.py` in ZIP)
+**Blueprint**: `docs/CRIA_MASTER_BLUEPRINT.md`
+**Author**: Dr Barry Ferrier with Claude (Anthropic), 30 April 2026
+**LLM**: Replit AI Integrations (OpenAI-compatible, `gpt-5-mini` via `AI_INTEGRATIONS_OPENAI_*`)
+
+### What it does
+
+Runs three architecturally distinct research pipelines from one research question, in parallel, producing findings in three voices and publication guidance.
+
+### Three Pipelines
+
+**CRIA-Cognitive** — 10 cognitive-role channels:
+- Scoping & Ontology, Evidence Acquisition, Contradiction & Anomaly, Synthesis, Causal Mapping,
+  Critic & Falsification, Serendipity, Quality Control, Cultural Context, Process Steering
+- Meta-layer (novelty scoring + cross-connection), Layer 3 (10 strategies), Hofstadter validation
+- Optimised for: converging on findings under disciplined workflow
+
+**CRIA-Epistemic** — 10 epistemic-mode channels:
+- Empirical, Phenomenological, Historical, Philosophical, Critical, Civilisational,
+  Cross-cultural, Computational, Adversarial, Wildcard
+- Two-stream metagent (Academic + Experimental), Layer 3 (7 frame-critical strategies), Hofstadter
+- Optimised for: frame excavation, refusal-as-finding, sovereign-source non-aggregation
+
+**CRIA-Convergent** — 5 cross-pipeline analytical channels:
+- Convergence Topology, Divergence Anatomy, Absence Mapping, Frame Collision, Evidence Ecology Comparison
+- Layer 3 (5 cross-pipeline strategies)
+- Runs AFTER both pipelines complete; analyses the shape of their disagreement
+
+### Connector Registry
+- **68 total connectors** (27 CRIA-Cognitive + 36 CRIA-Epistemic + shared)
+- **56 active** (verified at `/cria-unified/connectors`)
+- **12 partnership-gated** (catalogued inactive — Indigenous sovereignty sources: AIATSIS, Lowitja, NACCHO, NATSILS, Maiam nayri Wingara, First Nations Media Australia)
+
+### Three-Voice Rendering
+- **Academic**: formal, cited, position-privilege explicit, falsification conditions stated
+- **Editorial**: journalistic, educated general reader (Atlantic/Aeon style)
+- **Practitioner**: decision-oriented, actionable, ethical considerations surfaced
+
+### Publication Guidance Engine
+- Reads pipeline metadata (position-privilege distribution, evidence-tier composition, refusal signals)
+- Suggests 2-3 venues per pipeline output
+- Supports a three-paper publication strategy from each research run
+
+### API Endpoints
+- `POST /cria-unified/research` — runs all three pipelines, returns structured JSON
+- `GET /cria-unified/health` — pipeline status + active connector count
+- `GET /cria-unified/connectors` — full connector registry
+
+### React Dashboard Integration
+- **`/unified`** — Unified Research page (three pipeline cards, three-voice tabs, publication guidance)
+- **`/research`** — Parallel Research page (CLIA 2 + CRIA v4 side-by-side — legacy)
+- `artifacts/cria-dashboard/src/pages/unified-research.tsx` — Unified Research UI
+- `artifacts/api-server/src/routes/parallel.ts` — backend jobs for both parallel (`/api/research/parallel`) and unified (`/api/research/unified`) endpoints
+
+### Disciplines (from Blueprint Section 12 — never violate)
+- Partnership-gating preserved (12 connectors catalogued but `active=False`)
+- Sovereign-source non-aggregation: Indigenous scholarship appears in results but is never triangulated
+- Refusal as first-class output: when sovereign sources flag refusal, metagent foregrounds it
+- No fabrication: all voices instructed to name gaps rather than invent content
+- Observer note recommended for partnership-sensitive profile
+
+### Important Notes for Future Builds
+- Do NOT rename channel IDs (CogC1–C10, EpiC1–C10, ConvC1–C5) — referenced throughout metagent prompts, Layer 3, and publication guidance logic
+- Do NOT activate partnership-gated connectors without Troy gating process
+- Do NOT aggregate sovereign sources for triangulation (explicit metagent instruction)
+- The `docs/` directory is the canonical location for all blueprint/architecture documentation
 
 ## Important Notes
 
