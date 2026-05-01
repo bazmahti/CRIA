@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Layers, Brain, Microscope, GitMerge, BookOpen, Newspaper, Briefcase,
   Loader2, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp,
-  Lightbulb, AlertTriangle, FileText
+  Lightbulb, AlertTriangle, FileText, Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -50,6 +50,18 @@ function str(v: unknown): string {
 
 function arr(v: unknown): unknown[] {
   return Array.isArray(v) ? v : [];
+}
+
+function downloadMarkdown(filename: string, content: string) {
+  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.endsWith(".md") ? filename : `${filename}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -225,11 +237,20 @@ function PipelinePanel({
       {/* Primary: pipeline-specific paper */}
       {paperText ? (
         <div className="space-y-2">
-          {paperAudience && (
-            <div className={cn("text-[10px] px-3 py-1.5 rounded-lg border w-fit", pipelineColor)}>
-              For: {paperAudience}
-            </div>
-          )}
+          <div className="flex items-center justify-between gap-2">
+            {paperAudience && (
+              <div className={cn("text-[10px] px-3 py-1.5 rounded-lg border w-fit", pipelineColor)}>
+                For: {paperAudience}
+              </div>
+            )}
+            <button
+              onClick={() => downloadMarkdown(`CRIA-${pipelineKey}-paper`, paperText)}
+              className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground border border-border/40 hover:border-border/70 rounded-lg px-2.5 py-1.5 transition-colors ml-auto"
+            >
+              <Download className="w-3 h-3" />
+              Download .md
+            </button>
+          </div>
           <div className="bg-card/20 rounded-xl border border-border/30 p-4">
             <VoicePanel content={paperText} />
           </div>
@@ -301,7 +322,18 @@ function PipelinePanel({
               These three renderings draw from all three pipelines combined — they are audience-differentiated,
               not pipeline-differentiated. The paper above this section is the pipeline-specific output.
             </p>
-            <Tabs tabs={voiceTabs} active={voice} onChange={(t) => setVoice(t)} icons={voiceIcons} />
+            <div className="flex items-center justify-between">
+              <Tabs tabs={voiceTabs} active={voice} onChange={(t) => setVoice(t)} icons={voiceIcons} />
+              {voiceContent && (
+                <button
+                  onClick={() => downloadMarkdown(`CRIA-synthesis-${voice}`, voiceContent)}
+                  className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground border border-border/40 hover:border-border/70 rounded-lg px-2.5 py-1.5 transition-colors shrink-0 ml-2 mb-4"
+                >
+                  <Download className="w-3 h-3" />
+                  Download .md
+                </button>
+              )}
+            </div>
             <div className="bg-card/20 rounded-xl border border-border/30 p-4">
               <VoicePanel content={voiceContent} />
             </div>
@@ -653,7 +685,30 @@ export default function UnifiedResearch() {
                   Completed in {elapsed(job.startedAt, job.completedAt)} · Query: "{job.query.slice(0, 80)}{job.query.length > 80 ? "…" : ""}"
                 </p>
               </div>
-              <StatusBadge status="complete" />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const papers = (result["pipeline_papers"] ?? {}) as Record<string, Record<string, string>>;
+                    const voices = (result["voices"] ?? {}) as Record<string, Record<string, string>>;
+                    const slug = job.query.slice(0, 40).replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+                    [
+                      ["cognitive", papers["cognitive"]?.text],
+                      ["epistemic", papers["epistemic"]?.text],
+                      ["convergent", papers["convergent"]?.text],
+                      ["synthesis-academic", voices["academic"]?.text],
+                      ["synthesis-editorial", voices["editorial"]?.text],
+                      ["synthesis-practitioner", voices["practitioner"]?.text],
+                    ].forEach(([name, text]) => {
+                      if (text) setTimeout(() => downloadMarkdown(`CRIA-${name}-${slug}`, text as string), 100);
+                    });
+                  }}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border/40 hover:border-border/70 rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download all 6
+                </button>
+                <StatusBadge status="complete" />
+              </div>
             </div>
 
             <Tabs tabs={pipelineTabs} active={pipeline} onChange={(t) => setPipeline(t)} icons={pipelineIcons} />
