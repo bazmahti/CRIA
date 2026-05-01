@@ -6,15 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ExperimentChannel =
-  | (typeof ExperimentChannel)[keyof typeof ExperimentChannel]
-  | null;
+/**
+ * Free-text research channel identifier. Examples for HUM project: chronic_pain, abi, dementia, perinatal, eating_disorder, first_nations. Other projects may use any channel label (e.g. civilisational_synthesis).
 
-export const ExperimentChannel = {
-  chronic_pain: "chronic_pain",
-  abi: "abi",
-  dementia: "dementia",
-  perinatal: "perinatal",
-  eating_disorder: "eating_disorder",
-  first_nations: "first_nations",
-} as const;
+ */
+export type ExperimentChannel = string | null;

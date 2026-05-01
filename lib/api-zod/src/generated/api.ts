@@ -36,15 +36,11 @@ export const ListExperimentsResponseItem = zod.object({
   hypothesis: zod.string().nullish(),
   expectedOutcomeTypes: zod.array(zod.string()),
   channel: zod
-    .enum([
-      "chronic_pain",
-      "abi",
-      "dementia",
-      "perinatal",
-      "eating_disorder",
-      "first_nations",
-    ])
-    .nullish(),
+    .string()
+    .nullish()
+    .describe(
+      "Free-text research channel identifier. Examples for HUM project: chronic_pain, abi, dementia, perinatal, eating_disorder, first_nations. Other projects may use any channel label (e.g. civilisational_synthesis).\n",
+    ),
   patterns: zod.array(zod.number()).optional(),
   protections: zod
     .object({
@@ -139,15 +135,11 @@ export const GetExperimentsSummaryResponse = zod.object({
       hypothesis: zod.string().nullish(),
       expectedOutcomeTypes: zod.array(zod.string()),
       channel: zod
-        .enum([
-          "chronic_pain",
-          "abi",
-          "dementia",
-          "perinatal",
-          "eating_disorder",
-          "first_nations",
-        ])
-        .nullish(),
+        .string()
+        .nullish()
+        .describe(
+          "Free-text research channel identifier. Examples for HUM project: chronic_pain, abi, dementia, perinatal, eating_disorder, first_nations. Other projects may use any channel label (e.g. civilisational_synthesis).\n",
+        ),
       patterns: zod.array(zod.number()).optional(),
       protections: zod
         .object({
@@ -218,15 +210,11 @@ export const GetExperimentsSummaryResponse = zod.object({
       hypothesis: zod.string().nullish(),
       expectedOutcomeTypes: zod.array(zod.string()),
       channel: zod
-        .enum([
-          "chronic_pain",
-          "abi",
-          "dementia",
-          "perinatal",
-          "eating_disorder",
-          "first_nations",
-        ])
-        .nullish(),
+        .string()
+        .nullish()
+        .describe(
+          "Free-text research channel identifier. Examples for HUM project: chronic_pain, abi, dementia, perinatal, eating_disorder, first_nations. Other projects may use any channel label (e.g. civilisational_synthesis).\n",
+        ),
       patterns: zod.array(zod.number()).optional(),
       protections: zod
         .object({
@@ -359,15 +347,11 @@ export const GetExperimentResponse = zod.object({
   hypothesis: zod.string().nullish(),
   expectedOutcomeTypes: zod.array(zod.string()),
   channel: zod
-    .enum([
-      "chronic_pain",
-      "abi",
-      "dementia",
-      "perinatal",
-      "eating_disorder",
-      "first_nations",
-    ])
-    .nullish(),
+    .string()
+    .nullish()
+    .describe(
+      "Free-text research channel identifier. Examples for HUM project: chronic_pain, abi, dementia, perinatal, eating_disorder, first_nations. Other projects may use any channel label (e.g. civilisational_synthesis).\n",
+    ),
   patterns: zod.array(zod.number()).optional(),
   protections: zod
     .object({
@@ -449,15 +433,11 @@ export const UpdateExperimentResponse = zod.object({
   hypothesis: zod.string().nullish(),
   expectedOutcomeTypes: zod.array(zod.string()),
   channel: zod
-    .enum([
-      "chronic_pain",
-      "abi",
-      "dementia",
-      "perinatal",
-      "eating_disorder",
-      "first_nations",
-    ])
-    .nullish(),
+    .string()
+    .nullish()
+    .describe(
+      "Free-text research channel identifier. Examples for HUM project: chronic_pain, abi, dementia, perinatal, eating_disorder, first_nations. Other projects may use any channel label (e.g. civilisational_synthesis).\n",
+    ),
   patterns: zod.array(zod.number()).optional(),
   protections: zod
     .object({
@@ -539,15 +519,11 @@ export const RunExperimentResponse = zod.object({
   hypothesis: zod.string().nullish(),
   expectedOutcomeTypes: zod.array(zod.string()),
   channel: zod
-    .enum([
-      "chronic_pain",
-      "abi",
-      "dementia",
-      "perinatal",
-      "eating_disorder",
-      "first_nations",
-    ])
-    .nullish(),
+    .string()
+    .nullish()
+    .describe(
+      "Free-text research channel identifier. Examples for HUM project: chronic_pain, abi, dementia, perinatal, eating_disorder, first_nations. Other projects may use any channel label (e.g. civilisational_synthesis).\n",
+    ),
   patterns: zod.array(zod.number()).optional(),
   protections: zod
     .object({

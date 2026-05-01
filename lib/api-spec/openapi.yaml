@@ -305,8 +305,11 @@ components:
 
     ExperimentChannel:
       type: string
-      enum: [chronic_pain, abi, dementia, perinatal, eating_disorder, first_nations]
       nullable: true
+      description: >
+        Free-text research channel identifier. Examples for HUM project:
+        chronic_pain, abi, dementia, perinatal, eating_disorder, first_nations.
+        Other projects may use any channel label (e.g. civilisational_synthesis).
 
     OutputVoice:
       type: string
