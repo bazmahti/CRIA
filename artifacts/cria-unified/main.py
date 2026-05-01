@@ -90,12 +90,35 @@ CREATE INDEX IF NOT EXISTS research_jobs_created_at_idx ON research_jobs (create
 """
 
 
+async def _migrate_research_jobs(conn: asyncpg.Connection) -> None:
+    """
+    Idempotent migration: if the table exists with the old schema (pre-asyncpg
+    rewrite, which used `result` / `error` / `updated_at` columns instead of
+    `result_json` / `error_text` / `started_at`), drop it and recreate.
+    `CREATE TABLE IF NOT EXISTS` is a no-op on an existing table, so we must
+    detect and handle the schema version explicitly.
+    """
+    table_exists = await conn.fetchval(
+        "SELECT 1 FROM information_schema.tables "
+        "WHERE table_name='research_jobs' AND table_schema='public'"
+    )
+    if table_exists:
+        has_new_schema = await conn.fetchval(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name='research_jobs' AND column_name='result_json'"
+        )
+        if not has_new_schema:
+            log.info("Old research_jobs schema detected — dropping for migration")
+            await conn.execute("DROP TABLE research_jobs CASCADE")
+
+
 async def _init_db_pool() -> asyncpg.Pool:
     """Create the asyncpg connection pool and ensure the table exists."""
     # asyncpg needs the DSN without ?sslmode=... — pass ssl explicitly instead
     dsn = _DB_URL.split("?")[0] if "?" in _DB_URL else _DB_URL
     pool = await asyncpg.create_pool(dsn=dsn, ssl=False, min_size=2, max_size=10)
     async with pool.acquire() as conn:
+        await _migrate_research_jobs(conn)
         await conn.execute(_CREATE_TABLE_SQL)
     log.info("DB pool ready — research_jobs table verified")
     return pool
