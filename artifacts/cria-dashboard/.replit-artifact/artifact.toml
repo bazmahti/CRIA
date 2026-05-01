@@ -62,9 +62,6 @@ run = "python /home/runner/workspace/artifacts/cria-unified/main.py"
 
 [services.production]
 
-[services.production.build]
-args = ["pip", "install", "-r", "artifacts/cria-unified/requirements.txt"]
-
 [services.production.run]
 args = ["python", "artifacts/cria-unified/main.py"]
 
