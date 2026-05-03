@@ -3416,12 +3416,14 @@ async def research_status(job_id: str):
 
 
 # ---------------------------------------------------------------------------
-# /api/research/unified — production shim (single-port autoscale mode)
+# /api/research/unified — fallback shim
 #
-# In production, autoscale only allows ONE exposed port.  The api-server
-# (Node/Express) is therefore not deployed; these routes replace the two
-# endpoints the React dashboard calls so everything works through this
-# single FastAPI process.
+# The api-server (Node/Express) handles /api/* in production via
+# Replit's path-prefix proxy routing across multiple internal services.
+# This Python shim duplicates the /api/research/unified endpoint as a
+# fallback for environments where api-server isn't running (local dev
+# when only this process is up, or any future single-service deployment).
+# The shim is harmless redundancy — keep it as a safety net.
 #
 # Contract must match api-server/src/routes/parallel.ts exactly:
 #   POST response  → { jobId, status }          (camelCase jobId)

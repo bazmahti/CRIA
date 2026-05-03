@@ -11,3 +11,15 @@ paths = ["/api"]
 
 [services.development]
 run = "pnpm --filter @workspace/api-server run dev"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/api-server", "run", "build"]
+
+[services.production.run]
+args = ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
+
+[services.production.health.startup]
+path = "/api/healthz"
+
+[services.env]
+PORT = "8080"

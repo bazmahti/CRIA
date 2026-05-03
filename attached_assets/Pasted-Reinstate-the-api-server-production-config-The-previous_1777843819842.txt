@@ -1,0 +1,28 @@
+Reinstate the api-server production config. The previous diagnosis was wrong — Replit autoscale uses path-prefix proxy routing across multiple internal services, not a one-process-per-deployment model. The empirical evidence is conclusive: with the toml in place, all /api/* endpoints return 200 with real data; the api-server runs in production alongside cria-unified.
+
+The current state is dangerous: production is running on a build that includes the working toml config (checkpoint e9a1739), but source has been reverted. Any redeploy will drop the api-server and break every dashboard page that fetches data.
+
+Do this:
+
+1. Restore `[services.production]`, `[services.production.build]`, `[services.production.run]`, and `[services.production.health.startup]` blocks to `artifacts/api-server/.replit-artifact/artifact.toml`. The exact content was already in the file before reversion — pull it from the deployed checkpoint or git history (commit before the revert), do not rewrite from scratch.
+
+2. Also update the misleading comment block in `artifacts/cria-unified/main.py` above the `/api/research/unified` shim. The current comment claims "autoscale only allows ONE exposed port. The api-server is therefore not deployed." Replace with something like:
+
+   ```
+   # /api/research/unified — fallback shim
+   # The api-server (Node/Express) handles /api/* in production via
+   # Replit's path-prefix proxy. This Python shim duplicates the
+   # /api/research/unified endpoint as a fallback for environments
+   # where api-server isn't running (local dev when only this
+   # process is up, or any future single-service deployment).
+   ```
+
+   Keep the shim code itself — it's harmless redundancy and a useful safety net.
+
+3. Commit with message: `Reinstate api-server production config; correct comment in cria-unified explaining proxy routing`
+
+4. Push to main. Confirm Replit deploys cleanly. Re-run the curl battery against /api/healthz, /api/experiments, /api/experiments/summary, /api/research/parallel — all should still return 200.
+
+5. Post the post-deploy curl status codes plus the commit hash.
+
+Do not implement Python shims for any /api/* endpoints. They are unnecessary.

@@ -1,0 +1,200 @@
+# Implementation prompt: CRIA Advocacy Suite Expansion
+
+## Hard prerequisite — do not start until this is true
+
+The production deployment fix (the `/api/*` shims in
+`artifacts/cria-unified/main.py`) must be complete and verified
+before this work begins. The advocacy-suite expansion adds a new
+profile that the dashboard exposes through `/api/experiments` etc.
+— if those endpoints still 404 in production, you cannot verify
+the OCAA profile end-to-end and you will have stacked two unrelated
+debugging surfaces on top of each other.
+
+If the deployment is not yet green: STOP. Finish that work, deploy,
+confirm all dashboard pages render with data, then return here.
+
+## What you are building
+
+The full Advocacy Suite Expansion specified in
+`docs/CRIA_Advocacy_Suite_Expansion_Specification.md`. **Read the
+whole spec before writing any code.** The spec is the single source
+of truth — this prompt only enforces sequencing and discipline.
+
+Scope in one sentence: register three configurations
+(`civilisational_academic`, `therapeutic_clinical`, `editorial_cadence`),
+one new advocacy profile (`ocaa_daily_editorial`), seven new
+connector groups, ~12 new connector dataclass entries, two channel
+prompt rewrites, and a profile→groups→connectors cascade in the
+dashboard UI.
+
+## Discipline (read this twice)
+
+- This is **additive**. Do not modify existing connector entries.
+  Do not remove `general_scholarship` or `partnership_sensitive`
+  — they must keep working with their current behaviour after your
+  changes.
+- The two channel replacements (Cog Ch9, Epi Ch1) are the **only**
+  edits to existing pipeline code. Do not "while I'm here" refactor
+  any other channel.
+- Configurations and profiles are **parameter sets**, not new code
+  paths. Same `UnifiedOrchestrator` runs all of them. Do not create
+  `editorial_orchestrator.py`, `OCAAOrchestrator`, or any parallel
+  module.
+- Use the connector definitions from spec Section 5 verbatim. Do
+  not invent additional connectors that "would be useful for
+  advocacy." If Section 5 doesn't list it, don't add it.
+- Do not implement the deferred profiles (`yoursay_civic_engagement`,
+  `disability_advocacy_editorial`, `first_nations_partnership_editorial`).
+  Spec Section 3.2 explicitly defers them.
+- Do not improve editorial output rendering. Spec Section 8 defers
+  that.
+- Do not touch `.replit`, `artifact.toml`, deployment configs, or
+  the `/api/*` shim block in `main.py`.
+- If a step fails its checkpoint, STOP and report. Do not push past
+  failures.
+
+## Steps
+
+Follow Section 7 of the spec. Checkpoints below are mandatory.
+
+### Step 1 — Connector additions
+- Append the connector dataclass entries from spec Section 5
+  (Sections 5.1, 5.2, 5.3 — agriculture, biodiversity,
+  ecological-economics) to `cria_connectors_config.py`
+- Append each new entry to `ALL_NEW_CONNECTORS`
+- **Checkpoint:** `python -c "from cria_connectors_config import ALL_NEW_CONNECTORS; print(len(ALL_NEW_CONNECTORS))"` — record the new count and the diff vs before. Both numbers go in your final report.
+
+### Step 2 — Connector group definitions
+- In the same module, define named lists for each group from spec
+  Section 4.1 plus 5.1–5.3:
+  `mainstream_academic`, `agriculture_food_systems`,
+  `biodiversity_conservation`, `ecological_economics`,
+  `food_sovereignty_advocacy`, `indigenous_food_sovereignty`,
+  `australian_government_environment`
+- Each list contains string names matching `Connector.name` values
+- Add a `validate_groups()` helper that asserts every name in every
+  group exists in the connector registry
+- **Checkpoint:** call `validate_groups()` on import; it must not raise.
+
+### Step 3 — Configuration registry
+- Locate where `general_scholarship` and `partnership_sensitive`
+  are currently defined. Show me the file path and line range
+  before editing.
+- Add `civilisational_academic`, `therapeutic_clinical`,
+  `editorial_cadence` per spec Section 2 — full parameter set
+  (cadence, output structure, primary evidence tier,
+  position-privilege defaults, dissonance budget, output voice
+  priority).
+- **Checkpoint:** the existing two profiles still resolve to their
+  current behaviour. Run a single-iteration experiment with
+  `general_scholarship` to confirm no regression.
+
+### Step 4 — OCAA profile
+- Register `ocaa_daily_editorial` under the `editorial_cadence`
+  configuration per spec Section 3.1
+- `active_connector_groups` references the names from Step 2:
+  `mainstream_academic`, `agriculture_food_systems`,
+  `biodiversity_conservation`, `ecological_economics`,
+  `food_sovereignty_advocacy`, `indigenous_food_sovereignty`
+  (sovereign-source-aware retrieval only),
+  `australian_government_environment`
+- Refusal discipline, operational mode (fast-pass, single-pipeline
+  Cognitive primary), and output rendering preferences as specified
+
+### Step 5 — Cascade selector
+- Selector logic per spec Section 4.1:
+  - Layer 1: connector pool (already exists)
+  - Layer 2: profile-default groups → expanded to active connector
+    list at experiment construction
+  - Layer 3: per-experiment overrides (additions and removals)
+- Partnership-gated logic preserved: a profile selecting a group
+  that contains a partnership-gated connector does NOT auto-activate
+  that connector; the partnership flag still gates it
+- Update `artifacts/cria-dashboard/src/pages/unified-research.tsx`:
+  - Profile state expands from two to five options
+  - New connector pane shows: active groups (deselectable), inactive
+    groups (selectable), expand-for-individual-connectors
+  - Partnership-gated connectors render in a visibly distinct,
+    disabled state with a tooltip explaining why
+- The dashboard must POST these selections to the engine; engine
+  must respect them (not silently fall back to all-connectors)
+
+### Step 6 — Channel replacements
+- In `artifacts/cria-unified/main.py`:
+  - Cognitive Ch9 "Cultural Context" → Ch9 "Bibliometric &
+    Citation-Network Analysis" per spec Section 6.1 (rewrite the
+    channel prompt; keep the channel slot/index)
+  - Epistemic Ch1 "Empirical/Quantitative" → Ch1 "Methodological
+    Critique" per spec Section 6.2 (same approach)
+- Update `CRIA_UNIFIED_REPLIT_INSTRUCTIONS.md` channel descriptions
+  to match
+- **Checkpoint:** the two new channels must produce findings on a
+  test run that are textually distinguishable from their pipeline
+  peers — not just renamed versions of what was there before.
+
+### Step 7 — End-to-end verification
+Run one real experiment from the dashboard:
+- Profile: `ocaa_daily_editorial`
+- Query: an organic-agriculture or biodiversity question relevant
+  to OCAA's beat (e.g. "What does current evidence say about the
+  yield gap between organic and conventional agriculture in
+  temperate climates?")
+- Iterations: 1 (fast verification; full runs come later)
+- Confirm:
+  - experiment runs to completion (no `failed` status)
+  - new connectors appear in the findings (at least 3 of the new
+    agriculture/biodiversity/eco-econ connectors return results)
+  - new Ch9 (Bibliometric) produces a finding that references
+    citation patterns or bibliometric structure (not generic
+    cultural-context content)
+  - new Ch1 (Methodological Critique) produces a finding that
+    critiques methodology (not generic empirical/quantitative
+    content)
+  - editorial voice renders as primary output; academic voice not
+    auto-rendered (per `editorial_cadence` defaults)
+
+If any of these fail, stop and report. Do not edit verification
+criteria to make them pass.
+
+### Step 8 — Section 9 verification grep
+Run these greps and paste results in your final report. Each must
+return matches in **production code** (`.py`, `.tsx`), not just
+the spec markdown:
+
+```
+grep -rn "agriculture_food_systems" --include="*.py" --include="*.tsx"
+grep -rn "editorial_cadence" --include="*.py" --include="*.tsx"
+grep -rn "ocaa_daily_editorial" --include="*.py" --include="*.tsx"
+grep -rn "Bibliometric" artifacts/cria-unified/main.py
+grep -rn "Methodological Critique" artifacts/cria-unified/main.py
+```
+
+All five must hit. If any is empty, that step's work is incomplete
+— fix it before proceeding.
+
+### Step 9 — Commit and push
+**Single** commit. Suggested message (per spec Section 7):
+
+```
+Advocacy suite expansion: three-configuration architecture, OCAA
+daily editorial profile, agriculture/biodiversity/ecological-economics
+connector groups, Channel 9 and Channel 1 replacements per audit.
+```
+
+Push to `main`. Replit pulls.
+
+## Final report — required
+
+Post in this order:
+
+1. Step 1 connector count before/after
+2. Step 2 `validate_groups()` output
+3. Step 3 file path and line range for the configuration registry
+   you edited, plus the no-regression run confirmation
+4. Step 7 experiment results: jobId, completion status, number of
+   findings per pipeline, two example finding excerpts
+   demonstrating the new Ch9 and Ch1 are working
+5. Step 8 grep results — five command outputs verbatim
+6. Diff summary: files touched, lines added/removed
+7. Anything you couldn't implement and why
+8. Commit hash and push confirmation
