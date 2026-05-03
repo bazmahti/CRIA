@@ -3331,7 +3331,8 @@ class ResearchRequest(BaseModel):
 @app.get(f"{BASE_PATH}/", response_class=HTMLResponse)
 @app.get(f"{BASE_PATH}", response_class=HTMLResponse)
 async def serve_dashboard():
-    return HTMLResponse(DASHBOARD_HTML)
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/unified", status_code=302)
 
 
 async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
