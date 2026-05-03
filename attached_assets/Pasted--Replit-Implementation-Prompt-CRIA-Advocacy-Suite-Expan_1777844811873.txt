@@ -1,0 +1,831 @@
+# Replit Implementation Prompt — CRIA Advocacy Suite Expansion
+
+> **How to use this file.** Paste the entire contents of this file into
+> Replit’s chat as a single message. The implementation prompt is in
+> Part 1; the full specification (which Part 1 keeps referring to as
+> “the spec”) is embedded inline in Part 2. There is no missing
+> attachment — everything needed is in this document.
+> 
+> **First action Replit should take:** save Part 2 verbatim as
+> `docs/CRIA_Advocacy_Suite_Expansion_Specification.md` in the repo,
+> then proceed with Part 1’s steps. From that point on, “the spec”
+> in Part 1 refers to that saved file.
+
+-----
+
+# PART 1 — Implementation prompt
+
+## Hard prerequisite — do not start until this is true
+
+The api-server `[services.production]` block in
+`artifacts/api-server/.replit-artifact/artifact.toml` must be
+reinstated in source. The deployment empirically works *with* that
+block; without it in source, any redeploy drops the api-server and
+every dashboard page that fetches data goes blank — and that
+includes the OCAA dashboard work in Step 5 below, which you will
+not be able to verify end-to-end against a broken `/api/*`.
+
+If the toml has not yet been reinstated in source: STOP. Do that
+first (per the separate “Reinstate api-server production config”
+prompt). Confirm a clean redeploy with `/api/healthz`,
+`/api/experiments`, `/api/experiments/summary` all returning 200.
+Then return here.
+
+## What you are building
+
+The full Advocacy Suite Expansion specified in **Part 2** of this
+document.
+
+**Step 0 — first action:** create the file
+`docs/CRIA_Advocacy_Suite_Expansion_Specification.md` and write
+Part 2 of this document into it verbatim (everything from the
+`# CRIA Advocacy Suite Expansion — Specification` heading down to
+the closing italic line). This becomes the single source of truth.
+Read it end-to-end before writing any code.
+
+Scope in one sentence: register three configurations
+(`civilisational_academic`, `therapeutic_clinical`,
+`editorial_cadence`), one new advocacy profile
+(`ocaa_daily_editorial`), seven new connector groups,
+~17 new connector dataclass entries, two channel prompt rewrites,
+and a profile→groups→connectors cascade in the dashboard UI.
+
+## Discipline (read this twice)
+
+- This is **additive**. Do not modify existing connector entries.
+  Do not remove `general_scholarship` or `partnership_sensitive`
+  — they must keep working with their current behaviour after
+  your changes.
+- The two channel replacements (Cog Ch9, Epi Ch1) are the **only**
+  edits to existing pipeline code. Do not “while I’m here”
+  refactor any other channel.
+- Configurations and profiles are **parameter sets**, not new
+  code paths. Same `UnifiedOrchestrator` runs all of them. Do
+  not create `editorial_orchestrator.py`, `OCAAOrchestrator`, or
+  any parallel module.
+- Use the connector definitions from spec Section 5 verbatim. Do
+  not invent additional connectors that “would be useful for
+  advocacy.” If Section 5 doesn’t list it, don’t add it.
+- Do not implement the deferred profiles (`yoursay_civic_engagement`,
+  `disability_advocacy_editorial`,
+  `first_nations_partnership_editorial`). Spec Section 3.2
+  explicitly defers them.
+- Do not improve editorial output rendering. Spec Section 8
+  defers that.
+- Do not touch `.replit`, `artifact.toml`, deployment configs, or
+  the `/api/*` routes (Express side or Python shim side).
+- If a step fails its checkpoint, STOP and report. Do not push
+  past failures.
+
+## Steps
+
+Follow Section 7 of the spec. Checkpoints below are mandatory.
+
+### Step 1 — Connector additions
+
+- Append the connector dataclass entries from spec Sections 5.1
+  through 5.6 to `cria_connectors_config.py`
+- Append each new entry to `ALL_NEW_CONNECTORS`
+- **Note on enum values used by the spec:** the spec uses
+  `PositionPrivileged.STATE_ADMINISTRATIVE`, `PositionPrivileged.ADVOCACY`,
+  `AccessMode.PARTNERSHIP_GATED`, `DissonanceRole.SOVEREIGN`. Confirm
+  these values exist in the existing enums in
+  `cria_connectors_config.py` before writing entries that use them.
+  If any are missing, add them to the enum (this is the only
+  enum modification permitted) and report the addition.
+- **Checkpoint:** run
+  `python -c "from cria_connectors_config import ALL_NEW_CONNECTORS; print(len(ALL_NEW_CONNECTORS))"`
+  and report the count delta vs before.
+
+### Step 2 — Connector group definitions
+
+- In the same module, define named lists for:
+  `mainstream_academic`, `agriculture_food_systems`,
+  `biodiversity_conservation`, `ecological_economics`,
+  `food_sovereignty_advocacy`, `indigenous_food_sovereignty`,
+  `australian_government_environment`
+- Each list contains string values matching `Connector.name` fields
+- For `mainstream_academic`, populate it with the existing core
+  open-access scholarly connectors already in the registry
+  (OpenAlex, Crossref, Semantic Scholar, PubMed, arXiv, etc. —
+  use what’s actually there)
+- Add a `validate_groups()` helper that asserts every name in
+  every group exists in the connector registry; raise if not
+- **Checkpoint:** call `validate_groups()` on import; it must
+  not raise.
+
+### Step 3 — Configuration registry
+
+- Locate the file currently defining `general_scholarship` and
+  `partnership_sensitive`. Report the file path and line range
+  before editing. If they’re inline strings in
+  `artifacts/cria-unified/main.py`’s dashboard HTML and not in
+  a structured registry, create a structured registry — but
+  preserve the two existing names with their current behaviour.
+- Add `civilisational_academic`, `therapeutic_clinical`,
+  `editorial_cadence` per spec Section 2 — full parameter set
+  (cadence, output structure, primary evidence tier,
+  position-privilege defaults, dissonance budget, output voice
+  priority).
+- **Checkpoint:** run a single-iteration experiment with
+  `general_scholarship` and confirm no regression vs prior
+  behaviour. Same with `partnership_sensitive`.
+
+### Step 4 — OCAA profile
+
+- Register `ocaa_daily_editorial` under the `editorial_cadence`
+  configuration per spec Section 3.1
+- `active_connector_groups`: `mainstream_academic`,
+  `agriculture_food_systems`, `biodiversity_conservation`,
+  `ecological_economics`, `food_sovereignty_advocacy`,
+  `indigenous_food_sovereignty` (sovereign-source-aware retrieval
+  only — see spec 5.5 partnership flag), `australian_government_environment`
+- Refusal discipline, operational mode (fast-pass, single-pipeline
+  Cognitive primary), and output rendering preferences exactly
+  as spec Section 3.1 specifies
+
+### Step 5 — Cascade selector
+
+- Selector logic per spec Section 4:
+  - Layer 1: connector pool (already exists)
+  - Layer 2: profile-default groups → expanded to active
+    connector list at experiment construction
+  - Layer 3: per-experiment overrides (additions and removals)
+- Partnership-gated logic preserved: a profile selecting a group
+  containing a partnership-gated connector does **not**
+  auto-activate that connector; the partnership flag still gates
+  it. Verify this with a unit-style assertion in
+  `validate_groups()` or an adjacent helper.
+- Update `artifacts/cria-dashboard/src/pages/unified-research.tsx`:
+  - Profile state expands from two to five options
+    (`general_scholarship`, `partnership_sensitive`,
+    `civilisational_academic`, `therapeutic_clinical`,
+    `editorial_cadence`) — note: the OCAA profile is selected at
+    a sub-level within `editorial_cadence`, not as a top-level
+    configuration. Confirm this distinction is preserved in the
+    UI (configuration → profile, not flat).
+  - New connector pane: active groups (deselectable), inactive
+    groups (selectable), expand-for-individual-connectors
+  - Partnership-gated connectors render in a visibly distinct,
+    disabled state with a tooltip explaining why
+- The dashboard must POST these selections to the engine; engine
+  must respect them (no silent fall-back to all-connectors)
+
+### Step 6 — Channel replacements
+
+- In `artifacts/cria-unified/main.py`:
+  - Cognitive Ch9 “Cultural Context” → “Bibliometric &
+    Citation-Network Analysis” per spec Section 6.1. Rewrite the
+    channel prompt to perform what 6.1 specifies (citation
+    network analysis, terminology drift, who-cites-whom,
+    co-authorship clusters, journal-prestige distributions,
+    geographic/institutional concentrations). Use Crossref and
+    OpenAlex citation data already wired into the connector pool.
+    Keep the channel slot/index.
+  - Epistemic Ch1 “Empirical/Quantitative” → “Methodological
+    Critique” per spec Section 6.2. Rewrite the channel prompt
+    to perform what 6.2 specifies (method-level assumptions,
+    what counts as data/inference/measurement, methodological-frame
+    inventory). Keep the channel slot/index.
+- Update `CRIA_UNIFIED_REPLIT_INSTRUCTIONS.md` channel
+  descriptions to match
+- **Checkpoint:** the two new channels must produce findings on
+  a test run that are textually distinguishable from their
+  pipeline peers — not just renamed versions of what was there
+  before.
+
+### Step 7 — End-to-end verification
+
+Run one real experiment from the dashboard:
+
+- Configuration: `editorial_cadence`
+- Profile: `ocaa_daily_editorial`
+- Query: an organic-agriculture or biodiversity question relevant
+  to OCAA’s beat (e.g. “What does current evidence say about the
+  yield gap between organic and conventional agriculture in
+  temperate climates?”)
+- Iterations: 1 (fast verification)
+- Confirm:
+  - experiment runs to completion (no `failed` status)
+  - new connectors appear in the findings (at least 3 of the new
+    agriculture/biodiversity/eco-econ connectors return results)
+  - new Ch9 (Bibliometric) produces a finding referencing
+    citation patterns or bibliometric structure
+  - new Ch1 (Methodological Critique) produces a finding
+    critiquing methodology
+  - editorial voice renders as primary output; academic voice
+    not auto-rendered (per `editorial_cadence` defaults)
+  - `indigenous_food_sovereignty` group is referenced but
+    *not* aggregated for triangulation — the partnership-gated
+    connector should appear catalogued, not active
+  - **Strict deferral check:** the experiment uses only profiles
+    that exist as of Step 4. If `general_scholarship` or
+    `partnership_sensitive` produce different results than they
+    did pre-change, that is a regression — stop and investigate.
+
+If any of these fail, stop and report. Do not edit verification
+criteria to make them pass.
+
+### Step 8 — Section 9 verification grep
+
+Run these greps and paste verbatim. Each must return matches in
+**production code** (`.py`, `.tsx`), not just the spec markdown:
+
+```
+grep -rn "agriculture_food_systems" --include="*.py" --include="*.tsx"
+grep -rn "editorial_cadence" --include="*.py" --include="*.tsx"
+grep -rn "ocaa_daily_editorial" --include="*.py" --include="*.tsx"
+grep -rn "Bibliometric" artifacts/cria-unified/main.py
+grep -rn "Methodological Critique" artifacts/cria-unified/main.py
+```
+
+All five must hit. If any is empty, that step’s work is
+incomplete — fix it before proceeding.
+
+### Step 9 — Commit and push
+
+**Single** commit. Message (per spec Section 7):
+
+```
+Advocacy suite expansion: three-configuration architecture, OCAA
+daily editorial profile, agriculture/biodiversity/ecological-economics
+connector groups, Channel 9 and Channel 1 replacements per audit.
+```
+
+Push to `main`. Replit pulls.
+
+## Final report — required
+
+Post in this order:
+
+1. Confirmation that `docs/CRIA_Advocacy_Suite_Expansion_Specification.md`
+   was created from Part 2 of this document (`wc -l` of the file)
+1. Step 1 connector count before/after, plus any enum additions
+1. Step 2 `validate_groups()` output and partnership-gating
+   assertion result
+1. Step 3 file path and line range for the configuration registry
+   you edited, plus the no-regression run confirmation for both
+   pre-existing profiles
+1. Step 7 experiment results: jobId, completion status, number
+   of findings per pipeline, two example finding excerpts
+   demonstrating the new Ch9 and Ch1 are working, confirmation
+   that `indigenous_food_sovereignty` was not aggregated
+1. Step 8 grep results — five command outputs verbatim
+1. Diff summary: files touched, lines added/removed
+1. Anything you couldn’t implement and why
+1. Commit hash and push confirmation
+
+-----
+
+# PART 2 — Specification (verbatim)
+
+> Save the content from here to the end of this document as
+> `docs/CRIA_Advocacy_Suite_Expansion_Specification.md` before
+> proceeding with Part 1.
+
+-----
+
+# CRIA Advocacy Suite Expansion — Specification
+
+**Status:** Draft for Claude Code implementation
+**Source:** Settled across conversation, May 2026
+**Target:** `bazmahti/CRIA` repository, current synced state
+**Deployment route:** This specification → Claude Code at desktop → commit → push to GitHub → Replit pulls
+
+-----
+
+## 1. What this specification covers
+
+This document captures the settled architectural decisions from the conversation and translates them into a deployable specification for the CRIA codebase. It covers four pieces of work that are conceptually one — the advocacy suite expansion that supports CRIA’s research portfolio across HUM, Book 3, Juniper-collaboration, and OCAA work:
+
+The three-configuration framework that replaces the speculative advocacy-delineation framing.
+
+The base-level connector selector behaviour and the per-profile connector-group routing.
+
+The connector pool expansion for territories shared across OCAA, Book 3, and Juniper-collaboration work — agriculture, biodiversity, food sovereignty, ecological economics.
+
+The two flagged channels (Cognitive 9 Cultural Context and Epistemic 1 Empirical/Quantitative) with recommended replacements from the audit.
+
+What this specification does *not* cover, and why each is correctly deferred: full per-programme configuration for YourSay and MIH (project context not yet uploaded); OCAA-specific operational integration with the OpenClaw-terminal workflow (deferred until daily-cadence use establishes real needs rather than imagined ones); editorial output rendering for the fourth-output architecture (correctly queued for after academic-level rendering is fully verified, which it now substantially is).
+
+-----
+
+## 2. The three-configuration architecture
+
+The settled framing: CRIA serves three distinct research configurations, not six discrete programme silos. Each programme is an entry point into one of these configurations.
+
+### 2.1 Civilisational-academic configuration
+
+**Cadence:** Slow. Weeks per experiment. Deep dual-pipeline runs.
+
+**Output structure:** All four — three academic papers (Cognitive, Epistemic, Convergent) plus editorial.
+
+**Programmes served:** Book 3 (*What Remains*), Juniper-collaboration experiments, ASA-related civilisational research.
+
+**Primary evidence tier:** T1–T2 with frame-archaeological discipline applied throughout.
+
+**Position-privilege defaults:** Balanced across credentialed research (~0.30), theoretical tradition (~0.30), critical/counter-corpus (~0.20), with sovereign sources (~0.10) and advocacy/state/grey (~0.10 combined).
+
+**Dissonance budget:** 0.30–0.40 — high, because foundational territory needs productive perturbation.
+
+**Output voice priority:** Academic primary; editorial as civic-effect deliverable.
+
+### 2.2 Therapeutic-clinical configuration
+
+**Cadence:** Slow. Study-design pace. Full dual-pipeline runs with population-specific calibration.
+
+**Output structure:** Three papers plus editorial, with clinical-advisory and community-co-researcher review gates per HUM discipline.
+
+**Programmes served:** HUM’s six therapeutic populations (chronic_pain, abi, dementia, perinatal, eating_disorder, first_nations); HMN governance research where CRIA discipline applies.
+
+**Primary evidence tier:** T1–T2 biological mechanism plus T1 valuation from affected communities. The construct-tier inversion stands: participatory-defined constructs are T1; clinician-rated outside-in operationalisations are T3.
+
+**Position-privilege defaults:** Credentialed-research substantial (~0.35) but explicitly co-equal with autistic-led / community-led valuation evidence; community-curated and indigenous-scholarship weighted higher than civilisational-academic configuration uses.
+
+**Dissonance budget:** 0.20–0.25 — moderate, because therapeutic deployment requires reliable findings while still surfacing counter-corpus.
+
+**Output voice priority:** Academic primary; practitioner voice load-bearing for clinical translation; editorial available.
+
+### 2.3 Editorial-cadence configuration
+
+**Cadence:** Fast. Daily for OCAA; less frequent for other programmes’ public-facing work.
+
+**Output structure:** Editorial primary, with single-pipeline focused channels supplying the substantive finding. Academic papers reserved for less-frequent deeper pieces.
+
+**Programmes served:** OCAA daily LinkedIn editorial; any programme’s public-communications work; future YourSay civic-engagement editorial when that programme activates.
+
+**Primary evidence tier:** One substantive T1–T2 finding plus context for the day’s post.
+
+**Position-privilege defaults:** Balanced toward credentialed research and counter-corpus relevant to the day’s specific topic; advocacy and grey-practitioner sources prominent because daily-cadence demands current movement and industry knowledge.
+
+**Dissonance budget:** 0.15–0.20 — lower than the other two configurations, because fast-pass editorial work requires convergent findings, not extended frame-archaeological excavation. Frame-criticism still operates but is summarised concisely.
+
+**Output voice priority:** Editorial only by default; full academic-voice rendering available on demand for occasional longer pieces.
+
+### 2.4 Configuration as parameter set, not separate codebase
+
+These three configurations should be implemented as parameter presets within the existing CRIA architecture, not as separate codebases. The same orchestrator runs all three; different parameters activate different channels, weight evidence tiers differently, set different dissonance budgets, prioritise different output voices.
+
+This is critical for maintainability. Three configurations with thirty parameters each is one codebase with parametric configuration. Three separate codebases is three times the maintenance burden.
+
+-----
+
+## 3. The advocacy suite within editorial-cadence configuration
+
+OCAA is the reference profile for the advocacy suite. Other advocacy-flavoured profiles can be added when actual programmes need them, using OCAA’s structure as the template.
+
+### 3.1 OCAA Daily Editorial profile
+
+**Profile name:** `ocaa_daily_editorial`
+
+**Configuration:** editorial-cadence
+
+**Description:** Daily LinkedIn editorial output on organic agriculture, gardening, biodiversity loss, food sovereignty, regenerative agriculture, and adjacent environmental concerns. One post per day, 200–300 words, professional-public audience.
+
+**Active connector groups:** mainstream_academic, agriculture_food_systems, biodiversity_conservation, ecological_economics, food_sovereignty_advocacy, indigenous_food_sovereignty (sovereign-source-aware retrieval only), australian_government_environment.
+
+**Inactive connector groups for this profile:** clinical_medical, neurodiversity_specific, civilisational_philosophy (these belong to other profiles).
+
+**Refusal discipline:** Indigenous food-sovereignty knowledge as sovereign source — not aggregated for general-public posts without partnership and consent. Corporate-funded research treated with position-privilege caution. Consumer health claims require evidence-tier discipline given regulatory environment around organic food marketing.
+
+**Operational mode:** Fast-pass — one substantive finding plus citation plus angle per daily post. Single-pipeline (Cognitive primary; Epistemic background for position-privilege awareness only).
+
+**Output:** Editorial voice only by default. Full three-paper rendering available on explicit request for longer-form pieces.
+
+### 3.2 Future advocacy profiles (deferred)
+
+Three further profiles are anticipated but should not be specified before they are needed:
+
+`yoursay_civic_engagement` — democratic participation editorial when YourSay activates.
+
+`disability_advocacy_editorial` — public-facing disability-rights commentary when a programme requires it.
+
+`first_nations_partnership_editorial` — First Nations-led editorial work when partnership conversations land.
+
+These profiles share the editorial-cadence configuration shape but with different connector groups activated and different refusal disciplines applied. Adding them is a matter of registering new profile entries plus, where needed, additional connector-group definitions.
+
+-----
+
+## 4. Base-level connector selector design
+
+The settled interpretation: connector selection happens at three layers, with cascade.
+
+**Layer 1 — Connector pool.** All registered connectors live in `cria_connectors_config.py`. Adding a connector is a single dataclass entry. The pool can grow without runtime cost because connectors that aren’t selected for a given experiment don’t run.
+
+**Layer 2 — Profile-default connector groups.** Each profile has a default list of active connector groups. When a user selects a profile in the dashboard, those connector groups become the experiment’s active pool. This is the “base-level connector selector” — the user picks a profile and gets a sensible starting set automatically.
+
+**Layer 3 — Per-experiment override.** Within an experiment, the user can add or remove specific connectors from the profile’s defaults. This handles edge cases where a particular research question needs unusual sources.
+
+The architectural commitment: profiles are the primary axis; per-experiment overrides are secondary. Most experiments use profile defaults; overrides are the exception.
+
+### 4.1 Implementation requirements
+
+**Connector groups defined as named lists in code.** Each group is a Python list of connector names that activate together. Examples below.
+
+**Profile-to-groups mapping in the configuration registry.** Each profile entry includes its `active_connector_groups` field listing which groups activate by default.
+
+**Dashboard UI exposes the cascade.** When a user selects a profile, the connector pane shows: which groups are active by default (visible, can be deselected); which groups are inactive but available (visible, can be selected); individual connectors within groups can be expanded for granular control.
+
+**Registry-level validation prevents partnership-gated connectors from activating without partnership flag.** The existing partnership-gated logic stays in place; profile defaults don’t override it.
+
+-----
+
+## 5. Connector expansion specification
+
+The connectors below are needed for OCAA, Book 3, and Juniper-collaboration work. Each is specified with the values needed for direct registration in `cria_connectors_config.py`.
+
+### 5.1 Agriculture and food systems group (`agriculture_food_systems`)
+
+These connectors serve OCAA daily editorial, Book 3 ecological-collapse chapters, and Juniper-collaboration work on Polanyian substantivism and Mazzucato bio-economy.
+
+**Connectors to add:**
+
+```python
+AGROECOLOGY_AND_SUSTAINABLE_FOOD_SYSTEMS = Connector(
+    name="agroecology_and_sustainable_food_systems",
+    access_mode=AccessMode.ACADEMIC_CONNECTOR,
+    layer="L3,L7,L8",
+    domains=["D5_Governance", "D6_Philosophy"],
+    position_privileged=PositionPrivileged.CREDENTIALED_RESEARCH,
+    dissonance_role=DissonanceRole.BRIDGE,
+    base_url="https://www.tandfonline.com/journals/wjsa",
+    rate_limit_per_minute=60,
+    notes=(
+        "Taylor & Francis journal. Agroecology as scientific discipline. "
+        "Bridges credentialed research and food-sovereignty movement scholarship. "
+        "Routed via institutional academic access or via OpenAlex for OA articles."
+    ),
+)
+
+RENEWABLE_AGRICULTURE_AND_FOOD_SYSTEMS = Connector(
+    name="renewable_agriculture_and_food_systems",
+    access_mode=AccessMode.ACADEMIC_CONNECTOR,
+    layer="L3,L8",
+    domains=["D5_Governance"],
+    position_privileged=PositionPrivileged.CREDENTIALED_RESEARCH,
+    dissonance_role=DissonanceRole.BRIDGE,
+    base_url="https://www.cambridge.org/core/journals/renewable-agriculture-and-food-systems",
+    rate_limit_per_minute=60,
+    notes="Cambridge Univ Press. Sustainable agriculture research."
+)
+
+AGRICULTURE_AND_HUMAN_VALUES = Connector(
+    name="agriculture_and_human_values",
+    access_mode=AccessMode.ACADEMIC_CONNECTOR,
+    layer="L3,L7",
+    domains=["D5_Governance", "D6_Philosophy"],
+    position_privileged=PositionPrivileged.CREDENTIALED_RESEARCH,
+    dissonance_role=DissonanceRole.BRIDGE,
+    base_url="https://link.springer.com/journal/10460",
+    rate_limit_per_minute=60,
+    notes=(
+        "Springer journal. Agriculture-society interface, ethics, "
+        "food-sovereignty scholarship. Strong counter-corpus to industrial-agriculture framing."
+    ),
+)
+
+FAO_PUBLICATIONS = Connector(
+    name="fao_publications",
+    access_mode=AccessMode.OPEN_ACCESS,
+    layer="L8",
+    domains=["D5_Governance"],
+    position_privileged=PositionPrivileged.STATE_ADMINISTRATIVE,
+    dissonance_role=DissonanceRole.MAIN,
+    base_url="https://www.fao.org/publications",
+    rate_limit_per_minute=120,
+    notes="UN Food and Agriculture Organisation. State-administrative position."
+)
+
+ABARES = Connector(
+    name="abares",
+    access_mode=AccessMode.OPEN_ACCESS,
+    layer="L8",
+    domains=["D5_Governance"],
+    position_privileged=PositionPrivileged.STATE_ADMINISTRATIVE,
+    dissonance_role=DissonanceRole.MAIN,
+    base_url="https://www.agriculture.gov.au/abares",
+    rate_limit_per_minute=120,
+    notes="Australian Bureau of Agricultural and Resource Economics and Sciences."
+)
+```
+
+### 5.2 Biodiversity and conservation group (`biodiversity_conservation`)
+
+```python
+CONSERVATION_BIOLOGY = Connector(
+    name="conservation_biology",
+    access_mode=AccessMode.ACADEMIC_CONNECTOR,
+    layer="L3,L8",
+    domains=["D5_Governance", "D6_Philosophy"],
+    position_privileged=PositionPrivileged.CREDENTIALED_RESEARCH,
+    dissonance_role=DissonanceRole.MAIN,
+    base_url="https://conbio.onlinelibrary.wiley.com/journal/15231739",
+    rate_limit_per_minute=60,
+    notes="Wiley journal of the Society for Conservation Biology."
+)
+
+BIOLOGICAL_CONSERVATION = Connector(
+    name="biological_conservation",
+    access_mode=AccessMode.ACADEMIC_CONNECTOR,
+    layer="L3,L8",
+    domains=["D5_Governance"],
+    position_privileged=PositionPrivileged.CREDENTIALED_RESEARCH,
+    dissonance_role=DissonanceRole.MAIN,
+    base_url="https://www.sciencedirect.com/journal/biological-conservation",
+    rate_limit_per_minute=60,
+    notes="Elsevier journal. Quantitative conservation science."
+)
+
+ECOLOGY_AND_SOCIETY = Connector(
+    name="ecology_and_society",
+    access_mode=AccessMode.OPEN_ACCESS,
+    layer="L3,L7",
+    domains=["D5_Governance", "D6_Philosophy"],
+    position_privileged=PositionPrivileged.CREDENTIALED_RESEARCH,
+    dissonance_role=DissonanceRole.BRIDGE,
+    base_url="https://www.ecologyandsociety.org/",
+    rate_limit_per_minute=120,
+    notes=(
+        "Open-access journal. Strong on social-ecological systems thinking. "
+        "Bridges natural and social science."
+    ),
+)
+
+IPBES = Connector(
+    name="ipbes",
+    access_mode=AccessMode.OPEN_ACCESS,
+    layer="L8",
+    domains=["D5_Governance"],
+    position_privileged=PositionPrivileged.STATE_ADMINISTRATIVE,
+    dissonance_role=DissonanceRole.MAIN,
+    base_url="https://www.ipbes.net/",
+    rate_limit_per_minute=120,
+    notes="Intergovernmental Science-Policy Platform on Biodiversity and Ecosystem Services."
+)
+```
+
+### 5.3 Ecological economics group (`ecological_economics`)
+
+These specifically support Juniper-collaboration work on Polanyian substantivism and Mazzucato bio-economy, plus Book 3’s civilisational ecological-economic argument.
+
+```python
+ECOLOGICAL_ECONOMICS_JOURNAL = Connector(
+    name="ecological_economics_journal",
+    access_mode=AccessMode.ACADEMIC_CONNECTOR,
+    layer="L3,L7,L8",
+    domains=["D5_Governance", "D6_Philosophy"],
+    position_privileged=PositionPrivileged.CREDENTIALED_RESEARCH,
+    dissonance_role=DissonanceRole.BRIDGE,
+    base_url="https://www.sciencedirect.com/journal/ecological-economics",
+    rate_limit_per_minute=60,
+    notes=(
+        "Elsevier journal. Heterodox economics that engages ecological "
+        "constraints. Strong fit for Juniper-collaboration work on substantive "
+        "economic redesign."
+    ),
+)
+
+ENVIRONMENTAL_VALUES = Connector(
+    name="environmental_values",
+    access_mode=AccessMode.ACADEMIC_CONNECTOR,
+    layer="L3,L7",
+    domains=["D6_Philosophy"],
+    position_privileged=PositionPrivileged.THEORETICAL_TRADITION,
+    dissonance_role=DissonanceRole.BRIDGE,
+    base_url="https://journals.sagepub.com/home/eav",
+    rate_limit_per_minute=60,
+    notes="White Horse Press / Sage. Environmental philosophy and ethics."
+)
+
+JOURNAL_OF_POLITICAL_ECOLOGY = Connector(
+    name="journal_of_political_ecology",
+    access_mode=AccessMode.OPEN_ACCESS,
+    layer="L3,L7",
+    domains=["D5_Governance", "D6_Philosophy"],
+    position_privileged=PositionPrivileged.CREDENTIALED_RESEARCH,
+    dissonance_role=DissonanceRole.COUNTER,
+    base_url="https://journals.uair.arizona.edu/index.php/JPE",
+    rate_limit_per_minute=120,
+    notes=(
+        "Open-access journal. Critical political ecology — power, "
+        "environment, and political economy. Strong counter-corpus."
+    ),
+)
+```
+
+### 5.4 Food sovereignty advocacy group (`food_sovereignty_advocacy`)
+
+```python
+LA_VIA_CAMPESINA = Connector(
+    name="la_via_campesina",
+    access_mode=AccessMode.OPEN_ACCESS,
+    layer="L7",
+    domains=["D5_Governance"],
+    position_privileged=PositionPrivileged.ADVOCACY,
+    dissonance_role=DissonanceRole.COUNTER,
+    base_url="https://viacampesina.org/en/",
+    rate_limit_per_minute=120,
+    notes=(
+        "International peasant movement. Food-sovereignty framework. "
+        "Counter-corpus to industrial-agriculture and corporate-food-systems framing."
+    ),
+)
+
+GRAIN = Connector(
+    name="grain",
+    access_mode=AccessMode.OPEN_ACCESS,
+    layer="L7",
+    domains=["D5_Governance"],
+    position_privileged=PositionPrivileged.ADVOCACY,
+    dissonance_role=DissonanceRole.COUNTER,
+    base_url="https://grain.org/",
+    rate_limit_per_minute=120,
+    notes="Small NGO researching corporate-control issues in food systems."
+)
+
+ETC_GROUP = Connector(
+    name="etc_group",
+    access_mode=AccessMode.OPEN_ACCESS,
+    layer="L7",
+    domains=["D5_Governance"],
+    position_privileged=PositionPrivileged.ADVOCACY,
+    dissonance_role=DissonanceRole.COUNTER,
+    base_url="https://www.etcgroup.org/",
+    rate_limit_per_minute=120,
+    notes="Action Group on Erosion, Technology and Concentration. Tracks corporate-power in food and agriculture."
+)
+```
+
+### 5.5 Indigenous food sovereignty group (`indigenous_food_sovereignty`)
+
+These are sovereign-source-aware. Activation requires the partnership flag; dissonance role is SOVEREIGN, not COUNTER, meaning they appear as findings but are not aggregated for triangulation.
+
+```python
+INDIGENOUS_FOOD_AND_KNOWLEDGE_SYSTEMS_NETWORK = Connector(
+    name="indigenous_food_and_knowledge_systems_network",
+    access_mode=AccessMode.PARTNERSHIP_GATED,
+    layer="L4,L5,L6",
+    domains=["D5_Governance", "D6_Philosophy"],
+    position_privileged=PositionPrivileged.INDIGENOUS_SCHOLARSHIP,
+    dissonance_role=DissonanceRole.SOVEREIGN,
+    base_url=None,
+    rate_limit_per_minute=0,
+    enabled=False,
+    notes=(
+        "Catalogued, not activated. Awaits partnership conversation. "
+        "Indigenous food-sovereignty scholarship is sovereign source — "
+        "not aggregated for triangulation. Refusal as primary finding when "
+        "general-public posts engage this territory without partnership."
+    ),
+)
+
+# Note: more Indigenous food-sovereignty sources would go here once
+# partnership conversations have specified which sources are appropriate
+# for inclusion and under what conditions.
+```
+
+### 5.6 Australian government environment group (`australian_government_environment`)
+
+```python
+DCCEEW = Connector(
+    name="dcceew",
+    access_mode=AccessMode.OPEN_ACCESS,
+    layer="L8",
+    domains=["D5_Governance"],
+    position_privileged=PositionPrivileged.STATE_ADMINISTRATIVE,
+    dissonance_role=DissonanceRole.MAIN,
+    base_url="https://www.dcceew.gov.au/",
+    rate_limit_per_minute=120,
+    notes="Australian Department of Climate Change, Energy, the Environment and Water."
+)
+
+CSIRO_ENVIRONMENT = Connector(
+    name="csiro_environment",
+    access_mode=AccessMode.OPEN_ACCESS,
+    layer="L8",
+    domains=["D5_Governance"],
+    position_privileged=PositionPrivileged.CREDENTIALED_RESEARCH,
+    dissonance_role=DissonanceRole.MAIN,
+    base_url="https://www.csiro.au/en/research/environmental-impacts",
+    rate_limit_per_minute=120,
+    notes="CSIRO environmental research. Australian state-research position."
+)
+```
+
+-----
+
+## 6. Channel realignment: the two flagged channels
+
+From the audit work earlier in the conversation, two channels were flagged for examination because the §4 distinctness criterion (distinct from peers in pipeline; distinct from other pipeline’s coverage) is at risk of failure.
+
+### 6.1 Cognitive Channel 9 — replace Cultural Context
+
+**Current channel:** Cultural Context — assesses cultural scope and validity of findings. Flagged because the job sits awkwardly between Cognitive Quality Control (Channel 8) and Epistemic Cross-cultural (Channel 7).
+
+**Replacement:** Bibliometric & Citation-Network Analysis
+
+**Specification:**
+
+- Analyses the structure of the literature itself rather than its content.
+- Surfaces citation networks, terminology drift over time, who-cites-whom patterns, co-authorship clusters, journal-prestige distributions, geographic and institutional concentrations.
+- Output is meta-evidence about the evidence base: what kind of conversation has the literature been having, who has been included and excluded, what concepts have shifted meaning, where citation cascades occur.
+- Genuinely Cognitive in spirit (structural-empirical work), distinct from every other Cognitive channel.
+- Uses Crossref and OpenAlex citation data which are already wired into the connector pool.
+
+**Why this replacement clears §4:** Distinct from Quality Control (assesses individual sources, not literature structure); distinct from Synthesis (integrates findings, not citation patterns); distinct from Epistemic Cross-cultural (analyses citation structure, not non-Western framings); contributes to publishable-standard execution by adding a substantive analytical capability that single-researcher work struggles to match.
+
+### 6.2 Epistemic Channel 1 — replace Empirical/Quantitative
+
+**Current channel:** Empirical/Quantitative — numerical evidence, statistical methodology, effect sizes. Flagged because empirical-quantitative reading sits structurally close to what Cognitive does as a whole, risking redundancy.
+
+**Replacement:** Methodological Critique reading
+
+**Specification:**
+
+- Examines what methodological commitments different framings of the question presuppose, and how those commitments shape what counts as an answer.
+- Reads empirical work not for findings but for method-level assumptions: what counts as data, what counts as inference, what counts as valid measurement, what scales are commensurable, what’s being held constant.
+- Output is a methodological-frame inventory describing how the question is being approached and what each methodology presupposes.
+- Genuinely characteristic of frame-archaeological thinking applied to method.
+- Pairs naturally with the new Cognitive Channel 9 (Bibliometric) — Cognitive analyses citation structure, Epistemic analyses methodology assumptions.
+
+**Why this replacement clears §4:** Distinct from Philosophical (apparatus-engagement at theory level, not methodology); distinct from Critical (counter-corpus voices, not methodology critique); distinct from Cognitive evidence-aggregation as a whole (analyses method assumptions, not findings); contributes to publishable-standard execution by adding a substantive frame-archaeological capability.
+
+-----
+
+## 7. Deployment sequence for Claude Code
+
+The implementation work, in order. Each step produces a verifiable change before the next step begins.
+
+**Step 1 — Add the new connectors to `cria_connectors_config.py`.**
+
+Append the connector dataclass entries from Section 5 to the existing connector list. Update the `ALL_NEW_CONNECTORS` list (or equivalent registry) to include the new entries. No existing connectors are modified; this is purely additive. Verify by running the connector registry’s validation function.
+
+**Step 2 — Add connector group definitions.**
+
+Define the connector groups (`mainstream_academic`, `agriculture_food_systems`, `biodiversity_conservation`, `ecological_economics`, `food_sovereignty_advocacy`, `indigenous_food_sovereignty`, `australian_government_environment`, plus the existing groups already implicit in profile defaults) as named Python lists in the configuration module. Each group is a list of connector names from Step 1 plus existing connectors.
+
+**Step 3 — Register the three configurations.**
+
+In the configuration registry (whichever module currently defines `general_scholarship` and `partnership_sensitive`), add three new configuration entries: `civilisational_academic`, `therapeutic_clinical`, `editorial_cadence`. Each configuration entry includes its parameter set (cadence, output structure, primary evidence tier, position-privilege defaults, dissonance budget, output voice priority) per Section 2.
+
+**Step 4 — Register the OCAA daily editorial profile.**
+
+Within the editorial-cadence configuration, register the `ocaa_daily_editorial` profile per Section 3.1 specification. The profile entry includes its `active_connector_groups` list referencing groups from Step 2, plus its refusal discipline, operational mode, and output rendering preferences.
+
+**Step 5 — Implement the base-level connector selector cascade.**
+
+The selector logic per Section 4.1: when a profile is selected, activate its default connector groups; allow per-experiment override of individual connectors; preserve partnership-gated logic so sovereign sources aren’t auto-activated. Update the dashboard UI to expose the cascade — the relevant file is `artifacts/cria-dashboard/src/pages/unified-research.tsx`, which currently has `profile` state with two options.
+
+**Step 6 — Replace the two flagged channels.**
+
+In the Cognitive pipeline implementation (presumably in `artifacts/cria-unified/main.py`), replace Channel 9 (Cultural Context) with Channel 9 (Bibliometric & Citation-Network Analysis) per Section 6.1. In the Epistemic pipeline implementation, replace Channel 1 (Empirical/Quantitative) with Channel 1 (Methodological Critique) per Section 6.2. Update channel prompts to reflect new analytical focus. The existing channel descriptions in `CRIA_UNIFIED_REPLIT_INSTRUCTIONS.md` need updating to match.
+
+**Step 7 — Verification.**
+
+After all steps complete, run a test experiment using the OCAA profile with a sample query to confirm the cascade works end-to-end. Confirm the new connectors return results. Confirm the new Channel 9 (Bibliometric) and new Channel 1 (Methodological Critique) produce findings distinguishable from their respective pipeline peers.
+
+**Step 8 — Commit and push.**
+
+Single commit covering the advocacy-suite expansion. Suggested commit message: *“Advocacy suite expansion: three-configuration architecture, OCAA daily editorial profile, agriculture/biodiversity/ecological-economics connector groups, Channel 9 and Channel 1 replacements per audit.”*
+
+Push to `main`. Replit pulls.
+
+-----
+
+## 8. What this specification deliberately does not include
+
+Three things deliberately deferred, with reasons:
+
+**OCAA-specific operational integration with the OpenClaw-terminal workflow.** The terminal setup is built but not yet in active daily use because attention has been on CRIA and HUM. Designing the integration before real-use surfaces actual needs is the speculative-coverage trap. Defer until the daily workflow is running and gaps are concrete.
+
+**YourSay and MIH configurations.** Project context for these programmes is minimal in available documentation. Producing configurations would require inventing specifications. Defer until the relevant `*_PROJECT_CONTEXT.md` documents are uploaded or articulated.
+
+**Editorial output rendering improvements.** The four-output architecture is canonical but the editorial rendering layer has not been scrutinised in detail in this session. The civic-effect test from the canonical document (does this teach a non-specialist to think rather than reporting a conclusion) is the standard. Improving editorial rendering is its own specification when attention turns to it.
+
+-----
+
+## 9. Verification after deployment
+
+When Claude Code has implemented and pushed, the next session can verify by re-syncing the GitHub Integration on this Claude project and searching for:
+
+The new connector names (Crossref-pattern entries for each agriculture, biodiversity, ecological-economics connector). Confirms connector additions landed.
+
+The string `editorial_cadence` in the configuration registry. Confirms the three-configuration architecture is registered.
+
+The string `ocaa_daily_editorial` somewhere in the profile registry. Confirms OCAA profile is active.
+
+The Channel 9 and Channel 1 replacement names (`Bibliometric` and `Methodological Critique`) in the channel implementations. Confirms the audit replacements landed.
+
+If all four searches return matches, the deployment succeeded. If any fail, the implementation work for that piece needs re-examination.
+
+-----
+
+## 10. Discipline reminder
+
+This specification respects the smallest-valuable-addition principle from the v3-mistake-record. Every change in this specification has a concrete justification grounded in research questions the architecture serves, not speculative coverage of advocacy domains CRIA might-someday-engage.
+
+Profiles, configurations, and connector groups are extensible — adding new ones later is a registration step, not a system change. Starting with three configurations and one advocacy profile is the right discipline. Expanding when actual programmes need expansion is the architectural commitment that makes the system durable.
+
+-----
+
+*Specification compiled from conversation, May 2026. For implementation by Claude Code at desktop, against `bazmahti/CRIA` repository current synced state.*

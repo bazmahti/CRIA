@@ -471,6 +471,7 @@ export default function UnifiedResearch() {
   const [iterations, setIterations] = useState(1);
   const [voice, setVoice] = useState("all");
   const [profile, setProfile] = useState("general_scholarship");
+  const [showConnectorGroups, setShowConnectorGroups] = useState(false);
 
   const [job, setJob] = useState<UnifiedJobState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -665,14 +666,100 @@ export default function UnifiedResearch() {
                 <label className="block text-[10px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Profile</label>
                 <select
                   value={profile}
-                  onChange={(e) => setProfile(e.target.value)}
+                  onChange={(e) => { setProfile(e.target.value); setShowConnectorGroups(true); }}
                   className="w-full bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-xs focus:outline-none"
                 >
-                  <option value="general_scholarship">General scholarship</option>
-                  <option value="partnership_sensitive">Partnership-sensitive</option>
+                  <optgroup label="General">
+                    <option value="general_scholarship">General Scholarship</option>
+                    <option value="partnership_sensitive">Partnership-Sensitive</option>
+                  </optgroup>
+                  <optgroup label="Three-configuration architecture">
+                    <option value="civilisational_academic">Civilisational-Academic</option>
+                    <option value="therapeutic_clinical">Therapeutic-Clinical</option>
+                    <option value="ocaa_daily_editorial">OCAA Daily Editorial</option>
+                  </optgroup>
                 </select>
               </div>
             </div>
+
+            {/* Connector group cascade display */}
+            {(() => {
+              const PROFILE_GROUPS: Record<string, { active: string[]; inactive: string[] }> = {
+                general_scholarship: {
+                  active: ["mainstream_academic"],
+                  inactive: ["agriculture_food_systems", "biodiversity_conservation", "ecological_economics", "food_sovereignty_advocacy", "clinical_medical"],
+                },
+                partnership_sensitive: {
+                  active: ["mainstream_academic", "indigenous_sovereign"],
+                  inactive: ["agriculture_food_systems", "biodiversity_conservation", "ecological_economics", "food_sovereignty_advocacy", "clinical_medical"],
+                },
+                civilisational_academic: {
+                  active: ["mainstream_academic", "civilisational_philosophy", "ecological_economics"],
+                  inactive: ["agriculture_food_systems", "biodiversity_conservation", "food_sovereignty_advocacy", "indigenous_food_sovereignty", "australian_government_environment", "clinical_medical"],
+                },
+                therapeutic_clinical: {
+                  active: ["mainstream_academic", "clinical_medical", "neurodiversity_specific", "indigenous_sovereign", "australian_institutional"],
+                  inactive: ["agriculture_food_systems", "biodiversity_conservation", "ecological_economics", "food_sovereignty_advocacy", "indigenous_food_sovereignty", "civilisational_philosophy"],
+                },
+                ocaa_daily_editorial: {
+                  active: ["mainstream_academic", "agriculture_food_systems", "biodiversity_conservation", "ecological_economics", "food_sovereignty_advocacy", "indigenous_food_sovereignty", "australian_government_environment"],
+                  inactive: ["clinical_medical", "neurodiversity_specific", "civilisational_philosophy"],
+                },
+              };
+              const groups = PROFILE_GROUPS[profile];
+              if (!groups) return null;
+              const GROUP_NOTES: Record<string, string> = {
+                mainstream_academic: "Semantic Scholar · OpenAlex · Crossref · PubMed · arXiv",
+                indigenous_sovereign: "AIATSIS · Lowitja · NACCHO · NATSILS (partnership-gated)",
+                agriculture_food_systems: "Agroecology · Renewable Ag · FAO · ABARES",
+                biodiversity_conservation: "Conservation Biology · Biological Conservation · IPBES",
+                ecological_economics: "Ecological Economics · Environmental Values · Political Ecology",
+                food_sovereignty_advocacy: "La Via Campesina · GRAIN · ETC Group",
+                indigenous_food_sovereignty: "IFKSN (partnership-gated — sovereign source only)",
+                australian_government_environment: "DCCEEW · CSIRO Environment",
+                civilisational_philosophy: "PhilPapers · SEP · Constructivist Foundations · nLab",
+                clinical_medical: "PubMed · Cochrane · CINAHL · PsycINFO",
+                neurodiversity_specific: "Autism Science Foundation · PARC · ASAN",
+                australian_institutional: "AustLII · ARDC · NIAA · AHRC · ABS",
+              };
+              return (
+                <div className="mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowConnectorGroups(!showConnectorGroups)}
+                    className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ChevronDown className={cn("w-3 h-3 transition-transform", showConnectorGroups && "rotate-180")} />
+                    {showConnectorGroups ? "Hide" : "Show"} connector groups for this profile
+                  </button>
+                  {showConnectorGroups && (
+                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-2.5">
+                        <p className="text-[9px] font-semibold text-green-400 uppercase tracking-wider mb-1.5">Active groups</p>
+                        <div className="space-y-1">
+                          {groups.active.map(g => (
+                            <div key={g} className="text-[10px]">
+                              <span className="font-medium text-green-300/80">{g.replace(/_/g, " ")}</span>
+                              {GROUP_NOTES[g] && <span className="text-muted-foreground ml-1">— {GROUP_NOTES[g]}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="bg-muted/10 border border-border/30 rounded-lg p-2.5">
+                        <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Inactive (available on override)</p>
+                        <div className="space-y-1">
+                          {groups.inactive.map(g => (
+                            <div key={g} className="text-[10px] text-muted-foreground/60">
+                              <span>{g.replace(/_/g, " ")}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <button
               onClick={launch}

@@ -168,13 +168,19 @@ Runs three architecturally distinct research pipelines from one research questio
 
 **CRIA-Cognitive** — 10 cognitive-role channels:
 - Scoping & Ontology, Evidence Acquisition, Contradiction & Anomaly, Synthesis, Causal Mapping,
-  Critic & Falsification, Serendipity, Quality Control, Cultural Context, Process Steering
+  Critic & Falsification, Serendipity, Quality Control,
+  **Bibliometric & Citation-Network Analysis** *(replaced Cultural Context, May 2026 — §4 audit)*, Process Steering
+- Ch9 Bibliometric: analyses literature structure (citation networks, terminology drift,
+  authorship/institutional concentrations) as meta-evidence, using Crossref + OpenAlex data
 - Meta-layer (novelty scoring + cross-connection), Layer 3 (10 strategies), Hofstadter validation
 - Optimised for: converging on findings under disciplined workflow
 
 **CRIA-Epistemic** — 10 epistemic-mode channels:
-- Empirical, Phenomenological, Historical, Philosophical, Critical, Civilisational,
+- **Methodological Critique** *(replaced Empirical/Quantitative, May 2026 — §4 audit)*,
+  Phenomenological, Historical, Philosophical, Critical, Civilisational,
   Cross-cultural, Computational, Adversarial, Wildcard
+- Ch1 Methodological Critique: examines what methodological commitments different framings
+  presuppose (what counts as data, inference, measurement, commensurability); pairs with Ch9 Bibliometric
 - Two-stream metagent (Academic + Experimental), Layer 3 (7 frame-critical strategies), Hofstadter
 - Optimised for: frame excavation, refusal-as-finding, sovereign-source non-aggregation
 
@@ -184,9 +190,29 @@ Runs three architecturally distinct research pipelines from one research questio
 - Runs AFTER both pipelines complete; analyses the shape of their disagreement
 
 ### Connector Registry
-- **68 total connectors** (27 CRIA-Cognitive + 36 CRIA-Epistemic + shared)
-- **56 active** (verified at `/cria-unified/connectors`)
-- **12 partnership-gated** (catalogued inactive — Indigenous sovereignty sources: AIATSIS, Lowitja, NACCHO, NATSILS, Maiam nayri Wingara, First Nations Media Australia)
+- **86 total connectors** (68 original + 18 new from Advocacy Suite Expansion, May 2026)
+- New connectors in `cria_connectors_config.py` (7 groups):
+  - `agriculture_food_systems` (5): Agroecology & Sustainable Food Systems, Renewable Ag & Food Systems, Agriculture & Human Values, FAO Publications, ABARES
+  - `biodiversity_conservation` (4): Conservation Biology, Biological Conservation, Ecology & Society, IPBES
+  - `ecological_economics` (3): Ecological Economics Journal, Environmental Values, Journal of Political Ecology
+  - `food_sovereignty_advocacy` (3): La Via Campesina, GRAIN, ETC Group
+  - `indigenous_food_sovereignty` (1, partnership-gated): IFKSN
+  - `australian_government_environment` (2): DCCEEW, CSIRO Environment
+- **Partnership-gated** (catalogued inactive): AIATSIS, Lowitja, NACCHO, NATSILS, Maiam nayri Wingara, First Nations Media Australia, IFKSN
+
+### Three-Configuration Architecture (Advocacy Suite Expansion, May 2026)
+Defined in `cria_connectors_config.py`. Three configurations, five profiles, one codebase:
+
+| Configuration | Cadence | Profiles | Dissonance |
+|---|---|---|---|
+| `civilisational_academic` | Slow | `general_scholarship`, `partnership_sensitive`, `civilisational_academic` | 0.30–0.40 |
+| `therapeutic_clinical` | Slow | `therapeutic_clinical` | 0.20–0.25 |
+| `editorial_cadence` | Fast (daily) | `ocaa_daily_editorial` | 0.15–0.20 |
+
+**`ocaa_daily_editorial` profile**: OCAA daily LinkedIn editorial on organic agriculture, biodiversity, food sovereignty. Active groups: mainstream_academic + all 6 new advocacy/environment groups. Dissonance 0.17. Editorial voice only by default.
+
+### Dashboard Profile Selector (Advocacy Suite Expansion)
+`/unified` now offers 5 profiles in grouped dropdown (General / Three-configuration architecture). Profile selection auto-reveals connector group cascade panel showing active vs inactive groups with connector membership notes.
 
 ### Three-Voice Rendering
 - **Academic**: formal, cited, position-privilege explicit, falsification conditions stated

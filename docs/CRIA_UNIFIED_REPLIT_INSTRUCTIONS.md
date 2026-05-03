@@ -13,15 +13,20 @@ A unified three-pipeline research instrument:
 
 - **CRIA-Cognitive** — 10 cognitive-role channels (scoping, evidence,
   contradiction, synthesis, causal, critic, serendipity, quality,
-  cultural, steering) + meta-layer + Layer 3 + Hofstadter validation.
+  **bibliometric & citation-network** [replaced Cultural Context, May 2026],
+  steering) + meta-layer + Layer 3 + Hofstadter validation.
   Optimised for evidence aggregation across mainstream databases.
+  Ch9 Bibliometric analyses citation-network structure, terminology drift,
+  and literature meta-evidence rather than individual-source cultural scope.
 
-- **CRIA-Epistemic** — 10 epistemic-mode channels (empirical,
-  phenomenological, historical, philosophical, critical,
-  civilisational, cross-cultural, computational, adversarial,
-  wildcard) + two-stream metagent (academic + experimental) +
+- **CRIA-Epistemic** — 10 epistemic-mode channels (**methodological critique**
+  [replaced Empirical/Quantitative, May 2026], phenomenological, historical,
+  philosophical, critical, civilisational, cross-cultural, computational,
+  adversarial, wildcard) + two-stream metagent (academic + experimental) +
   Hofstadter validation + Layer 3. Frame-critical, sovereign-aware,
-  refusal-as-finding.
+  refusal-as-finding. Ch1 Methodological Critique examines method-level
+  presuppositions across framings — what counts as data, valid inference,
+  commensurable measurement. Pairs with Ch9 Bibliometric.
 
 - **CRIA-Convergent** — 5 cross-pipeline analytical channels
   (convergence topology, divergence anatomy, absence mapping, frame

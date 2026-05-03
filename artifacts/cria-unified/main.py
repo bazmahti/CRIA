@@ -219,6 +219,7 @@ class Modality(Enum):
 
 class PositionPrivileged(Enum):
     STATE_ADMIN = "state_admin"
+    STATE_ADMINISTRATIVE = "state_admin"  # alias for spec compatibility
     CREDENTIALED_RESEARCH = "credentialed_research"
     COMMUNITY_CURATED = "community_curated"
     INDIGENOUS_SCHOLARSHIP = "indigenous_scholarship"
@@ -647,6 +648,33 @@ EPISTEMIC_CONNECTORS = [
 ]
 
 ALL_CONNECTORS = COGNITIVE_CONNECTORS + EPISTEMIC_CONNECTORS
+
+# ── Advocacy Suite Expansion connectors (cria_connectors_config.py) ──────────
+# Convert Connector dataclass entries → ConnectorSpec for use in the pipeline.
+# Imported here (after all enum and ConnectorSpec definitions) to avoid
+# circular-import issues.
+try:
+    from cria_connectors_config import ALL_NEW_CONNECTORS, AccessMode
+
+    def _new_connector_to_spec(c) -> ConnectorSpec:
+        active = c.enabled and c.access_mode != AccessMode.PARTNERSHIP_GATED
+        gated = c.access_mode == AccessMode.PARTNERSHIP_GATED
+        pos = PositionPrivileged(c.position_privileged)
+        diss = DissonanceRole(c.dissonance_role)
+        return ConnectorSpec(
+            name=c.name,
+            url=c.base_url or "",
+            position_privileged=pos,
+            dissonance_role=diss,
+            pipeline_membership=[Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+            active=active,
+            partnership_gated=gated,
+            notes=c.notes,
+        )
+
+    ALL_CONNECTORS = ALL_CONNECTORS + [_new_connector_to_spec(c) for c in ALL_NEW_CONNECTORS]
+except ImportError:
+    pass  # graceful degradation if config module not present
 
 
 def connectors_for_pipeline(pipeline: Pipeline) -> List[ConnectorSpec]:
@@ -1258,42 +1286,99 @@ class CogC8_Quality(BaseChannel):
         )
 
 
-class CogC9_Cultural(BaseChannel):
-    def __init__(self):
-        super().__init__(9, "Cultural Context",
-                         "Assesses cultural scope and validity",
+class CogC9_Bibliometric(BaseChannel):
+    """
+    Cognitive Channel 9 — Bibliometric & Citation-Network Analysis.
+    Replaces Cultural Context (audited out: sat awkwardly between
+    Ch8 Quality Control and Epistemic Ch7 Cross-cultural).
+
+    Analyses the *structure* of the literature rather than its content.
+    Surfaces citation networks, terminology drift over time, who-cites-whom
+    patterns, co-authorship clusters, journal-prestige distributions,
+    geographic and institutional concentrations. Output is meta-evidence
+    about the evidence base. Uses Crossref and OpenAlex citation data.
+
+    §4 distinctness: distinct from Quality Control (individual sources vs
+    literature structure); distinct from Synthesis (findings vs citation
+    patterns); distinct from Epistemic Cross-cultural (citation structure
+    vs non-Western framings). Adds publishable-standard bibliometric
+    capability single-researcher work struggles to match.
+    """
+
+    def __init__(self, email: Optional[str] = None):
+        super().__init__(9, "Bibliometric & Citation-Network Analysis",
+                         "Analyses citation networks, terminology drift, and "
+                         "literature-structure as meta-evidence",
                          Pipeline.COGNITIVE)
+        self.openalex = OpenAlexAPI(email)
+        self.crossref = CrossrefAPI()
 
     def _system_prompt(self) -> str:
-        return ("You analyse cultural assumptions. Identify what cultural "
-                "contexts are assumed, which populations findings may not "
-                "generalise to.")
+        return (
+            "You are a bibliometric analyst performing citation-network analysis. "
+            "Your task is to analyse the *structure* of the literature, not its "
+            "findings. Identify: (1) who-cites-whom patterns and citation cascades; "
+            "(2) terminology drift — how key concepts have shifted meaning across "
+            "time and sub-fields; (3) geographic, institutional, and demographic "
+            "concentrations in authorship and citation; (4) journal-prestige "
+            "distributions and what that implies about what knowledge is being "
+            "validated; (5) which voices are absent from the citation network. "
+            "Output is meta-evidence about the evidence base, not a summary of findings."
+        )
 
     async def research(self, artefact: ResearchArtefact,
                        context: Dict[str, Any]) -> Finding:
         previous = context.get("previous_findings", [])
         cog_previous = [f for f in previous if f.pipeline == Pipeline.COGNITIVE]
-        synthesis = next(
-            (f for f in cog_previous if f.source_channel == "Synthesis & Abstraction"),
-            None
-        )
-        if not synthesis:
-            return Finding(
-                content="No synthesis to analyse for cultural context.",
-                source_channel=self.name, confidence=1.0, evidence=[],
-                pipeline=Pipeline.COGNITIVE,
-                epistemic_modality=Modality.KNOWLEDGE,
+
+        # Gather citation data from OpenAlex and Crossref
+        try:
+            openalex_results, crossref_results = await asyncio.gather(
+                self.openalex.search(artefact.research_question, limit=10),
+                self.crossref.search(artefact.research_question, rows=8),
+                return_exceptions=True,
             )
+        except Exception:
+            openalex_results, crossref_results = [], []
+
+        oa_papers = openalex_results if isinstance(openalex_results, list) else []
+        cr_papers = crossref_results if isinstance(crossref_results, list) else []
+        all_papers = oa_papers + cr_papers
+
+        # Build citation-structure summary for LLM
+        papers_block = "\n".join(
+            f"- [{p.get('source','?')}] {p.get('title','')} ({p.get('year','?')}) "
+            f"cited_by={p.get('citationCount') or p.get('cited_by', '?')}"
+            for p in all_papers[:14]
+        )
+
+        # Include titles from earlier Cognitive findings to frame the network
+        synthesis_texts = " | ".join(
+            f.content[:120] for f in cog_previous[:3] if f.content
+        )
+
         prompt = (
-            f"Analyse for cultural assumptions:\n\n{synthesis.content[:600]}\n\n"
-            f"1. Cultural contexts assumed\n2. Populations this may not "
-            f"generalise to\n3. Culture-specific vs universal claims"
+            f"Research question: {artefact.research_question}\n\n"
+            f"Papers retrieved from OpenAlex and Crossref:\n{papers_block or '(none retrieved)'}\n\n"
+            f"Earlier Cognitive findings context:\n{synthesis_texts or '(none yet)'}\n\n"
+            f"Perform a bibliometric and citation-network analysis:\n"
+            f"1. Citation cascade patterns — which papers/authors dominate?\n"
+            f"2. Terminology drift — how have key concepts shifted across time/sub-fields?\n"
+            f"3. Geographic and institutional concentrations — who is in, who is out?\n"
+            f"4. Journal-prestige distribution — what does peer-review gatekeeping imply?\n"
+            f"5. Absent voices — what perspectives are structurally excluded from this literature?\n\n"
+            f"Be specific about patterns. Name gaps rather than generalising."
         )
         response = await call_llm(prompt, system_prompt=self._system_prompt())
         return Finding(
-            content=response, source_channel=self.name,
-            confidence=0.75, evidence=["Cross-cultural methodology"],
+            content=response,
+            source_channel=self.name,
+            confidence=0.80,
+            evidence=[p.get("title", "") for p in all_papers[:6] if p.get("title")],
             pipeline=Pipeline.COGNITIVE,
+            epistemic_modality=Modality.KNOWLEDGE,
+            dissonance_role=DissonanceRole.BRIDGE,
+            frame_inventory_match=["bibliometric", "citation-network", "literature-structure"],
         )
 
 
@@ -1333,69 +1418,139 @@ class CogC10_Steering(BaseChannel):
 # CRIA-EPISTEMIC CHANNELS (10 epistemic-mode channels)
 # ============================================================
 
-class EpiC1_Empirical(BaseChannel):
+class EpiC1_MethodologicalCritique(BaseChannel):
+    """
+    Epistemic Channel 1 — Methodological Critique.
+    Replaces Empirical/Quantitative (audited out: empirical-quantitative
+    reading sits structurally close to what Cognitive does as a whole,
+    risking pipeline redundancy).
+
+    Examines what methodological commitments different framings of the
+    question presuppose, and how those commitments shape what counts as
+    an answer. Reads empirical work not for findings but for method-level
+    assumptions: what counts as data, what counts as inference, what
+    counts as valid measurement, what scales are commensurable, what is
+    being held constant.
+
+    Output: a methodological-frame inventory describing how the question
+    is being approached and what each methodology presupposes.
+
+    §4 distinctness: distinct from Philosophical (apparatus at theory
+    level, not methodology); distinct from Critical (counter-corpus voices,
+    not methodology critique); distinct from Cognitive evidence-aggregation
+    (method assumptions, not findings). Pairs naturally with Ch9
+    Bibliometric — Cognitive analyses citation structure, Epistemic
+    analyses methodology assumptions.
+    """
+
     def __init__(self, semantic_key: Optional[str] = None,
                  email: Optional[str] = None):
-        super().__init__(1, "Empirical / Quantitative",
-                         "Numerical evidence, datasets, peer-reviewed",
+        super().__init__(1, "Methodological Critique",
+                         "Examines methodological commitments and presuppositions "
+                         "across framings of the research question",
                          Pipeline.EPISTEMIC)
         self.semantic = SemanticScholarAPI(semantic_key)
         self.openalex = OpenAlexAPI(email)
-        self.pubmed = PubMedAPI()
 
     def _system_prompt(self) -> str:
-        return ("You are an empirical research analyst. Privilege numerical "
-                "evidence, statistical methodology, replicated findings.")
+        return (
+            "You are a methodological critic applying frame-archaeological thinking "
+            "to research methodology. Your task is NOT to summarise findings — it is "
+            "to examine what methodological commitments different approaches to this "
+            "question presuppose. For each major methodological tradition present:\n"
+            "- What counts as data in this methodology?\n"
+            "- What counts as valid inference?\n"
+            "- What counts as valid measurement or operationalisation?\n"
+            "- What scales or constructs are treated as commensurable that may not be?\n"
+            "- What is being held constant that the methodology cannot see?\n"
+            "- What would a different methodological tradition notice that this one "
+            "systematically cannot?\n"
+            "Output a methodological-frame inventory, not a findings summary. "
+            "Name presuppositions explicitly. Flag commensurability failures."
+        )
 
     async def research(self, artefact: ResearchArtefact,
                        context: Dict[str, Any]) -> Finding:
+        # Retrieve papers to read for their methodology, not their findings
         results = await asyncio.gather(
-            self.semantic.search(artefact.research_question, limit=6),
-            self.openalex.search(artefact.research_question, limit=6),
-            self.pubmed.search(artefact.research_question, retmax=4),
-            return_exceptions=True
+            self.semantic.search(
+                f"{artefact.research_question} methodology research design",
+                limit=6,
+            ),
+            self.openalex.search(
+                f"{artefact.research_question} methodological framework",
+                limit=6,
+            ),
+            return_exceptions=True,
         )
-        all_papers = []
+        all_papers: List[Dict] = []
         for r in results:
             if isinstance(r, list):
                 all_papers.extend(r)
 
-        seen = set()
-        unique = []
+        seen: set = set()
+        unique: List[Dict] = []
         for p in all_papers:
             key = (p.get("title") or "")[:60].lower()
             if key and key not in seen:
                 seen.add(key)
                 unique.append(p)
 
-        if not unique:
+        papers_block = "\n".join(
+            f"- {p.get('title', '')} ({p.get('year', '')}) — "
+            f"{(p.get('abstract') or '')[:120]}"
+            for p in unique[:10]
+        )
+
+        # Pull any Cognitive findings to understand what methodology produced them
+        previous = context.get("previous_findings", [])
+        cog_findings = [
+            f for f in previous if f.pipeline == Pipeline.COGNITIVE
+        ]
+        cog_summary = " | ".join(f.content[:100] for f in cog_findings[:3])
+
+        prompt = (
+            f"Research question: {artefact.research_question}\n\n"
+            f"Papers retrieved (read for methodology, not findings):\n"
+            f"{papers_block or '(none retrieved)'}\n\n"
+            f"Cognitive pipeline findings (to reveal what methodologies produced them):\n"
+            f"{cog_summary or '(none yet)'}\n\n"
+            f"Produce a methodological-frame inventory:\n"
+            f"1. What methodological traditions are present in this literature?\n"
+            f"2. What does each methodology treat as data? As valid inference?\n"
+            f"3. What operationalisations or measurements are assumed commensurable "
+            f"across traditions — and are they?\n"
+            f"4. What is each methodology holding constant that another tradition "
+            f"would treat as a variable?\n"
+            f"5. What would be visible to a different methodological tradition that "
+            f"the dominant ones cannot see?\n\n"
+            f"Name presuppositions explicitly. Do not summarise findings."
+        )
+        analysis = await call_llm(prompt, system_prompt=self._system_prompt())
+
+        if not analysis or not analysis.strip():
             return Finding(
-                content="No empirical evidence retrieved.",
+                content="Methodological critique: insufficient literature retrieved.",
                 source_channel=self.name, confidence=0.5, evidence=[],
                 pipeline=Pipeline.EPISTEMIC,
                 evidence_tier=EvidenceTier.T3,
             )
 
-        papers_text = "\n\n".join(
-            f"- {p.get('title', '')} ({p.get('year', '')})"
-            for p in unique[:8]
-        )
-        prompt = (
-            f"Question: {artefact.research_question}\n\n"
-            f"Empirical evidence:\n{papers_text}\n\n"
-            f"Produce empirical reading: what does quantitative literature "
-            f"show, effect sizes, methodological limitations, evidence tier?"
-        )
-        analysis = await call_llm(prompt, system_prompt=self._system_prompt())
         return Finding(
-            content=analysis, source_channel=self.name,
-            confidence=0.75,
+            content=analysis,
+            source_channel=self.name,
+            confidence=0.80,
             evidence=[p.get("title", "") for p in unique[:5] if p.get("title")],
             pipeline=Pipeline.EPISTEMIC,
             evidence_tier=EvidenceTier.T2,
             position_privileged=PositionPrivileged.CREDENTIALED_RESEARCH,
-            dissonance_role=DissonanceRole.MAIN,
-            frame_inventory_match=["empirical", "quantitative"],
+            dissonance_role=DissonanceRole.BRIDGE,
+            frame_inventory_match=[
+                "methodological_critique",
+                "frame_archaeological",
+                "commensurability",
+                "presupposition_inventory",
+            ],
         )
 
 
@@ -3114,7 +3269,7 @@ class UnifiedOrchestrator:
             CogC3_Contradiction(), CogC4_Synthesis(),
             CogC5_Causal(), CogC6_Critic(),
             CogC7_Serendipity(), CogC8_Quality(),
-            CogC9_Cultural(), CogC10_Steering(),
+            CogC9_Bibliometric(email), CogC10_Steering(),
         ]
         self.cog_meta = CognitiveMetaLayer()
         self.cog_layer3 = CognitiveLayer3()
@@ -3122,7 +3277,7 @@ class UnifiedOrchestrator:
 
         # Epistemic pipeline
         self.epi_channels = [
-            EpiC1_Empirical(semantic_key, email), EpiC2_Phenomenological(semantic_key, email),
+            EpiC1_MethodologicalCritique(semantic_key, email), EpiC2_Phenomenological(semantic_key, email),
             EpiC3_Historical(email), EpiC4_Philosophical(),
             EpiC5_Critical(), EpiC6_Civilisational(email),
             EpiC7_CrossCultural(email), EpiC8_Computational(),
