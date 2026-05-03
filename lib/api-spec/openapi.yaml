@@ -18,6 +18,8 @@ tags:
     description: Artefact templates
   - name: analytics
     description: Dashboard analytics and cross-experiment views
+  - name: research-history
+    description: Research job history from CRIA runs
 paths:
   /healthz:
     get:
@@ -284,6 +286,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Template"
+
+  /research-jobs:
+    get:
+      operationId: listResearchJobs
+      tags: [research-history]
+      summary: List research jobs
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [queued, running, complete, failed]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: List of research jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResearchJob"
+
+  /research-jobs/{id}:
+    get:
+      operationId: getResearchJob
+      tags: [research-history]
+      summary: Get a single research job with full output
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Research job detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResearchJobDetail"
+        "404":
+          description: Not found
 
 components:
   schemas:
@@ -626,6 +675,81 @@ components:
         - convergentFindings
         - divergentFindings
         - frameDistribution
+
+    ResearchJob:
+      type: object
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, complete, failed]
+        questionText:
+          type: string
+          nullable: true
+        mode:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        startedAt:
+          type: string
+          nullable: true
+        completedAt:
+          type: string
+          nullable: true
+        errorText:
+          type: string
+          nullable: true
+      required:
+        - id
+        - jobId
+        - status
+        - createdAt
+
+    ResearchJobDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, complete, failed]
+        questionText:
+          type: string
+          nullable: true
+        mode:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        startedAt:
+          type: string
+          nullable: true
+        completedAt:
+          type: string
+          nullable: true
+        errorText:
+          type: string
+          nullable: true
+        voices:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: object
+            properties:
+              text:
+                type: string
+            additionalProperties: true
+      required:
+        - id
+        - jobId
+        - status
+        - createdAt
 
     ReflexivityReport:
       type: object

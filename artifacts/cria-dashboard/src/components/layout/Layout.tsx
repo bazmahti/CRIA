@@ -10,12 +10,14 @@ import {
   Layers,
   BookOpen,
   Brain,
+  History,
 } from "lucide-react";
 
 const NAV = [
   { href: "/research", label: "Parallel Research", icon: Zap },
   { href: "/control-room", label: "Control Room", icon: LayoutDashboard },
   { href: "/experiments", label: "Experiment Queue", icon: FlaskConical },
+  { href: "/history", label: "Research History", icon: History },
   { href: "/findings", label: "Findings Index", icon: FileText },
   { href: "/reflexivity", label: "Reflexivity Report", icon: RefreshCw },
   { href: "/templates", label: "Artefact Templates", icon: Library },

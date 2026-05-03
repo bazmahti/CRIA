@@ -196,6 +196,58 @@ export interface CrossExperimentView {
   frameDistribution: CrossExperimentViewFrameDistribution;
 }
 
+export type ResearchJobStatus =
+  (typeof ResearchJobStatus)[keyof typeof ResearchJobStatus];
+
+export const ResearchJobStatus = {
+  queued: "queued",
+  running: "running",
+  complete: "complete",
+  failed: "failed",
+} as const;
+
+export interface ResearchJob {
+  id: string;
+  jobId: string;
+  status: ResearchJobStatus;
+  questionText?: string | null;
+  mode?: string | null;
+  createdAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  errorText?: string | null;
+}
+
+export type ResearchJobDetailStatus =
+  (typeof ResearchJobDetailStatus)[keyof typeof ResearchJobDetailStatus];
+
+export const ResearchJobDetailStatus = {
+  queued: "queued",
+  running: "running",
+  complete: "complete",
+  failed: "failed",
+} as const;
+
+export type ResearchJobDetailVoices = {
+  [key: string]: {
+    text?: string;
+    [key: string]: unknown;
+  };
+} | null;
+
+export interface ResearchJobDetail {
+  id: string;
+  jobId: string;
+  status: ResearchJobDetailStatus;
+  questionText?: string | null;
+  mode?: string | null;
+  createdAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  errorText?: string | null;
+  voices?: ResearchJobDetailVoices;
+}
+
 export type ReflexivityReportChannelBreakdown = { [key: string]: number };
 
 export type ReflexivityReportProjectBreakdown = { [key: string]: number };
@@ -253,3 +305,18 @@ export type GetCrossExperimentViewParams = {
   project?: string;
   channel?: string;
 };
+
+export type ListResearchJobsParams = {
+  status?: ListResearchJobsStatus;
+  limit?: number;
+};
+
+export type ListResearchJobsStatus =
+  (typeof ListResearchJobsStatus)[keyof typeof ListResearchJobsStatus];
+
+export const ListResearchJobsStatus = {
+  queued: "queued",
+  running: "running",
+  complete: "complete",
+  failed: "failed",
+} as const;

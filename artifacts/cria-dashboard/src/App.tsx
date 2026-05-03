@@ -12,6 +12,7 @@ import ReflexivityPage from "@/pages/reflexivity";
 import TemplatesPage from "@/pages/templates";
 import ParallelResearch from "@/pages/parallel-research";
 import UnifiedResearch from "@/pages/unified-research";
+import ResearchHistoryPage from "@/pages/research-history";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -31,6 +32,7 @@ function Router() {
         <Route path="/experiments/new" component={NewExperimentPage} />
         <Route path="/experiments/:id" component={ExperimentDetailPage} />
         <Route path="/experiments" component={ExperimentsPage} />
+        <Route path="/history" component={ResearchHistoryPage} />
         <Route path="/findings" component={FindingsPage} />
         <Route path="/reflexivity" component={ReflexivityPage} />
         <Route path="/templates" component={TemplatesPage} />

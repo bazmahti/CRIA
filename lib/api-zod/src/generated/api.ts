@@ -651,3 +651,53 @@ export const GetTemplateResponse = zod.object({
   ]),
   artefactYaml: zod.string(),
 });
+
+/**
+ * @summary List research jobs
+ */
+export const listResearchJobsQueryLimitDefault = 50;
+
+export const ListResearchJobsQueryParams = zod.object({
+  status: zod.enum(["queued", "running", "complete", "failed"]).optional(),
+  limit: zod.coerce.number().default(listResearchJobsQueryLimitDefault),
+});
+
+export const ListResearchJobsResponseItem = zod.object({
+  id: zod.string(),
+  jobId: zod.string(),
+  status: zod.enum(["queued", "running", "complete", "failed"]),
+  questionText: zod.string().nullish(),
+  mode: zod.string().nullish(),
+  createdAt: zod.string(),
+  startedAt: zod.string().nullish(),
+  completedAt: zod.string().nullish(),
+  errorText: zod.string().nullish(),
+});
+export const ListResearchJobsResponse = zod.array(ListResearchJobsResponseItem);
+
+/**
+ * @summary Get a single research job with full output
+ */
+export const GetResearchJobParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const GetResearchJobResponse = zod.object({
+  id: zod.string(),
+  jobId: zod.string(),
+  status: zod.enum(["queued", "running", "complete", "failed"]),
+  questionText: zod.string().nullish(),
+  mode: zod.string().nullish(),
+  createdAt: zod.string(),
+  startedAt: zod.string().nullish(),
+  completedAt: zod.string().nullish(),
+  errorText: zod.string().nullish(),
+  voices: zod
+    .record(
+      zod.string(),
+      zod.object({
+        text: zod.string().optional(),
+      }),
+    )
+    .nullish(),
+});

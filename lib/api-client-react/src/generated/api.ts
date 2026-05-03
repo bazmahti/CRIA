@@ -26,7 +26,10 @@ import type {
   GetCrossExperimentViewParams,
   HealthStatus,
   ListExperimentsParams,
+  ListResearchJobsParams,
   ReflexivityReport,
+  ResearchJob,
+  ResearchJobDetail,
   Template,
   ValidationError,
   ValidationResult,
@@ -1218,6 +1221,190 @@ export function useGetTemplate<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetTemplateQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List research jobs
+ */
+export const getListResearchJobsUrl = (params?: ListResearchJobsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/research-jobs?${stringifiedParams}`
+    : `/api/research-jobs`;
+};
+
+export const listResearchJobs = async (
+  params?: ListResearchJobsParams,
+  options?: RequestInit,
+): Promise<ResearchJob[]> => {
+  return customFetch<ResearchJob[]>(getListResearchJobsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListResearchJobsQueryKey = (
+  params?: ListResearchJobsParams,
+) => {
+  return [`/api/research-jobs`, ...(params ? [params] : [])] as const;
+};
+
+export const getListResearchJobsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listResearchJobs>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListResearchJobsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listResearchJobs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListResearchJobsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listResearchJobs>>
+  > = ({ signal }) => listResearchJobs(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listResearchJobs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListResearchJobsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listResearchJobs>>
+>;
+export type ListResearchJobsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List research jobs
+ */
+
+export function useListResearchJobs<
+  TData = Awaited<ReturnType<typeof listResearchJobs>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListResearchJobsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listResearchJobs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListResearchJobsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a single research job with full output
+ */
+export const getGetResearchJobUrl = (id: string) => {
+  return `/api/research-jobs/${id}`;
+};
+
+export const getResearchJob = async (
+  id: string,
+  options?: RequestInit,
+): Promise<ResearchJobDetail> => {
+  return customFetch<ResearchJobDetail>(getGetResearchJobUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetResearchJobQueryKey = (id: string) => {
+  return [`/api/research-jobs/${id}`] as const;
+};
+
+export const getGetResearchJobQueryOptions = <
+  TData = Awaited<ReturnType<typeof getResearchJob>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getResearchJob>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetResearchJobQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getResearchJob>>> = ({
+    signal,
+  }) => getResearchJob(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getResearchJob>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetResearchJobQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getResearchJob>>
+>;
+export type GetResearchJobQueryError = ErrorType<void>;
+
+/**
+ * @summary Get a single research job with full output
+ */
+
+export function useGetResearchJob<
+  TData = Awaited<ReturnType<typeof getResearchJob>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getResearchJob>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetResearchJobQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
