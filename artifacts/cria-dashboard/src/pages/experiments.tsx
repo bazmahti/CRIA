@@ -17,15 +17,15 @@ const CHANNELS = ["chronic_pain", "abi", "dementia", "perinatal", "eating_disord
 
 export default function ExperimentsPage() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [projectFilter, setProjectFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("__all__");
+  const [projectFilter, setProjectFilter] = useState("__all__");
   const { toast } = useToast();
   const qc = useQueryClient();
 
   const { data: experiments, isLoading } = useListExperiments({
     search: search || undefined,
-    status: (statusFilter || undefined) as any,
-    project: projectFilter || undefined,
+    status: (statusFilter === "__all__" ? undefined : statusFilter) as any,
+    project: projectFilter === "__all__" ? undefined : projectFilter,
   });
 
   const deleteExperiment = useDeleteExperiment({
@@ -71,7 +71,7 @@ export default function ExperimentsPage() {
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All statuses</SelectItem>
+            <SelectItem value="__all__">All statuses</SelectItem>
             {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -80,7 +80,7 @@ export default function ExperimentsPage() {
             <SelectValue placeholder="All projects" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All projects</SelectItem>
+            <SelectItem value="__all__">All projects</SelectItem>
             {PROJECTS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
           </SelectContent>
         </Select>
