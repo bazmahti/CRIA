@@ -11,6 +11,7 @@ import {
   BookOpen,
   Brain,
   History,
+  Search,
 } from "lucide-react";
 
 const NAV = [
@@ -18,6 +19,7 @@ const NAV = [
   { href: "/control-room", label: "Control Room", icon: LayoutDashboard },
   { href: "/experiments", label: "Experiment Queue", icon: FlaskConical },
   { href: "/history", label: "Research History", icon: History },
+  { href: "/search", label: "Search Findings", icon: Search },
   { href: "/findings", label: "Findings Index", icon: FileText },
   { href: "/reflexivity", label: "Reflexivity Report", icon: RefreshCw },
   { href: "/templates", label: "Artefact Templates", icon: Library },

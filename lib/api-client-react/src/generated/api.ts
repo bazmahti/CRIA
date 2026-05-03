@@ -30,6 +30,8 @@ import type {
   ReflexivityReport,
   ResearchJob,
   ResearchJobDetail,
+  SearchFindingsParams,
+  SearchResults,
   Template,
   ValidationError,
   ValidationResult,
@@ -1221,6 +1223,100 @@ export function useGetTemplate<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetTemplateQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Unified search across experiments, findings, and research jobs
+ */
+export const getSearchFindingsUrl = (params: SearchFindingsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/search?${stringifiedParams}`
+    : `/api/search`;
+};
+
+export const searchFindings = async (
+  params: SearchFindingsParams,
+  options?: RequestInit,
+): Promise<SearchResults> => {
+  return customFetch<SearchResults>(getSearchFindingsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getSearchFindingsQueryKey = (params?: SearchFindingsParams) => {
+  return [`/api/search`, ...(params ? [params] : [])] as const;
+};
+
+export const getSearchFindingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchFindings>>,
+  TError = ErrorType<unknown>,
+>(
+  params: SearchFindingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchFindings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getSearchFindingsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof searchFindings>>> = ({
+    signal,
+  }) => searchFindings(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchFindings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type SearchFindingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchFindings>>
+>;
+export type SearchFindingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Unified search across experiments, findings, and research jobs
+ */
+
+export function useSearchFindings<
+  TData = Awaited<ReturnType<typeof searchFindings>>,
+  TError = ErrorType<unknown>,
+>(
+  params: SearchFindingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchFindings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getSearchFindingsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

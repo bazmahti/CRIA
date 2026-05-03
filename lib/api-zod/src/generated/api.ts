@@ -653,6 +653,32 @@ export const GetTemplateResponse = zod.object({
 });
 
 /**
+ * @summary Unified search across experiments, findings, and research jobs
+ */
+export const searchFindingsQueryLimitDefault = 30;
+
+export const SearchFindingsQueryParams = zod.object({
+  q: zod.coerce.string(),
+  limit: zod.coerce.number().default(searchFindingsQueryLimitDefault),
+});
+
+export const SearchFindingsResponse = zod.object({
+  query: zod.string(),
+  total: zod.number(),
+  results: zod.array(
+    zod.object({
+      id: zod.string(),
+      type: zod.enum(["experiment", "research_job"]),
+      title: zod.string(),
+      excerpt: zod.string(),
+      status: zod.string(),
+      createdAt: zod.string(),
+      url: zod.string(),
+    }),
+  ),
+});
+
+/**
  * @summary List research jobs
  */
 export const listResearchJobsQueryLimitDefault = 50;

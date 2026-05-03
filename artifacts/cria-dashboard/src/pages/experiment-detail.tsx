@@ -32,7 +32,10 @@ export default function ExperimentDetailPage() {
     query: {
       enabled: !!expId,
       queryKey: getGetExperimentQueryKey(expId),
+      staleTime: 0,
+      refetchOnMount: "always",
       refetchInterval: (q) => q.state.data?.status === "running" ? 3000 : false,
+      refetchIntervalInBackground: true,
     },
   });
 

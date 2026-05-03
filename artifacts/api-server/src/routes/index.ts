@@ -4,6 +4,7 @@ import experimentsRouter from "./experiments";
 import templatesRouter from "./templates";
 import parallelRouter from "./parallel";
 import researchJobsRouter from "./research-jobs";
+import searchRouter from "./search";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(experimentsRouter);
 router.use(templatesRouter);
 router.use(parallelRouter);
 router.use(researchJobsRouter);
+router.use(searchRouter);
 
 export default router;

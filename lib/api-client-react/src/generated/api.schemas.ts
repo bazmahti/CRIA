@@ -196,6 +196,30 @@ export interface CrossExperimentView {
   frameDistribution: CrossExperimentViewFrameDistribution;
 }
 
+export type SearchResultType =
+  (typeof SearchResultType)[keyof typeof SearchResultType];
+
+export const SearchResultType = {
+  experiment: "experiment",
+  research_job: "research_job",
+} as const;
+
+export interface SearchResult {
+  id: string;
+  type: SearchResultType;
+  title: string;
+  excerpt: string;
+  status: string;
+  createdAt: string;
+  url: string;
+}
+
+export interface SearchResults {
+  query: string;
+  total: number;
+  results: SearchResult[];
+}
+
 export type ResearchJobStatus =
   (typeof ResearchJobStatus)[keyof typeof ResearchJobStatus];
 
@@ -304,6 +328,11 @@ export const ListExperimentsStatus = {
 export type GetCrossExperimentViewParams = {
   project?: string;
   channel?: string;
+};
+
+export type SearchFindingsParams = {
+  q: string;
+  limit?: number;
 };
 
 export type ListResearchJobsParams = {

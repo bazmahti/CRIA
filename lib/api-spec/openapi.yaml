@@ -287,6 +287,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/Template"
 
+  /search:
+    get:
+      operationId: searchFindings
+      tags: [findings]
+      summary: Unified search across experiments, findings, and research jobs
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResults"
+
   /research-jobs:
     get:
       operationId: listResearchJobs
@@ -675,6 +699,49 @@ components:
         - convergentFindings
         - divergentFindings
         - frameDistribution
+
+    SearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [experiment, research_job]
+        title:
+          type: string
+        excerpt:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+        url:
+          type: string
+      required:
+        - id
+        - type
+        - title
+        - excerpt
+        - status
+        - createdAt
+        - url
+
+    SearchResults:
+      type: object
+      properties:
+        query:
+          type: string
+        total:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResult"
+      required:
+        - query
+        - total
+        - results
 
     ResearchJob:
       type: object
