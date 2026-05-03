@@ -715,7 +715,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function checkHealth() {
   // CRIA
   try {
-    const r = await fetch(`${CFG.criaBase}/health`, {credentials:'include'});
+    const r = await fetch(`${CFG.criaBase}/health`);
     if (r.ok) {
       setPill('cria', 'live'); setSysDot('cria', 'var(--green)');
       document.getElementById('sys-cria').textContent = 'CRIA: online';
@@ -727,7 +727,7 @@ async function checkHealth() {
 
   // Ultraria (via proxy)
   try {
-    const r = await fetch(`${CFG.ultraBase}/api/ultraria/proxy/health`, {credentials:'include'});
+    const r = await fetch(`${CFG.ultraBase}/api/ultraria/proxy/health`);
     if (r.ok) {
       const d = await r.json();
       const online = d.status === 'ok';
@@ -933,7 +933,6 @@ async function runCRIA(q) {
   try {
     const resp = await fetch(`${CFG.criaBase}/api/research/unified`, {
       method: 'POST',
-      credentials: 'include',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         query: q,
@@ -973,7 +972,6 @@ async function runUltraria(q) {
   try {
     const resp = await fetch(`${CFG.ultraBase}/api/ultraria/proxy/run`, {
       method: 'POST',
-      credentials: 'include',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         query: q,
@@ -1016,7 +1014,7 @@ async function pollJob(jobId, system) {
         return;
       }
       try {
-        const r = await fetch(endpoint, {credentials:'include'});
+        const r = await fetch(endpoint);
         if (!r.ok) throw new Error(`Poll ${r.status}`);
         const data = await r.json();
         if (data.status === 'complete' || data.status === 'failed') {
@@ -1280,7 +1278,7 @@ async function saveConfig() {
 // ── Lane live/stub status ─────────────────────────────────────────
 async function fetchLaneStatus() {
   try {
-    const r = await fetch(`${CFG.ultraBase}/api/ultraria/proxy/lanes/status`, {credentials:'include'});
+    const r = await fetch(`${CFG.ultraBase}/api/ultraria/proxy/lanes/status`);
     if (!r.ok) return;
     const data = await r.json();
     (data.lanes || []).forEach(lane => {

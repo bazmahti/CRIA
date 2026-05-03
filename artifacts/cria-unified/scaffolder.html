@@ -248,7 +248,6 @@ async function draftExperiment() {
     const resp = await fetch(`${BASE}/scaffold/draft`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      credentials: 'include',
       body: JSON.stringify({question, project}),
     });
     if (!resp.ok) {
@@ -302,7 +301,6 @@ async function validateYaml() {
     const resp = await fetch(`${BASE}/scaffold/validate`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      credentials: 'include',
       body: JSON.stringify({yaml_text: yaml}),
     });
     const data = await resp.json();
@@ -337,7 +335,6 @@ async function saveArtefact() {
     const resp = await fetch(`${BASE}/scaffold/save`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      credentials: 'include',
       body: JSON.stringify({yaml_text: yaml}),
     });
     const data = await resp.json();
@@ -367,7 +364,7 @@ async function showSaved() {
   content.innerHTML = '<div class="status-line">Loading…</div>';
 
   try {
-    const resp = await fetch(`${BASE}/scaffold/list`, {credentials: 'include'});
+    const resp = await fetch(`${BASE}/scaffold/list`);
     const data = await resp.json();
     const items = data.artefacts || [];
     if (items.length === 0) {
@@ -401,7 +398,6 @@ async function showAudit() {
   try {
     const resp = await fetch(`${BASE}/scaffold/audit`, {
       headers: {'Accept': 'application/json'},
-      credentials: 'include',
     });
     const data = await resp.json();
     content.innerHTML = renderAudit(data);
