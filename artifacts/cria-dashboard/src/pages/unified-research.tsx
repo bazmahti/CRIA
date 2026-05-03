@@ -568,28 +568,6 @@ export default function UnifiedResearch() {
           </p>
         </div>
 
-        {/* Mode chooser */}
-        <div className="flex items-center gap-2 mb-6 p-1 bg-card/40 border border-border/50 rounded-xl w-fit">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold">
-            <Brain className="w-3.5 h-3.5" />
-            CRIA only
-          </div>
-          <a
-            href="/cria-unified/unified"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 text-xs font-medium transition-colors"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            CRIA + Ultraria
-          </a>
-          <a
-            href="/cria-unified/scaffold"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 text-xs font-medium transition-colors"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Scaffolder
-          </a>
-        </div>
-
         {/* Pipeline status cards */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[

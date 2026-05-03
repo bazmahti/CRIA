@@ -9,17 +9,22 @@ import {
   Zap,
   Layers,
   BookOpen,
-  ChevronRight,
+  Brain,
 } from "lucide-react";
 
 const NAV = [
-  { href: "/unified", label: "Unified Research", icon: Layers, highlight: true },
   { href: "/research", label: "Parallel Research", icon: Zap, highlight: false },
-  { href: "/", label: "Control Room", icon: LayoutDashboard },
+  { href: "/control-room", label: "Control Room", icon: LayoutDashboard },
   { href: "/experiments", label: "Experiment Queue", icon: FlaskConical },
   { href: "/findings", label: "Findings Index", icon: FileText },
   { href: "/reflexivity", label: "Reflexivity Report", icon: RefreshCw },
   { href: "/templates", label: "Artefact Templates", icon: Library },
+];
+
+const MODES = [
+  { label: "CRIA only", icon: Brain, href: "/unified", internal: true },
+  { label: "CRIA + Ultraria", icon: Layers, href: "/cria-unified/unified", internal: false },
+  { label: "Scaffolder", icon: FileText, href: "/cria-unified/scaffold", internal: false },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -30,7 +35,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside className="w-60 flex-shrink-0 flex flex-col bg-sidebar border-r border-sidebar-border">
         {/* Brand */}
-        <div className="px-5 py-5 border-b border-sidebar-border">
+        <div className="px-5 py-4 border-b border-sidebar-border">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded bg-primary/20 border border-primary/30 flex items-center justify-center">
               <BookOpen className="w-3.5 h-3.5 text-primary" />
@@ -42,21 +47,45 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Unified Research CTA */}
-        <div className="px-3 pt-4 pb-2">
-          <Link href="/unified">
-            <button className="w-full flex items-center gap-2 px-3 py-2 rounded bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary/40 text-primary text-xs font-medium transition-colors group">
-              <Layers className="w-3.5 h-3.5" />
-              Unified Research
-              <ChevronRight className="w-3 h-3 ml-auto opacity-50 group-hover:opacity-100 transition-opacity" />
-            </button>
-          </Link>
+        {/* Mode chooser */}
+        <div className="px-3 pt-4 pb-3 border-b border-sidebar-border">
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2 px-1">Research Mode</p>
+          <div className="space-y-1">
+            {MODES.map(({ label, icon: Icon, href, internal }) => {
+              const active = internal && location.startsWith(href);
+              if (internal) {
+                return (
+                  <Link key={href} href={href}>
+                    <div className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+                      active
+                        ? "bg-primary/20 border border-primary/40 text-primary"
+                        : "bg-card/40 border border-border/40 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/60"
+                    )}>
+                      <Icon className={cn("w-3.5 h-3.5 flex-shrink-0", active ? "text-primary" : "opacity-60")} />
+                      {label}
+                      {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />}
+                    </div>
+                  </Link>
+                );
+              }
+              return (
+                <a key={href} href={href} className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
+                  "bg-card/40 border border-border/40 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/60"
+                )}>
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
+                  {label}
+                </a>
+              );
+            })}
+          </div>
         </div>
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-2 space-y-0.5">
           {NAV.map(({ href, label, icon: Icon, highlight }) => {
-            const active = href === "/" ? location === "/" : location.startsWith(href);
+            const active = location.startsWith(href);
             return (
               <Link key={href} href={href}>
                 <div className={cn(
