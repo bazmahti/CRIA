@@ -758,7 +758,7 @@ const QUESTIONS = [
 
 // ── State ────────────────────────────────────────────────────────
 let STATE = {
-  mode: 'unified',
+  mode: 'cria',
   spiral: false,
   running: false,
   activeLanes: new Set([1,2,3,4,5,6,7]),
@@ -782,7 +782,7 @@ document.addEventListener('DOMContentLoaded', () => {
   buildChannels();
   buildLanes();
   buildQuestions();
-  setMode('unified');
+  setMode('cria');
   checkHealth();
   fetchLaneStatus();
   setInterval(checkHealth, 30000);
