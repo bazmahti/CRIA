@@ -12,8 +12,7 @@
       document.getElementById('draft-status') ||
       document.getElementById('scaffolder-status') ||
       document.querySelector('[data-role="status"]') ||
-      document.querySelector('.status') ||
-      document.body;
+      document.querySelector('.status');
     var msg =
       '[DIAG ' + label + '] ' +
       (payload.message || payload.reason || 'unknown') +
@@ -24,7 +23,7 @@
       ' | stack: ' +
       (payload.stack || (payload.error && payload.error.stack) ||
        (payload.reason && payload.reason.stack) || 'no stack');
-    if (statusEl) {
+    if (statusEl && statusEl !== document.body) {
       statusEl.textContent = msg;
       statusEl.style.whiteSpace = 'pre-wrap';
       statusEl.style.color = '#b00';

@@ -12,11 +12,10 @@
       document.getElementById('draft-status') ||
       document.getElementById('scaffolder-status') ||
       document.querySelector('[data-role="status"]') ||
-      document.querySelector('.status') ||
-      document.body;
+      document.querySelector('.status');
     var msg =
       '[DIAG ' + label + '] ' +
-      (payload.message || payload.reason || 'unknown') +
+      (payload.message || payload.reason || 'unknown') ||
       ' | location: ' +
       (payload.filename || 'n/a') + ':' +
       (payload.lineno || '?') + ':' +
@@ -24,7 +23,7 @@
       ' | stack: ' +
       (payload.stack || (payload.error && payload.error.stack) ||
        (payload.reason && payload.reason.stack) || 'no stack');
-    if (statusEl) {
+    if (statusEl && statusEl !== document.body) {
       statusEl.textContent = msg;
       statusEl.style.whiteSpace = 'pre-wrap';
       statusEl.style.color = '#b00';
@@ -796,11 +795,11 @@ async function checkHealth() {
     const r = await fetch(`${CFG.criaBase}/health`);
     if (r.ok) {
       setPill('cria', 'live'); setSysDot('cria', 'var(--green)');
-      document.getElementById('sys-cria').textContent = 'CRIA: online';
+      const elC = document.getElementById('sys-cria'); if (elC) elC.textContent = 'CRIA: online';
     } else throw new Error(r.status);
   } catch {
     setPill('cria', 'err'); setSysDot('cria', 'var(--red)');
-    document.getElementById('sys-cria').textContent = 'CRIA: unreachable';
+    const elC = document.getElementById('sys-cria'); if (elC) elC.textContent = 'CRIA: unreachable';
   }
 
   // Ultraria (via proxy)
@@ -811,12 +810,11 @@ async function checkHealth() {
       const online = d.status === 'ok';
       setPill('ultra', online ? 'live' : 'err');
       setSysDot('ultra', online ? 'var(--green)' : 'var(--red)');
-      document.getElementById('sys-ultra').textContent = online
-        ? `Ultraria: online (${d.phase||'stub'})` : 'Ultraria: offline';
+      const elU2 = document.getElementById('sys-ultra'); if (elU2) elU2.textContent = online ? `Ultraria: online (${d.phase||'stub'})` : 'Ultraria: offline';
     } else throw new Error(r.status);
   } catch {
     setPill('ultra', 'err'); setSysDot('ultra', 'var(--red)');
-    document.getElementById('sys-ultra').textContent = 'Ultraria: unreachable';
+    const elU = document.getElementById('sys-ultra'); if (elU) elU.textContent = 'Ultraria: unreachable';
   }
 }
 
