@@ -71,3 +71,16 @@ path = "/cria-unified/health"
 [services.env]
 PORT = "8003"
 BASE_PATH = "/cria-unified"
+ULTRARIA_URL = "http://localhost:8004"
+
+[[services]]
+name = "ultraria"
+paths = [ "/ultraria" ]
+localPort = 8004
+
+[services.development]
+run = "python /home/runner/workspace/artifacts/cria-unified/ultraria_stub.py"
+
+[services.env]
+PORT = "8004"
+ULTRARIA_PORT = "8004"

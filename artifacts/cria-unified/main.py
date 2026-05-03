@@ -44,7 +44,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import uvicorn
@@ -3984,6 +3984,68 @@ function escapeHtml(str) {
 </script>
 </body>
 </html>"""
+
+
+# ============================================================
+# UNIFIED DASHBOARD ROUTES (Phase 1 — Ultraria integration)
+# ============================================================
+
+import pathlib as _pathlib
+
+
+@app.get(f"{BASE_PATH}/unified", response_class=HTMLResponse)
+@app.get(f"{BASE_PATH}/unified/", response_class=HTMLResponse)
+async def serve_unified_dashboard():
+    """Serves the three-mode unified CRIA · Ultraria research dashboard."""
+    html_path = _pathlib.Path(__file__).parent / "unified_dashboard.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404,
+                            detail="unified_dashboard.html not found")
+    return HTMLResponse(html_path.read_text(encoding="utf-8"))
+
+
+@app.get(f"{BASE_PATH}/api/ultraria/proxy/health")
+async def proxy_ultraria_health():
+    """Proxies health check to Ultraria stub (port 8004)."""
+    ultraria_url = os.environ.get("ULTRARIA_URL", "http://localhost:8004")
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(f"{ultraria_url}/health")
+            return r.json()
+    except Exception as exc:
+        return {"status": "offline", "error": str(exc),
+                "service": "ultraria-stub", "phase": "1-stub"}
+
+
+@app.post(f"{BASE_PATH}/api/ultraria/proxy/run")
+async def proxy_ultraria_run(request: Request):
+    """Proxies Ultraria run requests from the dashboard to the stub service."""
+    ultraria_url = os.environ.get("ULTRARIA_URL", "http://localhost:8004")
+    body = await request.json()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.post(f"{ultraria_url}/api/ultraria/run", json=body)
+            return r.json()
+    except Exception as exc:
+        raise HTTPException(status_code=503,
+                            detail=f"Ultraria stub unreachable: {exc}")
+
+
+@app.get(f"{BASE_PATH}/api/ultraria/proxy/run/{{job_id}}")
+async def proxy_ultraria_poll(job_id: str):
+    """Proxies Ultraria job polling from dashboard to stub service."""
+    ultraria_url = os.environ.get("ULTRARIA_URL", "http://localhost:8004")
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(f"{ultraria_url}/api/ultraria/run/{job_id}")
+            if r.status_code == 404:
+                raise HTTPException(status_code=404, detail="Job not found")
+            return r.json()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503,
+                            detail=f"Ultraria stub unreachable: {exc}")
 
 
 # ============================================================
