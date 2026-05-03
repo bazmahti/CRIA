@@ -1,0 +1,9 @@
+experiment_id: save_test_01
+created_at: "2026-05-03T09:00:00Z"
+created_by: claude-scaffolder-test0001
+project: smoke
+query_class: deliberate
+question: |
+  What replaces the meaning function labour provided?
+observer_note: "Smoke test mapping the posture I ask from."
+require_human_review: true

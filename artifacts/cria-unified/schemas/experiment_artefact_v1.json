@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CRIA Experiment Artefact v1",
+  "description": "Schema for formal CRIA experiment artefacts produced by the scaffolder. Substantive fields (dissonance_budget, position_privilege_balance, etc.) may be null — the audit log records which were filled.",
+  "type": "object",
+  "required": ["experiment_id", "created_at", "created_by", "question", "query_class"],
+  "properties": {
+    "experiment_id":    { "type": "string", "minLength": 1 },
+    "created_at":       { "type": "string" },
+    "created_by":       { "type": "string" },
+    "project":          { "type": ["string", "null"] },
+    "query_class":      { "type": "string", "enum": ["deliberate"] },
+    "question":         { "type": "string", "minLength": 1 },
+    "hypothesis":       { "type": ["string", "null"] },
+    "expected_outcome_types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["convergence", "divergence", "frame_extinction", "refusal", "null_finding", "position_privilege_artefact"]
+      }
+    },
+    "channel":          { "type": ["string", "null"] },
+    "patterns":         { "type": "array" },
+    "protections": {
+      "type": ["object", "null"],
+      "properties": {
+        "p1_falsification":    { "type": ["boolean", "null"] },
+        "p2_eliza_output":     { "type": ["boolean", "null"] },
+        "p3_meta_observation": { "type": ["boolean", "null"] },
+        "p4_independence_testing": { "type": ["boolean", "null"] }
+      }
+    },
+    "evidence_tier_threshold": { "type": ["string", "null"] },
+    "convergence_requirement":  { "type": ["string", "null"] },
+    "include_layers":    { "type": "array" },
+    "exclude_connectors":{ "type": "array" },
+    "silo_aware":        { "type": ["boolean", "null"] },
+    "frames_expected":   { "type": "array" },
+    "frames_explicitly_excluded": { "type": "array" },
+    "frames_excluded_rationale":  { "type": ["object", "null"] },
+    "dissonance_budget": { "type": ["number", "null"], "minimum": 0.0, "maximum": 1.0 },
+    "position_privilege_balance": { "type": ["object", "null"] },
+    "output_voice": {
+      "type": ["string", "null"],
+      "enum": ["academic_first", "ferrier_popular_first", "academic_first_then_ferrier", "raw_findings_only", null]
+    },
+    "output_format": {
+      "type": ["string", "null"],
+      "enum": ["report", "convergence_map", "frame_inventory", "refusal_record", "position_privilege_audit", null]
+    },
+    "budget_cap_aud":      { "type": ["number", "null"] },
+    "iteration_cap":       { "type": ["integer", "null"] },
+    "time_cap_seconds":    { "type": ["integer", "null"] },
+    "require_human_review":{ "type": ["boolean", "null"] },
+    "observer_note":       { "type": ["string", "null"] },
+    "reflexivity_questions":{ "type": "array" }
+  },
+  "additionalProperties": false
+}

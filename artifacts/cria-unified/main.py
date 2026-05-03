@@ -3379,7 +3379,11 @@ async def research_endpoint(request: ResearchRequest, background_tasks: Backgrou
     await db_create_job(job_id, question_text=request.query, mode=request.profile)
     background_tasks.add_task(_run_research_job, job_id, artefact)
     log.info("Job %s queued — %r", job_id, request.query[:80])
-    return {"jobId": job_id, "status": "running"}
+    if _SCAFFOLDER_OK:
+        _scaffolder.log_exploratory_query(
+            request.query, job_id, request.profile, request.dissonance_budget
+        )
+    return {"jobId": job_id, "status": "running", "query_class": "exploratory"}
 
 
 @app.get(f"{BASE_PATH}/research/{{job_id}}")
@@ -3445,7 +3449,11 @@ async def api_unified_post(
     await db_create_job(job_id, question_text=request.query, mode=request.profile)
     background_tasks.add_task(_run_research_job, job_id, artefact)
     log.info("Unified-API job %s queued — %r", job_id, request.query[:80])
-    return {"jobId": job_id, "status": "running"}
+    if _SCAFFOLDER_OK:
+        _scaffolder.log_exploratory_query(
+            request.query, job_id, request.profile, request.dissonance_budget
+        )
+    return {"jobId": job_id, "status": "running", "query_class": "exploratory"}
 
 
 @app.get("/api/research/unified/{job_id}")
@@ -4025,6 +4033,12 @@ function escapeHtml(str) {
 # ============================================================
 
 import pathlib as _pathlib
+try:
+    import experiment_scaffolder as _scaffolder
+    _SCAFFOLDER_OK = True
+except Exception as _se:
+    log.warning("experiment_scaffolder import failed: %s", _se)
+    _SCAFFOLDER_OK = False
 
 
 @app.get(f"{BASE_PATH}/unified", response_class=HTMLResponse)
@@ -4092,6 +4106,78 @@ async def proxy_ultraria_poll(job_id: str):
     except Exception as exc:
         raise HTTPException(status_code=503,
                             detail=f"Ultraria stub unreachable: {exc}")
+
+
+# ============================================================
+# EXPERIMENT SCAFFOLDER ROUTES  (spec: §3.2)
+# ============================================================
+
+class _ScaffoldDraftRequest(BaseModel):
+    question: str
+    project: str = "?"
+
+class _ScaffoldYamlRequest(BaseModel):
+    yaml_text: str
+
+def _scaffolder_required():
+    if not _SCAFFOLDER_OK:
+        raise HTTPException(status_code=503, detail="Scaffolder module unavailable")
+
+@app.get(f"{BASE_PATH}/scaffold", response_class=HTMLResponse)
+async def serve_scaffolder():
+    """Render the scaffolder UI."""
+    html_path = _pathlib.Path(__file__).parent / "scaffolder.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="scaffolder.html not found")
+    return HTMLResponse(html_path.read_text(encoding="utf-8"))
+
+@app.post(f"{BASE_PATH}/scaffold/draft")
+async def scaffold_draft(req: _ScaffoldDraftRequest):
+    """Accept prose question; return frame inventory + draft YAML (Category A filled, B blank)."""
+    _scaffolder_required()
+    frame_inventory = await _scaffolder.generate_frame_inventory(req.question)
+    import hashlib as _hl, uuid as _uuid
+    session_hash = _hl.sha256(str(_uuid.uuid4()).encode()).hexdigest()[:8]
+    experiment_id, draft_yaml = _scaffolder.generate_draft_yaml(
+        req.question, project=req.project, session_hash=session_hash,
+    )
+    _scaffolder.log_draft_action(experiment_id, req.question, frame_inventory, session_hash)
+    return {
+        "experiment_id": experiment_id,
+        "frame_inventory": frame_inventory,
+        "draft_yaml": draft_yaml,
+        "query_class": "deliberate",
+    }
+
+@app.post(f"{BASE_PATH}/scaffold/validate")
+async def scaffold_validate(req: _ScaffoldYamlRequest):
+    """Validate YAML against schema; return errors line-by-line."""
+    _scaffolder_required()
+    valid, errors = _scaffolder.validate_draft(req.yaml_text)
+    return {"valid": valid, "errors": errors}
+
+@app.post(f"{BASE_PATH}/scaffold/save")
+async def scaffold_save(req: _ScaffoldYamlRequest):
+    """Validate YAML, save to pending_experiments/, append to scaffolder_audit.jsonl."""
+    _scaffolder_required()
+    import hashlib as _hl, uuid as _uuid
+    session_hash = _hl.sha256(str(_uuid.uuid4()).encode()).hexdigest()[:8]
+    success, path, errors = _scaffolder.save_artefact(req.yaml_text, session_hash)
+    if not success:
+        return {"saved": False, "errors": errors, "query_class": "deliberate"}
+    return {"saved": True, "path": path, "query_class": "deliberate"}
+
+@app.get(f"{BASE_PATH}/scaffold/list")
+async def scaffold_list():
+    """List all saved deliberate artefacts in pending_experiments/."""
+    _scaffolder_required()
+    return {"artefacts": _scaffolder.list_artefacts()}
+
+@app.get(f"{BASE_PATH}/scaffold/audit")
+async def scaffold_audit():
+    """Return 90-day reflexivity audit summary (JSON)."""
+    _scaffolder_required()
+    return _scaffolder.get_audit_summary(days=90)
 
 
 # ============================================================

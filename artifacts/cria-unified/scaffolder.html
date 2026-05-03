@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CRIA · Experiment Scaffolder</title>
+<style>
+:root{
+  --bg:#0a0a14;--surface:#0f0f1e;--border:#1e1e38;--border2:#2a2a48;
+  --text:#d8d8f0;--grey:#6a6a9a;--grey2:#4a4a7a;--grey3:#2a2a4a;
+  --blue:#6ab0f5;--blue3:#0d1f35;--violet:#9b7ff4;--violet3:#1a1030;
+  --green:#4ade80;--green3:#0d2a1a;--gold:#f0c050;--gold3:#2a1e08;
+  --red:#f87171;--red3:#2a0f0f;
+  --font-mono:"JetBrains Mono","Fira Mono","Courier New",monospace;
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-sans);
+  font-size:13px;line-height:1.6;min-height:100vh;}
+
+/* ── Nav ── */
+.nav{background:var(--surface);border-bottom:1px solid var(--border);
+  padding:10px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.nav-logo{font-family:var(--font-mono);font-size:13px;font-weight:700;
+  color:var(--violet);letter-spacing:.06em;}
+.nav-sep{color:var(--grey2);}
+.nav-title{font-size:12px;color:var(--grey);font-family:var(--font-mono);}
+.nav a{color:var(--grey);text-decoration:none;font-size:11px;padding:3px 8px;
+  border:1px solid var(--border);border-radius:3px;transition:all .15s;}
+.nav a:hover{color:var(--text);border-color:var(--violet);}
+.nav-spacer{flex:1;}
+
+/* ── Layout ── */
+.page{max-width:900px;margin:0 auto;padding:24px 18px 48px;}
+.section{margin-bottom:28px;}
+.section-hdr{font-family:var(--font-mono);font-size:11px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--violet);
+  border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:14px;}
+.section-note{font-size:11px;color:var(--grey);line-height:1.7;
+  background:var(--violet3);border:1px solid var(--border2);
+  border-radius:4px;padding:10px 13px;margin-bottom:14px;}
+.section-note strong{color:var(--violet);}
+
+/* ── Form elements ── */
+label{display:block;font-size:11px;color:var(--grey);margin-bottom:5px;
+  font-family:var(--font-mono);letter-spacing:.04em;}
+textarea,input[type=text]{
+  width:100%;background:var(--surface);border:1px solid var(--border2);
+  color:var(--text);font-family:var(--font-sans);font-size:13px;
+  padding:10px 12px;border-radius:4px;resize:vertical;outline:none;
+  transition:border-color .15s;}
+textarea:focus,input[type=text]:focus{border-color:var(--violet);}
+textarea{min-height:90px;}
+.yaml-area{font-family:var(--font-mono);font-size:11px;min-height:480px;
+  background:#080810;color:#c0c8f0;}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;
+  padding:8px 18px;border-radius:4px;border:none;
+  font-family:var(--font-mono);font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .15s;letter-spacing:.04em;}
+.btn-primary{background:var(--violet);color:#fff;}
+.btn-primary:hover{background:#b08ffa;}
+.btn-primary:disabled{background:var(--grey3);color:var(--grey2);cursor:not-allowed;}
+.btn-save{background:var(--green3);color:var(--green);border:1px solid var(--green);}
+.btn-save:hover:not(:disabled){background:#1a4a2a;}
+.btn-save:disabled{background:var(--grey3);color:var(--grey2);border-color:var(--grey3);cursor:not-allowed;}
+.btn-row{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+
+/* ── Frames panel ── */
+.frames-panel{display:none;background:var(--surface);border:1px solid var(--border2);
+  border-radius:4px;padding:14px 16px;margin-bottom:18px;}
+.frames-panel.visible{display:block;}
+.frames-title{font-family:var(--font-mono);font-size:10px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--gold);
+  margin-bottom:10px;}
+.frames-note{font-size:11px;color:var(--grey);line-height:1.7;margin-bottom:10px;
+  border-left:2px solid var(--gold3);padding-left:10px;}
+.frame-item{font-size:12px;color:var(--text);line-height:1.7;
+  padding:4px 0;border-bottom:1px solid var(--border);}
+.frame-item:last-child{border-bottom:none;}
+.frame-bullet{color:var(--gold);margin-right:6px;}
+
+/* ── Validation panel ── */
+.val-panel{display:none;border-radius:4px;padding:10px 14px;margin-top:10px;
+  font-family:var(--font-mono);font-size:11px;line-height:1.8;}
+.val-panel.err{display:block;background:var(--red3);border:1px solid var(--red);color:var(--red);}
+.val-panel.ok{display:block;background:var(--green3);border:1px solid var(--green);color:var(--green);}
+
+/* ── Saved list ── */
+.saved-list{margin-top:28px;}
+.saved-item{background:var(--surface);border:1px solid var(--border);
+  border-radius:4px;padding:10px 14px;margin-bottom:8px;}
+.saved-item-id{font-family:var(--font-mono);font-size:11px;color:var(--violet);}
+.saved-item-q{font-size:12px;color:var(--grey);margin-top:3px;}
+.saved-item-meta{font-size:10px;color:var(--grey2);font-family:var(--font-mono);margin-top:4px;}
+
+/* ── Exploratory banner ── */
+.exp-banner{background:var(--gold3);border:1px solid var(--gold);
+  color:var(--gold);border-radius:4px;padding:8px 13px;font-size:11px;
+  font-family:var(--font-mono);line-height:1.7;margin-bottom:16px;display:none;}
+.exp-banner.visible{display:block;}
+
+/* ── Spinner ── */
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--grey3);
+  border-top-color:var(--violet);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Status line ── */
+.status-line{font-family:var(--font-mono);font-size:11px;color:var(--grey);
+  padding:6px 0;min-height:24px;}
+
+/* ── Divider ── */
+.divider{border:none;border-top:1px solid var(--border);margin:24px 0;}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <span class="nav-logo">CRIA · ULTRARIA</span>
+  <span class="nav-sep">·</span>
+  <span class="nav-title">Experiment Scaffolder</span>
+  <span class="nav-spacer"></span>
+  <a href="javascript:void(0)" onclick="showSaved()">Saved Artefacts</a>
+  <a href="javascript:void(0)" onclick="showAudit()">Reflexivity Audit</a>
+  <a href="../unified">← Dashboard</a>
+</div>
+
+<div class="page">
+
+  <!-- ── Boundary declaration ── -->
+  <div class="section">
+    <div class="section-note">
+      <strong>Scaffolder boundary:</strong> This tool fills <em>clerical</em> fields only
+      (experiment ID, timestamp, question echo). All substantive fields — dissonance budget,
+      position-privilege balance, channels, patterns, observer note — are left blank for you
+      to complete. The annotations explain what each field controls; they do not propose values.
+      <br><br>
+      This friction is intentional. Substantive fields are research-design decisions, not boilerplate.
+      A separate frame inventory describes what the question's <em>language</em> presupposes —
+      it is descriptive, not prescriptive.
+    </div>
+  </div>
+
+  <!-- ── Section A: Prose question input ── -->
+  <div class="section" id="section-a">
+    <div class="section-hdr">A — Research question</div>
+    <label for="question-input">Paste your prose question here.</label>
+    <textarea id="question-input" rows="4" placeholder="What replaces the meaning function that labour has provided for 10,000 years?"></textarea>
+
+    <div style="margin-top:10px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      <div style="flex:1;min-width:180px;">
+        <label for="project-input">Project label (optional)</label>
+        <input type="text" id="project-input" placeholder="Book 3 · Chapter 4">
+      </div>
+      <div class="btn-row" style="margin-top:0;">
+        <button class="btn btn-primary" id="draft-btn" onclick="draftExperiment()">
+          Draft an experiment artefact from this question
+        </button>
+      </div>
+    </div>
+    <div class="status-line" id="draft-status"></div>
+  </div>
+
+  <!-- ── Section B: Frame inventory + draft YAML ── -->
+  <div class="section" id="section-b" style="display:none;">
+    <div class="section-hdr">B — Frame inventory &amp; draft artefact</div>
+
+    <div class="frames-panel visible" id="frames-panel">
+      <div class="frames-title">Frame inventory of the question as written</div>
+      <div class="frames-note">
+        The question's language presupposes the following framings. These are visible in the
+        phrasing — not inferred from research design. They may be intentional (load-bearing
+        assumptions you want to test), artefactual (frames you did not notice were there),
+        or load-limiting (frames the experiment cannot escape, worth declaring). Decide which,
+        and reflect that decision in the substantive fields below.
+      </div>
+      <div id="frames-list"></div>
+    </div>
+
+    <label for="yaml-area">Draft artefact YAML — edit the substantive fields below the annotation line.</label>
+    <textarea class="yaml-area" id="yaml-area" spellcheck="false"></textarea>
+    <div style="font-size:10px;color:var(--grey2);font-family:var(--font-mono);margin-top:5px;">
+      Category A fields (experiment_id, created_at, created_by, question) are pre-filled.
+      All fields below the === SUBSTANTIVE === marker are yours to complete.
+    </div>
+  </div>
+
+  <!-- ── Section C: Validate + save ── -->
+  <div class="section" id="section-c" style="display:none;">
+    <div class="section-hdr">C — Validate &amp; save</div>
+    <div class="section-note">
+      The save button is enabled when the YAML is structurally valid and the two required
+      substantive fields (<strong>observer_note</strong> and <strong>require_human_review</strong>)
+      are explicitly set. All other substantive fields may remain null — the audit log
+      records which were left blank.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="validateYaml()">Validate</button>
+      <button class="btn btn-save" id="save-btn" disabled onclick="saveArtefact()">
+        Save to pending_experiments/
+      </button>
+    </div>
+    <div class="val-panel" id="val-panel"></div>
+    <div class="status-line" id="save-status"></div>
+  </div>
+
+  <!-- ── Saved artefacts list ── -->
+  <div id="saved-section" style="display:none;">
+    <hr class="divider">
+    <div class="section-hdr">Saved artefacts — pending_experiments/</div>
+    <div id="saved-list-content"><div class="status-line">Loading…</div></div>
+  </div>
+
+  <!-- ── Audit section ── -->
+  <div id="audit-section" style="display:none;">
+    <hr class="divider">
+    <div class="section-hdr">Reflexivity audit — last 90 days</div>
+    <div class="section-note">
+      This audit surfaces patterns in how the scaffolder has been used.
+      Consistent dissonance budgets or position-privilege weightings across many experiments
+      indicate corpus drift — not a problem to fix, but a pattern to know about.
+      The frame-inventory section audits <em>Claude's</em> frame-presupposition tendencies,
+      not yours.
+    </div>
+    <div id="audit-content"><div class="status-line">Loading…</div></div>
+  </div>
+
+</div><!-- end .page -->
+
+<script>
+const BASE = window.location.origin + '/cria-unified';
+let _sessionValid = false;
+
+async function draftExperiment() {
+  const question = document.getElementById('question-input').value.trim();
+  if (!question) { setStatus('draft-status', 'Enter a question first.', 'err'); return; }
+
+  const project = document.getElementById('project-input').value.trim() || '?';
+  const btn = document.getElementById('draft-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Generating frame inventory…';
+  setStatus('draft-status', '');
+
+  try {
+    const resp = await fetch(`${BASE}/scaffold/draft`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({question, project}),
+    });
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({detail: resp.statusText}));
+      throw new Error(e.detail || resp.statusText);
+    }
+    const data = await resp.json();
+
+    // Show frame inventory
+    const framesList = document.getElementById('frames-list');
+    framesList.innerHTML = '';
+    (data.frame_inventory || []).forEach(f => {
+      const d = document.createElement('div');
+      d.className = 'frame-item';
+      d.innerHTML = `<span class="frame-bullet">◆</span>${esc(f)}`;
+      framesList.appendChild(d);
+    });
+
+    // Load YAML into editor
+    document.getElementById('yaml-area').value = data.draft_yaml || '';
+
+    // Show sections B and C
+    document.getElementById('section-b').style.display = '';
+    document.getElementById('section-c').style.display = '';
+    _sessionValid = false;
+    document.getElementById('save-btn').disabled = true;
+    setStatus('draft-status', `Artefact drafted — ID: ${data.experiment_id}`, 'ok');
+  } catch(e) {
+    setStatus('draft-status', `Draft failed: ${e.message}`, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Draft an experiment artefact from this question';
+  }
+}
+
+async function validateYaml() {
+  const yaml = document.getElementById('yaml-area').value;
+  const panel = document.getElementById('val-panel');
+  const saveBtn = document.getElementById('save-btn');
+
+  try {
+    const resp = await fetch(`${BASE}/scaffold/validate`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({yaml_text: yaml}),
+    });
+    const data = await resp.json();
+    if (data.valid) {
+      panel.className = 'val-panel ok';
+      panel.textContent = '✓ Valid — all required fields set. Ready to save.';
+      saveBtn.disabled = false;
+      _sessionValid = true;
+    } else {
+      panel.className = 'val-panel err';
+      panel.textContent = (data.errors || ['Unknown error']).join('\n');
+      saveBtn.disabled = true;
+      _sessionValid = false;
+    }
+    panel.style.display = 'block';
+  } catch(e) {
+    panel.className = 'val-panel err';
+    panel.textContent = `Validation request failed: ${e.message}`;
+    panel.style.display = 'block';
+  }
+}
+
+async function saveArtefact() {
+  if (!_sessionValid) { await validateYaml(); if (!_sessionValid) return; }
+  const yaml = document.getElementById('yaml-area').value;
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Saving…';
+  setStatus('save-status', '');
+
+  try {
+    const resp = await fetch(`${BASE}/scaffold/save`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({yaml_text: yaml}),
+    });
+    const data = await resp.json();
+    if (resp.ok && data.saved) {
+      setStatus('save-status', `Saved: ${data.path}`, 'ok');
+      document.getElementById('section-c').style.display = 'none';
+      document.getElementById('section-b').style.display = 'none';
+      document.getElementById('question-input').value = '';
+      showSaved();
+    } else {
+      const errs = (data.errors || [data.detail || 'Unknown error']).join('\n');
+      setStatus('save-status', `Save failed:\n${errs}`, 'err');
+      btn.disabled = false;
+      btn.textContent = 'Save to pending_experiments/';
+    }
+  } catch(e) {
+    setStatus('save-status', `Save request failed: ${e.message}`, 'err');
+    btn.disabled = false;
+    btn.textContent = 'Save to pending_experiments/';
+  }
+}
+
+async function showSaved() {
+  const sec = document.getElementById('saved-section');
+  const content = document.getElementById('saved-list-content');
+  sec.style.display = '';
+  content.innerHTML = '<div class="status-line">Loading…</div>';
+
+  try {
+    const resp = await fetch(`${BASE}/scaffold/list`, {credentials: 'include'});
+    const data = await resp.json();
+    const items = data.artefacts || [];
+    if (items.length === 0) {
+      content.innerHTML = '<div class="status-line">No saved artefacts yet.</div>';
+      return;
+    }
+    content.innerHTML = items.map(item => `
+      <div class="saved-item">
+        <div class="saved-item-id">${esc(item.experiment_id || item.filename)}</div>
+        <div class="saved-item-q">${esc(item.question || '')}</div>
+        <div class="saved-item-meta">
+          ${esc(item.created_at || '')}
+          · project: ${esc(item.project || '?')}
+          · observer_note: ${item.observer_note_set ? '✓ set' : '⚠ blank'}
+          · require_human_review: ${item.require_human_review === null ? '⚠ null' : String(item.require_human_review)}
+          ${item.dissonance_budget !== null && item.dissonance_budget !== undefined ? '· dissonance_budget: ' + item.dissonance_budget : ''}
+        </div>
+        ${item.error ? `<div style="color:var(--red);font-size:10px;">${esc(item.error)}</div>` : ''}
+      </div>`).join('');
+  } catch(e) {
+    content.innerHTML = `<div class="status-line" style="color:var(--red);">Load failed: ${e.message}</div>`;
+  }
+}
+
+async function showAudit() {
+  const sec = document.getElementById('audit-section');
+  const content = document.getElementById('audit-content');
+  sec.style.display = '';
+  content.innerHTML = '<div class="status-line">Loading…</div>';
+
+  try {
+    const resp = await fetch(`${BASE}/scaffold/audit`, {
+      headers: {'Accept': 'application/json'},
+      credentials: 'include',
+    });
+    const data = await resp.json();
+    content.innerHTML = renderAudit(data);
+  } catch(e) {
+    content.innerHTML = `<div class="status-line" style="color:var(--red);">Load failed: ${e.message}</div>`;
+  }
+}
+
+function renderAudit(d) {
+  const rows = (pairs) => pairs.map(([k,v]) =>
+    `<tr><td style="color:var(--grey);padding:3px 12px 3px 0;font-family:var(--font-mono);font-size:11px;">${esc(String(k))}</td>`+
+    `<td style="font-family:var(--font-mono);font-size:11px;">${esc(String(v))}</td></tr>`
+  ).join('');
+
+  const frames = (d.top_frame_presuppositions || []).map(f =>
+    `<div class="frame-item"><span class="frame-bullet">◆</span>${esc(f.frame)} <span style="color:var(--grey2);">(${f.count})</span></div>`
+  ).join('');
+
+  const channels = Object.entries(d.channel_frequency || {}).map(([k,v]) =>
+    `<div class="frame-item"><span class="frame-bullet">◈</span>${esc(k)}: ${v}</div>`
+  ).join('') || '<div style="color:var(--grey2);font-size:11px;">No channel data yet.</div>';
+
+  const dbDist = (d.dissonance_budget_distribution || []).length > 0
+    ? d.dissonance_budget_distribution.join(', ')
+    : 'No data yet';
+
+  return `
+  <table style="border-collapse:collapse;margin-bottom:18px;">
+    ${rows([
+      ['Period', `Last ${d.period_days} days`],
+      ['Total entries', d.total_entries || 0],
+      ['Drafts generated', d.drafts || 0],
+      ['Artefacts saved', d.saves || 0],
+      ['Drafts not saved', d.drafts_not_saved || 0],
+      ['Sparse saves (missing required fields)', d.sparse_saves || 0],
+    ])}
+  </table>
+  <div style="margin-bottom:18px;">
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--grey);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Dissonance budget distribution</div>
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--text);">${esc(dbDist)}</div>
+    <div style="font-size:10px;color:var(--grey2);margin-top:4px;">Consistent values across experiments indicate corpus-level framing bias — not a fault, but a pattern to name.</div>
+  </div>
+  <div style="margin-bottom:18px;">
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--grey);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Channel frequency</div>
+    ${channels}
+  </div>
+  <div>
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--grey);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Top frame presuppositions surfaced by inventory (audits Claude's tendencies)</div>
+    ${frames || '<div style="color:var(--grey2);font-size:11px;">No frame data yet.</div>'}
+    <div style="font-size:10px;color:var(--grey2);margin-top:8px;">Frequent presuppositions here are a signal about what Claude tends to surface — not about what is true. The mitigation is transparency.</div>
+  </div>`;
+}
+
+function setStatus(id, msg, type) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = type === 'err' ? 'var(--red)' : type === 'ok' ? 'var(--green)' : 'var(--grey)';
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Re-validate on YAML edit (clear saved state)
+document.addEventListener('DOMContentLoaded', () => {
+  const ya = document.getElementById('yaml-area');
+  if (ya) ya.addEventListener('input', () => {
+    _sessionValid = false;
+    document.getElementById('save-btn').disabled = true;
+    const panel = document.getElementById('val-panel');
+    panel.className = 'val-panel';
+    panel.style.display = 'none';
+  });
+});
+</script>
+</body>
+</html>
