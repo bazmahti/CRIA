@@ -123,7 +123,7 @@ textarea{min-height:90px;}
   <span class="nav-spacer"></span>
   <a href="javascript:void(0)" onclick="showSaved()">Saved Artefacts</a>
   <a href="javascript:void(0)" onclick="showAudit()">Reflexivity Audit</a>
-  <a href="../unified">← Dashboard</a>
+  <a href="/cria-unified/unified">← Dashboard</a>
 </div>
 
 <div class="page">
@@ -160,6 +160,7 @@ textarea{min-height:90px;}
       </div>
     </div>
     <div class="status-line" id="draft-status"></div>
+    <div id="draft-success-banner" style="display:none;background:#0d2a1a;border:1px solid #4ade80;color:#4ade80;border-radius:4px;padding:10px 14px;font-family:monospace;font-size:12px;margin-top:10px;line-height:1.6;"></div>
   </div>
 
   <!-- ── Section B: Frame inventory + draft YAML ── -->
@@ -241,6 +242,7 @@ async function draftExperiment() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span> Generating frame inventory…';
   setStatus('draft-status', '');
+  document.getElementById('draft-success-banner').style.display = 'none';
 
   try {
     const resp = await fetch(`${BASE}/scaffold/draft`, {
@@ -273,7 +275,16 @@ async function draftExperiment() {
     document.getElementById('section-c').style.display = '';
     _sessionValid = false;
     document.getElementById('save-btn').disabled = true;
-    setStatus('draft-status', `Artefact drafted — ID: ${data.experiment_id}`, 'ok');
+
+    // Show success banner
+    const banner = document.getElementById('draft-success-banner');
+    banner.textContent = `✓ Draft ready — experiment ID: ${esc(data.experiment_id)}. Review the frame inventory and YAML below, fill in the substantive fields, then validate and save.`;
+    banner.style.display = 'block';
+
+    // Scroll to section B
+    setTimeout(() => {
+      document.getElementById('section-b').scrollIntoView({behavior: 'smooth', block: 'start'});
+    }, 80);
   } catch(e) {
     setStatus('draft-status', `Draft failed: ${e.message}`, 'err');
   } finally {
