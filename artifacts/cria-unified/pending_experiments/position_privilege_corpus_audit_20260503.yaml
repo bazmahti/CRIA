@@ -1,0 +1,226 @@
+# Position-Privilege Corpus Audit — Reflexive Smoke Test
+# ============================================================================
+# This is the first deliberate experiment artefact for CRIA Unified.
+# It audits what's actually IN the existing Book 3 / civilisational corpus
+# before any substantive cross-cultural or framework-validity question is
+# asked of that corpus. Findings shape what subsequent experiments can
+# legitimately claim.
+#
+# Drafted manually 2026-05-03 by Claude in conversation with Dr Barry Ferrier,
+# acting as the manual scaffolder pattern. Every substantive decision is
+# documented in the companion file:
+#   POSITION_PRIVILEGE_AUDIT_RATIONALE.md
+# Read that file before running. If any substantive decision below does not
+# fit your intent, edit it before saving and update the rationale.
+# ============================================================================
+
+experiment_id: position_privilege_corpus_audit_20260503
+created_at: 2026-05-03T14:30:00Z
+created_by: claude-manual-scaffolder-2026-05-03
+project: book3
+
+question: >
+  What is the actual position-privilege distribution across CRIA's existing
+  Book 3 / civilisational corpus to date? Specifically, what proportion of
+  ingested sources are credentialed academic research, Indigenous scholarship
+  (oral, written, community-attested), theoretical-tradition primary texts,
+  and community-curated knowledge — and what does that distribution reveal
+  about which voices have been able to inform the work so far?
+
+hypothesis: >
+  The corpus is materially skewed toward credentialed academic research,
+  for two reasons that compound: (1) the systemic reason — academic literature
+  is digitally indexed, openly searchable, and machine-ingestible at scale,
+  while Indigenous scholarship is often gated, oral, or in formats that
+  resist programmatic ingestion; (2) the apparatus reason — CRIA's connector
+  layer is currently weighted toward conventional academic sources (PubMed,
+  Scholar Gateway, etc.) with thinner coverage of community-curated and
+  Indigenous-sovereign repositories. Predicted distribution at this stage:
+  ~70-80% credentialed research, ~5-10% Indigenous scholarship,
+  ~10-15% theoretical-tradition primary texts, ~5% community-curated.
+  This hypothesis is intentionally falsifiable. If the actual distribution
+  is materially different — particularly if Indigenous scholarship is
+  better represented than predicted — that itself is a finding worth
+  documenting and would change what subsequent experiments can claim.
+
+expected_outcome_types:
+  - position_privilege_artefact   # the audit's primary output
+  - frame_extinction               # which framings appear under-represented
+  - null_finding                   # corpus may be too early-stage to support claims
+  - refusal                        # the act of categorising Indigenous sources
+                                   # by Western analytical categories may itself
+                                   # be a category-error worth surfacing as refusal
+
+channel: null   # cross-channel — this is a corpus-level audit, not a
+                # channel-specific finding
+
+patterns: [1, 3, 9]
+# P1 Inversion — what is NOT in the corpus is as important as what is
+# P3 Cultural Archaeology — the audit is literally archaeology of corpus
+#   composition; this is the load-bearing pattern
+# P9 Philosophical Grounding — the categories "credentialed" vs "Indigenous"
+#   themselves carry assumptions that need to be surfaced, not just applied
+
+protections:
+  p1_falsification: true
+  p2_eliza_output: true
+  p3_meta_observation: true
+  p4_independence_testing: true
+# All four ON. Particularly important here: P1 (researcher-confirmation bias
+# is high when auditing one's own corpus) and P3 (the audit is itself
+# reflexive and the strange-loop layer is load-bearing).
+
+evidence_tier_threshold: T2
+# T2 because this is a classification question (what category is each source
+# in?), not a substantive-claim question. T1 would be too restrictive — it
+# would exclude many of the sources we're trying to count.
+
+convergence_requirement: strong_with_falsification
+# Audit findings must be clear: either the corpus IS skewed (with numbers)
+# or it isn't (with numbers). Partial/divergent findings here would be weak
+# and would propagate uncertainty into every subsequent experiment.
+
+include_layers: [L1, L2, L3, L4, L5, L6, L7]
+# All layers. This is a corpus-wide audit; no layer should be excluded.
+
+include_connectors: []
+# Empty = use all available connectors. The audit is descriptive — it
+# reports what each connector is contributing, not which ones to favour.
+
+exclude_connectors: []
+# Excluding any connector would distort the audit. Leave empty.
+
+silo_aware: true
+# CRITICAL for this audit. The whole point is to surface where Indigenous-
+# sovereign sources sit. Aggregating them with credentialed research for
+# triangulation would defeat the audit's purpose and reproduce the very
+# problem being measured.
+
+frames_expected:
+  - western_academic_credentialing
+  - indigenous_relational_scholarship
+  - phenomenological_tradition
+  - cybernetic_systems
+  - critical_theory
+  - community_attested_knowledge
+# What framings I expect to find SOME representation of in the corpus.
+# Listing them in advance is a discipline — it surfaces my assumptions
+# about what's there before the audit runs.
+
+frames_explicitly_excluded: []
+frames_excluded_rationale: {}
+# Excluding any framing from an audit would defeat its purpose. The audit
+# must see everything that's there, including framings the researcher hasn't
+# anticipated.
+
+dissonance_budget: 0.30
+# High. This is a foundational audit; tension between what's in the corpus
+# and what arguably *should* be is the whole point. A low budget would
+# pressure the apparatus to find clean findings where messiness is the
+# truth.
+
+position_privilege_balance: null
+# DELIBERATELY NULL. The audit's job is to *measure* the position-privilege
+# distribution that exists, not to specify one for the experiment to seek.
+# Setting a balance here would predetermine what the audit is allowed to
+# find. Null instructs the apparatus to retrieve sources without pre-
+# weighting and report the distribution actually found.
+#
+# This is the most important substantive decision in the artefact. If a
+# future scaffolder version cannot represent "no pre-weighting; report
+# distribution," the field needs schema redesign — not a default value.
+
+output_voice: raw_findings_only
+# This experiment produces internal research material that informs
+# subsequent experiments. Academic or Ferrier-popular framings would be
+# premature; we want unstyled findings that inform decisions, not
+# publication-ready prose.
+
+output_format: position_privilege_audit
+# The dedicated format for this experiment shape. Produces:
+#   - distribution table (count + percentage by category)
+#   - representative-source list per category
+#   - frame-coverage map
+#   - explicit named gaps
+#   - confidence note on classification edge cases
+
+budget_cap_aud: 8.00
+# Higher than typical (5.00) because the audit must scan broadly across
+# all sources rather than focusing narrowly. Hard cap; truncation is
+# acceptable and would itself be a finding (corpus larger than budget allows).
+
+iteration_cap: 10
+# Lower than typical (15) because this is classification, not iterative
+# refinement. If the apparatus needs more than 10 iterations to classify
+# sources, the classification scheme itself is failing.
+
+time_cap_seconds: 600
+# Standard. Hard cap.
+
+require_human_review: true
+# CRITICAL. These findings inform every subsequent experiment. They must
+# be ratified by Dr Ferrier before entering the formal evidence base.
+# An unratified audit propagates errors into all downstream work.
+
+observer_note: >
+  This is a reflexive smoke-test experiment, the first deliberate artefact
+  run after the CRIA Unified build's protection layer was deployed (May 2026).
+  Its purpose is twofold: (1) to verify that the deliberate-experiment
+  pattern works end-to-end with a known-good artefact before any substantive
+  research question is asked; (2) to establish a position-privilege baseline
+  for the existing corpus so that subsequent cross-cultural and framework-
+  validity experiments (e.g. four_requirements_cross_cultural_validity)
+  can interpret their findings against a known corpus composition rather
+  than against an assumed-balanced corpus.
+  
+  Strange-loop note: this audit is itself an act of categorisation, and
+  the categories used (credentialed_research, indigenous_scholarship, etc.)
+  carry Western-analytical assumptions about what makes knowledge "count."
+  The audit cannot escape this; it can only surface it. The reflexivity
+  questions below name the limitation. Findings that would aggregate
+  Indigenous scholarship by these categories without acknowledging the
+  category-imposition are themselves position-privilege artefacts and
+  should be flagged as such in the output.
+  
+  Dr Ferrier is preparing Book 3 (What Remains, the academic civilisational
+  text). Several upcoming experiments rest on assumptions about corpus
+  balance that this audit tests directly. If the audit finds the corpus
+  is materially skewed (predicted), the remediation is not "rerun this
+  audit until balanced" — the remediation is corpus expansion via the
+  Indigenous-sovereign and community-curated pathways named in the
+  Corpus Expansion Specification, BEFORE substantive cross-cultural
+  experiments are run against the current corpus.
+
+reflexivity_questions:
+  - >
+    Who decides what counts as "credentialed research" versus "Indigenous
+    scholarship"? Whose categorisation scheme is the audit using, and what
+    framings does that scheme make invisible? In particular, what about
+    Indigenous-credentialed-academic work — does it count as "credentialed
+    research" (foregrounding the academic credential) or as "Indigenous
+    scholarship" (foregrounding the standpoint)? The choice determines
+    what the audit appears to find.
+  - >
+    Does the act of categorising sources by these four buckets itself impose
+    a Western analytical frame on the very Indigenous scholarship the audit
+    is trying to make visible? Mary Graham's relational ontology, Yunkaporta's
+    right-relationships in Sand Talk, and Pacific vā as relational space
+    would each refuse the premise that knowledge can be sorted into discrete
+    privilege-categories at all. The audit cannot escape this critique —
+    it can only acknowledge it.
+  - >
+    What does it mean to "balance" sources whose epistemologies refuse
+    commensurability with each other? If credentialed research and Indigenous
+    scholarship operate under different ontologies of what counts as
+    knowledge, claims about their proportional representation in a corpus
+    presume a meta-frame that flattens them into comparable units. The
+    audit's findings should be read with this caveat as a load-limit, not
+    as evidence the categories are valid.
+  - >
+    What audit findings would, if produced, indicate that the audit itself
+    is broken rather than that the corpus is balanced? Specifically: a
+    finding that the corpus is exactly 25/25/25/25 across the four categories
+    would be more suspicious than a finding of clear skew, because it would
+    suggest the apparatus is producing the answer the categorisation scheme
+    expects rather than reporting what's there. Convergence-too-clean is
+    its own failure mode.
