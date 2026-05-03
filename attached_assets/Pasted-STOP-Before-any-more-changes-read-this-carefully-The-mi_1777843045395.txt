@@ -1,0 +1,151 @@
+STOP. Before any more changes, read this carefully.
+
+## The misguided fix
+
+You're about to add a `[services.production]` block to
+`artifacts/api-server/.replit-artifact/artifact.toml` to "deploy" the
+Node API server. **This will not work** and please do not do it.
+
+The repo's `.replit` sets `deploymentTarget = "autoscale"`. Autoscale
+deployments expose **exactly one port** to the public. Adding a
+production config to the api-server artifact won't change that —
+autoscale will still only run one service. The api-server will either
+not start, or it will start and not be reachable.
+
+This is already documented in the codebase. See the comment in
+`artifacts/cria-unified/main.py` above the `/api/research/unified`
+routes:
+
+> "In production, autoscale only allows ONE exposed port. The
+> api-server (Node/Express) is therefore not deployed; these routes
+> replace the two endpoints the React dashboard calls so everything
+> works through this single FastAPI process."
+
+A previous session correctly diagnosed this and added shims for the
+two unified-research endpoints inside `main.py`. The bug is that the
+React dashboard calls **more endpoints than just those two**, and the
+rest were never shimmed — so every page except `/unified` shows blank
+in production.
+
+## What I want you to do instead
+
+### Step 0 — Revert the toml edit
+
+If you've already created `artifacts/api-server/.replit-artifact/artifact.edit.toml`
+or modified `artifact.toml`, revert it. The api-server toml should
+stay exactly as it was before this session. Confirm with `git diff
+artifacts/api-server/.replit-artifact/`.
+
+### Step 1 — Verify the diagnosis with curl
+
+Against the deployed URL, run these and paste me the response status
+codes:
+
+```
+curl -sS -o /dev/null -w "%{http_code}\n" $DEPLOY_URL/api/healthz
+curl -sS -o /dev/null -w "%{http_code}\n" $DEPLOY_URL/api/experiments
+curl -sS -o /dev/null -w "%{http_code}\n" $DEPLOY_URL/api/experiments/summary
+curl -sS -o /dev/null -w "%{http_code}\n" $DEPLOY_URL/api/experiments/cross-view
+curl -sS -o /dev/null -w "%{http_code}\n" $DEPLOY_URL/api/experiments/reflexivity-report
+curl -sS -o /dev/null -w "%{http_code}\n" $DEPLOY_URL/api/research/parallel
+curl -sS -o /dev/null -w "%{http_code}\n" "$DEPLOY_URL/cria-unified/health"
+```
+
+Expected per my diagnosis: `/cria-unified/health` returns 200,
+everything `/api/*` except `/api/research/unified` returns 404.
+Do not proceed to Step 2 until those numbers are confirmed.
+
+### Step 2 — Add the missing /api/* shims to main.py
+
+The proper fix is: the deployed FastAPI process (`cria-unified/main.py`)
+becomes the single backend, and it shims **every** route the React
+dashboard hits. Read these files first to enumerate the full surface:
+
+- `lib/api-spec/openapi.yaml` — canonical route list
+- `artifacts/api-server/src/routes/experiments.ts` — handler logic to port
+- `artifacts/api-server/src/routes/parallel.ts` — handler logic for /api/research/parallel
+- `artifacts/api-server/src/db/schema.ts` (or wherever Drizzle's tables live) — schema for `experiments` and `findings` tables
+- `artifacts/cria-unified/main.py` — where the new shims will live, alongside the existing `/api/research/unified` ones
+
+The endpoints to shim, in priority order (highest = visit-first pages):
+
+1. `GET  /api/experiments/summary`             — Control Room landing
+2. `GET  /api/experiments`                     — Experiment Queue
+3. `GET  /api/experiments/{id}`                — Experiment Detail
+4. `GET  /api/experiments/{id}/findings`       — Experiment Detail
+5. `GET  /api/experiments/cross-view`          — Findings Index
+6. `GET  /api/experiments/reflexivity-report`  — Reflexivity Report
+7. `POST /api/experiments`                     — New Experiment
+8. `POST /api/experiments/{id}/run`            — Run button
+9. `POST /api/experiments/{id}/validate`       — YAML validate
+10. `PATCH /api/experiments/{id}`              — Approve/edit
+11. `DELETE /api/experiments/{id}`             — Delete
+12. `GET  /api/research/parallel`              — Parallel page list
+13. `GET  /api/research/parallel/{jobId}`      — Parallel page detail
+14. `POST /api/research/parallel`              — Parallel page submit (calls v2 + v4 — keep this as a NotImplemented 501 if those services aren't deployed; do NOT silently fail)
+15. `GET  /api/healthz`                        — frontend probe
+
+Implementation rules:
+
+- Use **psycopg** (v3, sync) called via the existing `_db_executor`
+  pool, matching the pattern already used by `_db_create_job` /
+  `_db_get_job`. Do **not** introduce SQLAlchemy or asyncpg — keep
+  the dependency surface small.
+- Read from the **same Postgres database** the Drizzle ORM uses
+  (same `DATABASE_URL` env var). The `experiments` and `findings`
+  tables already exist there — do not recreate them, do not run
+  migrations from Python.
+- Match the response shape of the Express handlers exactly. The
+  React client is generated from the OpenAPI spec via Orval; if a
+  field name or casing differs, the dashboard will silently break.
+  Test response shape against `lib/api-client-react/src/generated/api.ts`
+  type definitions.
+- For YAML parsing/validation in `POST /api/experiments`, use
+  `pyyaml` and port the validation logic from
+  `artifacts/api-server/src/lib/validate-artefact.ts`. Do not skip
+  validation — the dashboard surfaces the errors.
+- For the run-experiment simulated flow (3-second auto-complete with
+  synthetic findings), port `generateFindingsMarkdown` from
+  `experiments.ts` to Python. Use FastAPI `BackgroundTasks`, same as
+  the existing unified-research job pattern.
+- Group the new code in a clearly delimited section in `main.py`,
+  same style as the existing `/api/research/unified` shim block:
+
+  ```python
+  # ---------------------------------------------------------------------------
+  # /api/experiments — production shim (single-port autoscale mode)
+  # Mirrors artifacts/api-server/src/routes/experiments.ts
+  # ---------------------------------------------------------------------------
+  ```
+
+### Step 3 — Rebuild and verify
+
+After the shims are in:
+
+```
+pnpm --filter @workspace/cria-dashboard run build
+```
+
+(this regenerates `dist/public` so the React static files are fresh —
+though the React code itself shouldn't need changes; the API surface
+it calls is unchanged).
+
+Then redeploy and re-run the Step 1 curl battery. Every endpoint
+should return 200 (or 4xx for missing resources, never 404 from
+"route doesn't exist"). Then load each dashboard page in a browser
+and confirm data renders.
+
+### What I do NOT want you to do
+
+- Do **not** edit `.replit` to change `deploymentTarget`
+- Do **not** add a production config to `api-server/artifact.toml`
+- Do **not** try to run two processes in autoscale via shell tricks
+- Do **not** stub endpoints with empty arrays "to make pages render" —
+  if a shim isn't ready, leave it 404 and tell me which ones are
+  outstanding
+- Do **not** create a new database — reuse the existing one
+
+When you're done, post: (a) the curl status codes from Step 1, (b)
+the diff of `artifacts/cria-unified/main.py`, (c) the curl status
+codes after redeploy, (d) any endpoints from the priority list you
+were unable to shim and why.
