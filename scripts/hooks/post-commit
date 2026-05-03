@@ -1,0 +1,51 @@
+#!/bin/bash
+# Post-commit hook: sync commits to GitHub on every local commit.
+#
+# Installed automatically by scripts/post-merge.sh into .git/hooks/post-commit.
+# Edit this file (scripts/hooks/post-commit) — NOT the .git copy — so changes
+# are tracked in version control and re-deployed on the next merge.
+#
+# Push failures are logged visibly; the local commit is NEVER blocked.
+
+TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S')"
+LOCAL_HEAD="$(git rev-parse HEAD 2>/dev/null)"
+BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo "HEAD")"
+
+if [ -z "$GITHUB_TOKEN" ]; then
+  echo "" >&2
+  echo "[github-sync] WARNING: GITHUB_TOKEN is not set — commit was NOT pushed to GitHub." >&2
+  echo "[github-sync] Add or restore the secret in Replit Secrets to re-enable sync." >&2
+  echo "" >&2
+  # Exit 0: never block the local commit.
+  exit 0
+fi
+
+GITHUB_URL="https://bazmahti:${GITHUB_TOKEN}@github.com/bazmahti/CRIA.git"
+
+echo "[github-sync] $TIMESTAMP — pushing $LOCAL_HEAD ($BRANCH) to GitHub"
+
+PUSH_OUTPUT="$(git push "$GITHUB_URL" "HEAD:$BRANCH" 2>&1)"
+PUSH_EXIT="$?"
+
+if [ "$PUSH_EXIT" -ne 0 ]; then
+  echo "" >&2
+  echo "╔══════════════════════════════════════════════════════════════╗" >&2
+  echo "║  GITHUB SYNC FAILED                                         ║" >&2
+  echo "║  Your commit was saved locally but was NOT pushed to GitHub.║" >&2
+  echo "║  The GITHUB_TOKEN may have expired or GitHub is unreachable.║" >&2
+  echo "╚══════════════════════════════════════════════════════════════╝" >&2
+  echo "" >&2
+  echo "[github-sync] timestamp : $TIMESTAMP" >&2
+  echo "[github-sync] commit    : $LOCAL_HEAD" >&2
+  echo "[github-sync] branch    : $BRANCH" >&2
+  echo "[github-sync] exit code : $PUSH_EXIT" >&2
+  echo "[github-sync] details   :" >&2
+  echo "$PUSH_OUTPUT" | sed 's/^/[github-sync]   /' >&2
+  echo "" >&2
+  echo "[github-sync] Run 'bash scripts/sync-github.sh' to retry manually." >&2
+  echo "" >&2
+  # Exit 0: never block the local commit — only the sync alert fires.
+  exit 0
+fi
+
+echo "[github-sync] push succeeded — GitHub is now at $(git rev-parse --short HEAD)"
