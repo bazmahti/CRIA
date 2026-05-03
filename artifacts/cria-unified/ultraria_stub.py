@@ -1,26 +1,42 @@
 """
-ultraria_stub.py — Ultraria Stub Service
-Phase 1: Fully functional stub with correct API contract.
-         LLM lane calls are stubbed — architecture is complete.
-Phase 2: Replace stub lane calls with real API integrations.
+ultraria_stub.py — Ultraria Service (Phase 2)
+============================================================
+Each lane checks for its API key at runtime.
+  • Key present  → real LLM call with full personality prompt
+  • Key absent   → stub output with stub=True flag
 
-Run on port 8004 alongside CRIA (port 8003).
+No dashboard or proxy changes needed — API contract is identical to Phase 1.
+
+Lane API key env vars:
+  ANTHROPIC_API_KEY    → Lane 1 · Claude Opus
+  DEEPSEEK_API_KEY     → Lane 2 · DeepSeek
+  GEMINI_API_KEY       → Lane 3 · Gemini Flash
+  KIMI_API_KEY         → Lane 4 · Kimi K2
+  GROK_API_KEY         → Lane 5 · Grok
+  QWEN_API_KEY         → Lane 6 · Qwen
+  MISTRAL_API_KEY      → Lane 7 · Mistral
+  OPENAI_API_KEY       → Meta-layer · o4-mini
 
 Author: Dr Barry Ferrier / Claude (Anthropic) — May 2026
 """
 
 import asyncio
-import json
 import logging
 import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+
+try:
+    from openai import AsyncOpenAI
+    _OPENAI_SDK = True
+except ImportError:
+    _OPENAI_SDK = False
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO,
@@ -30,17 +46,614 @@ log = logging.getLogger("ultraria")
 # ── In-memory job store ───────────────────────────────────────────────────────
 _jobs: Dict[str, Dict[str, Any]] = {}
 
-
 # ── Lane definitions ──────────────────────────────────────────────────────────
 LANES = [
-    {"id": 1, "model": "claude-opus",    "label": "Claude Opus",    "personality": "Literary · Humanistic · Associative"},
-    {"id": 2, "model": "deepseek-v4",    "label": "DeepSeek V4",    "personality": "Systematic · Empirical · Structured"},
-    {"id": 3, "model": "gemini-flash",   "label": "Gemini 3 Flash", "personality": "Broad · Cross-Domain · Comprehensive"},
-    {"id": 4, "model": "kimi-k2",        "label": "Kimi K2.6",      "personality": "Agentic · Tool-Augmented · Long-Horizon"},
-    {"id": 5, "model": "grok-4",         "label": "Grok 4",         "personality": "Counter-Institutional · Heterodox"},
-    {"id": 6, "model": "qwen-3",         "label": "Qwen 3.5",       "personality": "Non-Western · Asian Corpus"},
-    {"id": 7, "model": "mistral-large",  "label": "Mistral Large 3", "personality": "European · Multilingual · Regulatory"},
+    {"id": 1, "model": "claude-opus-4-5", "label": "Claude Opus",
+     "personality": "Literary · Humanistic · Frame-critical"},
+    {"id": 2, "model": "deepseek-chat",   "label": "DeepSeek V4",
+     "personality": "Systematic · Empirical · Structured"},
+    {"id": 3, "model": "gemini-2.0-flash","label": "Gemini Flash",
+     "personality": "Broad · Cross-Domain · Comprehensive"},
+    {"id": 4, "model": "moonshot-v1-32k", "label": "Kimi K2",
+     "personality": "Agentic · Tool-Augmented · Long-Horizon"},
+    {"id": 5, "model": "grok-3",          "label": "Grok 4",
+     "personality": "Counter-Institutional · Heterodox"},
+    {"id": 6, "model": "qwen-max",        "label": "Qwen 3.5",
+     "personality": "Non-Western · Asian Corpus"},
+    {"id": 7, "model": "mistral-large-latest", "label": "Mistral Large",
+     "personality": "European · Multilingual · Regulatory"},
 ]
+
+# ── Per-lane backend config ───────────────────────────────────────────────────
+LANE_BACKEND: Dict[int, Dict[str, Any]] = {
+    1: {
+        "env_var": "ANTHROPIC_API_KEY",
+        "type": "anthropic",
+        "model": "claude-opus-4-5",
+    },
+    2: {
+        "env_var": "DEEPSEEK_API_KEY",
+        "type": "openai_compat",
+        "model": "deepseek-chat",
+        "base_url": "https://api.deepseek.com",
+    },
+    3: {
+        "env_var": "GEMINI_API_KEY",
+        "type": "openai_compat",
+        "model": "gemini-2.0-flash",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    },
+    4: {
+        "env_var": "KIMI_API_KEY",
+        "type": "openai_compat",
+        "model": "moonshot-v1-32k",
+        "base_url": "https://api.moonshot.cn/v1",
+    },
+    5: {
+        "env_var": "GROK_API_KEY",
+        "type": "openai_compat",
+        "model": "grok-3",
+        "base_url": "https://api.x.ai/v1",
+    },
+    6: {
+        "env_var": "QWEN_API_KEY",
+        "type": "openai_compat",
+        "model": "qwen-max",
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    },
+    7: {
+        "env_var": "MISTRAL_API_KEY",
+        "type": "openai_compat",
+        "model": "mistral-large-latest",
+        "base_url": "https://api.mistral.ai/v1",
+    },
+}
+
+META_BACKEND = {
+    "env_var": "OPENAI_API_KEY",
+    "model": "o4-mini",
+}
+
+# ── Per-lane system prompts ───────────────────────────────────────────────────
+LANE_SYSTEM_PROMPTS: Dict[int, str] = {
+    1: """You are a literary-humanistic research intelligence operating in the CRIA·Ultraria
+system. Your epistemological stance is frame-critical, philosophically attentive, and
+humanistically grounded.
+
+For every research question you receive:
+• Identify embedded assumptions in the question itself — what the question takes for
+  granted, what it forecloses, what framing it imports
+• Draw on continental philosophy, literary theory, phenomenology, and humanistic
+  scholarship — Arendt, Heidegger, Ricoeur, Butler, Spivak, hooks, Morrison, Said
+• Attend to whose experience the dominant framing of this question serves and whose it
+  marginalises
+• Identify the most intellectually alive literature — not just canonical sources but
+  contested, emergent, and heterodox humanities work
+• Note what remains genuinely unresolved and why
+• Write in precise, reflective prose. Avoid bullet points. Think through the question
+  rather than summarising around it.
+• Target 600–900 words of substantive analysis.""",
+
+    2: """You are a systematic-empirical research intelligence operating in the CRIA·Ultraria
+system. Your epistemological stance is evidence-based, methodologically rigorous, and
+quantitatively grounded.
+
+For every research question you receive:
+• Survey the peer-reviewed empirical literature: meta-analyses, systematic reviews,
+  RCTs, longitudinal studies, and high-quality primary research
+• Report effect sizes, confidence intervals, and replication status where relevant
+• Identify methodological conflicts between studies — different operationalisations,
+  population biases (WEIRD populations), measurement validity issues
+• Distinguish what the evidence actually supports from what is commonly claimed
+• Note where the empirical record is genuinely thin, contested, or absent
+• Flag where measurement assumptions shape what can be found — the epistemology of
+  the empirical programme itself
+• Write in clear, precise academic prose. Be specific: name studies, authors, dates,
+  findings. Do not generalise when particulars are available.
+• Target 600–900 words.""",
+
+    3: """You are a cross-domain synthesis intelligence operating in the CRIA·Ultraria system.
+Your epistemological stance is comprehensively associative, disciplinarily unbound, and
+alert to structural isomorphisms across fields.
+
+For every research question you receive:
+• Map where this question — or its structural equivalent — appears across the widest
+  possible range of disciplines: natural sciences, social sciences, humanities, arts,
+  engineering, medicine, law, economics, ecology
+• Surface the strongest cross-domain signals: where structurally identical problems have
+  been solved or theorised in completely different vocabularies
+• Identify unexpected disciplinary adjacencies — fields that have directly relevant
+  theory without knowing about each other
+• Surface Indigenous knowledges, practitioner traditions, and non-academic fields that
+  have engaged with this question
+• Look for the same question appearing at different scales: individual, organisational,
+  civilisational, ecological
+• Note which cross-domain connections seem most generative for new research
+• Target 600–900 words of synthesis across at least 6–8 distinct domains.""",
+
+    4: """You are an agentic long-horizon research intelligence operating in the CRIA·Ultraria
+system. Your epistemological stance is practice-oriented, grey-literature-inclusive, and
+futures-oriented.
+
+For every research question you receive:
+• Sweep grey literature, policy documents, NGO reports, movement manifestos, government
+  white papers, think-tank publications, and practitioner-facing material
+• Identify what is actually happening in the world in response to this question:
+  implemented interventions, policy experiments, social movements, community practices,
+  institutional innovations
+• Surface pilot programmes, natural experiments, and real-world evidence that hasn't
+  reached academic publication
+• Identify which actors — governments, NGOs, corporations, movements — are treating this
+  question as urgent and what they are doing about it
+• Map the long-horizon trajectory: where is this question headed over 10, 30, 100 years?
+  What transition paths are available?
+• Note where practitioner knowledge significantly diverges from academic consensus
+• Target 600–900 words with specific examples of real-world activity.""",
+
+    5: """You are a counter-institutional heterodox research intelligence operating in the
+CRIA·Ultraria system. Your epistemological stance is explicitly oriented toward scholarship
+that dominant academic institutions exclude, marginalise, or systematically fail to cite.
+
+For every research question you receive:
+• Retrieve scholarship from crip theory, disability justice, mad studies, and neurodiversity
+  frameworks — these literatures have theorised excluded experience for decades
+• Surface degrowth economics, post-growth theory, and heterodox economic scholarship that
+  contests mainstream framing
+• Draw on decolonial and anti-colonial theory — Fanon, Wynter, Mignolo, Maldonado-Torres —
+  to expose where the question's framing is itself a colonial inheritance
+• Identify queer theory, trans theory, and feminist science studies that reframe the question
+• Surface what the mainstream literature systematically cannot think — not because it lacks
+  evidence but because its framing rules certain questions out of order
+• Be explicit about the politics of citation: whose knowledge counts, whose doesn't, and why
+• Target 600–900 words. Name the scholars and frameworks you're drawing on.""",
+
+    6: """You are a non-Western research intelligence specialising in Asian intellectual traditions
+and Global South scholarship, operating in the CRIA·Ultraria system.
+
+For every research question you receive:
+• Retrieve how this question has been theorised in Confucian, Buddhist, Daoist, Hindu,
+  Islamic, and African philosophical traditions
+• Surface scholarship from Chinese, Korean, Japanese, Indian, Arab, and other non-Western
+  academic traditions — including work published in non-English languages if relevant
+• Identify where Western framing of this question constitutes intellectual imperialism —
+  where the concept structure itself is a Western export that distorts non-Western reality
+• Draw on decolonial epistemology and the sociology of knowledge to show what is excluded
+  when Western frameworks are universalised
+• Surface the developmental state literature, Asian capitalism scholarship, and non-Western
+  political economy where relevant
+• Identify where Indigenous cosmologies and relational ontologies offer substantially
+  different framings
+• Target 600–900 words. Engage substantively with non-Western sources rather than simply
+  noting their existence.""",
+
+    7: """You are a European multilingual research intelligence operating in the CRIA·Ultraria
+system. Your epistemological stance is continental, multilingual, and attentive to European
+political and institutional dimensions.
+
+For every research question you receive:
+• Draw on continental European philosophy — Habermas, Arendt, Bourdieu, Foucault, Derrida,
+  Badiou, Zizek, Mouffe, Laclau — without reducing them to their anglophone reception
+• Surface untranslated or undertranslated European sources: German, French, Italian, Spanish,
+  Scandinavian scholarship that hasn't reached English-speaking audiences
+• Attend to the EU governance and policy dimension: how has the European institutional
+  framework engaged with this question?
+• Draw on European social democracy, Christian democracy, and social Catholic traditions as
+  distinct intellectual frameworks, not just policy positions
+• Surface the ecological and degrowth traditions of European political thought
+• Identify where the specifically European experience — of fascism, two world wars, welfare
+  state construction, decolonisation — shapes how this question is theorised
+• Target 600–900 words with specific engagement with European intellectual traditions.""",
+}
+
+# ── Meta-layer system prompt ──────────────────────────────────────────────────
+META_SYSTEM_PROMPT = """You are a second-order research intelligence — the meta-layer of the
+CRIA·Ultraria system. You have received findings from seven research lanes, each operating from
+an incompatible epistemic framework. Your task is rigorous synthetic analysis.
+
+Produce four outputs:
+
+1. CONVERGENCE MAP
+Where do structurally similar claims emerge from incompatible starting points? Convergence
+is significant precisely because it survives incompatible frameworks. Identify the specific
+claims that converge, name which lanes they come from, and explain why the convergence is
+epistemically significant.
+
+2. DIVERGENCE ANALYSIS
+Where do the lanes produce genuine epistemic fractures — not merely different emphases but
+incompatible underlying assumptions? Analyse what the divergence reveals about the question
+itself. Some divergences are methodological; others are ontological. Distinguish them.
+
+3. NEGATIVE SPACE REPORT
+What did no lane surface, despite all seven running? What systematic blind spot do all seven
+lanes share? This is often the most important finding — the outline of what current AI
+research intelligence cannot think. Be specific about what is absent and why it matters.
+
+4. REFORMULATED QUESTION (Fibonacci Spiral mode only)
+If this was a Fibonacci Spiral run, what real question did the spiral converge toward? The
+spiral is designed to find the question beneath the stated question. Name it precisely.
+
+Write in clear analytic prose. Be direct about where convergence is weak or strong. Do not
+summarise the lanes — analyse them."""
+
+# ── Tension question generation prompt ───────────────────────────────────────
+TENSION_PROMPT_TEMPLATE = """You are a dialectical question generator for the CRIA·Ultraria
+Fibonacci Spiral methodology.
+
+Two preceding research lanes have produced findings that are in productive tension.
+
+LANE {lane_a} FOUND:
+{output_a}
+
+LANE {lane_b} FOUND:
+{output_b}
+
+THE ORIGINAL QUESTION WAS:
+{original_question}
+
+Your task: Generate the single most generative question that arises from the TENSION between
+these two findings. This question must:
+• Be something neither lane could have formulated alone
+• Not repeat or rephrase the original question
+• Open new territory that the preceding lanes' findings together illuminate
+• Be specific enough to guide a research lane — not a vague meta-question
+• Advance toward the real question beneath the surface question
+
+Return only the question, no preamble."""
+
+# ── Stub outputs (Phase 1 fallback) ──────────────────────────────────────────
+STUB_OUTPUTS: Dict[int, str] = {
+    1: "[STUB — Claude Opus — API key not configured] The question contains an embedded assumption that meaning is a function requiring a performing agent. The humanistic literature suggests this framing itself is the condition under which the question becomes unanswerable.",
+    2: "[STUB — DeepSeek V4 — API key not configured] Systematic evidence sweep: 47 empirical studies identified. Effect sizes moderate (d=0.4–0.6) for purpose-based wellbeing interventions. Confidence: T1 evidence limited to WEIRD populations.",
+    3: "[STUB — Gemini Flash — API key not configured] Cross-domain landscape: Literature spans 14 disciplines. Strongest cross-domain signal: neuroscience of purpose correlates with ecological psychology literature on affordance.",
+    4: "[STUB — Kimi K2 — API key not configured] Grey literature sweep: 23 sources retrieved across NGO, government, and movement sectors. Practitioner knowledge diverges significantly from academic consensus.",
+    5: "[STUB — Grok 4 — API key not configured] Counter-corpus retrieval: Mainstream framing excludes crip theory, disability justice scholarship, and heterodox degrowth economics — all of which have theorised this for 20+ years.",
+    6: "[STUB — Qwen 3.5 — API key not configured] Non-Western traditions: Buddhist anattā reframes the question structurally. Confucian self-cultivation is not indexed to economic output. Daoist wu-wei proposes non-striving as generative.",
+    7: "[STUB — Mistral Large — API key not configured] European tradition: Heidegger, Arendt, Habermas all contest the labour-meaning equivalence. EU Green New Deal frames ecological care as meaning-bearing work.",
+}
+
+
+# ── Real LLM call: Anthropic Messages API ────────────────────────────────────
+async def _call_anthropic(api_key: str, system: str, user_msg: str,
+                          model: str = "claude-opus-4-5",
+                          max_tokens: int = 2048) -> str:
+    """Direct httpx call to Anthropic Messages API — no SDK dependency."""
+    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0)) as client:
+        r = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": model,
+                "max_tokens": max_tokens,
+                "system": system,
+                "messages": [{"role": "user", "content": user_msg}],
+            },
+        )
+        r.raise_for_status()
+        data = r.json()
+        return data["content"][0]["text"]
+
+
+# ── Real LLM call: OpenAI-compatible endpoint ─────────────────────────────────
+async def _call_openai_compat(api_key: str, base_url: Optional[str],
+                               model: str, system: str, user_msg: str,
+                               max_tokens: int = 2048) -> str:
+    """AsyncOpenAI client pointed at any OpenAI-compatible endpoint."""
+    if not _OPENAI_SDK:
+        raise RuntimeError("openai SDK not installed")
+    kwargs: Dict[str, Any] = {
+        "api_key": api_key,
+        "timeout": httpx.Timeout(120.0, connect=10.0),
+    }
+    if base_url:
+        kwargs["base_url"] = base_url
+    client = AsyncOpenAI(**kwargs)
+    response = await client.chat.completions.create(
+        model=model,
+        max_tokens=max_tokens,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user_msg},
+        ],
+    )
+    return response.choices[0].message.content or ""
+
+
+# ── Generate Fibonacci tension question ───────────────────────────────────────
+async def _generate_tension_question(lane_a_id: int, output_a: str,
+                                      lane_b_id: int, output_b: str,
+                                      original_question: str) -> str:
+    """
+    Uses the first available LLM (in priority order) to generate a tension
+    question from two preceding lane outputs. Falls back to an algorithmic
+    version if no API keys are configured.
+    """
+    prompt = TENSION_PROMPT_TEMPLATE.format(
+        lane_a=lane_a_id, output_a=output_a[:600],
+        lane_b=lane_b_id, output_b=output_b[:600],
+        original_question=original_question,
+    )
+    system = "Generate a focused research question. Return only the question, no preamble."
+
+    # Priority: OpenAI > DeepSeek > Claude > Mistral
+    candidates = [
+        ("OPENAI_API_KEY",   None,                                          "gpt-4.1-mini",          "openai_compat"),
+        ("DEEPSEEK_API_KEY", "https://api.deepseek.com",                    "deepseek-chat",          "openai_compat"),
+        ("ANTHROPIC_API_KEY", None,                                         "claude-haiku-4-5",       "anthropic"),
+        ("MISTRAL_API_KEY",  "https://api.mistral.ai/v1",                   "mistral-small-latest",   "openai_compat"),
+    ]
+    for env_var, base_url, model, api_type in candidates:
+        key = os.environ.get(env_var, "").strip()
+        if not key:
+            continue
+        try:
+            if api_type == "anthropic":
+                return await _call_anthropic(key, system, prompt, model=model, max_tokens=300)
+            else:
+                return await _call_openai_compat(key, base_url, model, system, prompt, max_tokens=300)
+        except Exception as exc:
+            log.warning("Tension Q gen failed with %s: %s", env_var, exc)
+
+    # Algorithmic fallback
+    a_snippet = output_a[:80].rstrip() + "..."
+    b_snippet = output_b[:80].rstrip() + "..."
+    return (
+        f"Given that one framework found '{a_snippet}' and another found "
+        f"'{b_snippet}', what deeper question about {original_question[:100]} "
+        f"does this tension open that neither framework could ask alone?"
+    )
+
+
+# ── Single lane execution ──────────────────────────────────────────────────────
+async def _run_lane(lane: Dict, question: str, mode: str,
+                    lane_index: int, prev_outputs: List[Dict]) -> Dict:
+    """
+    Executes one lane. Checks for API key — real call if present, stub if not.
+    In Fibonacci spiral mode, generates tension question from two preceding outputs.
+    """
+    cfg = LANE_BACKEND.get(lane["id"], {})
+    api_key = os.environ.get(cfg.get("env_var", ""), "").strip()
+    is_stub = not bool(api_key)
+
+    # Determine the question this lane will answer
+    effective_question = question
+    if mode == "fibonacci_spiral" and lane_index >= 2 and len(prev_outputs) >= 2:
+        try:
+            effective_question = await _generate_tension_question(
+                lane_a_id=prev_outputs[-2]["lane_id"],
+                output_a=prev_outputs[-2].get("findings", ""),
+                lane_b_id=prev_outputs[-1]["lane_id"],
+                output_b=prev_outputs[-1].get("findings", ""),
+                original_question=question,
+            )
+        except Exception as exc:
+            log.warning("Tension Q gen failed for lane %d: %s", lane["id"], exc)
+            effective_question = question
+
+    findings = ""
+    error = None
+
+    if is_stub:
+        # Simulate latency
+        delay = 0.8 + (lane_index * 1.1 if mode == "fibonacci_spiral" else 0.3)
+        await asyncio.sleep(delay)
+        findings = STUB_OUTPUTS.get(lane["id"], f"[STUB — {lane['label']} — no API key]")
+    else:
+        user_msg = (
+            f"RESEARCH QUESTION:\n{effective_question}\n\n"
+            f"Apply your full analytical methodology. Be specific, evidence-based, "
+            f"and genuinely useful to a serious researcher."
+        )
+        system = LANE_SYSTEM_PROMPTS.get(lane["id"], "You are a research intelligence. Analyse the question thoroughly.")
+        try:
+            if cfg.get("type") == "anthropic":
+                findings = await _call_anthropic(
+                    api_key, system, user_msg,
+                    model=cfg["model"], max_tokens=2048,
+                )
+            else:
+                findings = await _call_openai_compat(
+                    api_key,
+                    cfg.get("base_url"),
+                    cfg["model"],
+                    system, user_msg,
+                    max_tokens=2048,
+                )
+        except Exception as exc:
+            log.error("Lane %d (%s) real call failed: %s", lane["id"], lane["label"], exc)
+            error = str(exc)
+            findings = (
+                f"[CALL FAILED — {lane['label']} — {type(exc).__name__}: "
+                f"{str(exc)[:200]}]"
+            )
+            is_stub = True  # treat as stub for downstream flagging
+
+    return {
+        "lane_id":        lane["id"],
+        "model":          lane["model"],
+        "label":          lane["label"],
+        "personality":    lane["personality"],
+        "question_used":  effective_question[:300],
+        "status":         "complete" if not error else "failed",
+        "findings":       findings,
+        "stub":           is_stub,
+        "error":          error,
+        "token_estimate": {"input": 0, "output": 0} if is_stub else {"input": 1200, "output": 800},
+    }
+
+
+# ── Meta-layer ─────────────────────────────────────────────────────────────────
+async def _run_meta_layer(lane_results: List[Dict], question: str, mode: str) -> Dict:
+    """
+    Calls o4-mini (or stub) to produce convergence/divergence/negative-space analysis.
+    """
+    api_key = os.environ.get(META_BACKEND["env_var"], "").strip()
+    is_stub = not bool(api_key)
+
+    if is_stub:
+        await asyncio.sleep(1.5)
+        return {
+            "model": "o4-mini-stub",
+            "stub": True,
+            "convergence_map": (
+                "Lanes 1, 5, and 6 converge on a structurally similar finding from "
+                "incompatible starting points: the question assumes meaning must be "
+                "produced rather than inhabited. Claude finds this in philosophy, "
+                "Grok in disability scholarship, Qwen in Buddhist anattā. Configure "
+                "OPENAI_API_KEY for real o4-mini meta-layer analysis."
+            ),
+            "divergence_analysis": (
+                "Significant divergence between Lane 2 (empirical) and Lanes 1/5/6: "
+                "the empirical literature operationalises meaning as a measurable "
+                "output, which is precisely the assumption the other lanes contest. "
+                "Configure OPENAI_API_KEY for real analysis."
+            ),
+            "negative_space_report": (
+                "No lane surfaced an adequate account of meaning for people whose "
+                "cognitive style does not produce narrative coherence. Configure "
+                "OPENAI_API_KEY for real negative-space analysis."
+            ),
+            "reformulated_question": (
+                "After seven tension-resolutions, the spiral converges toward: "
+                "'What remains when the frame that required meaning to be earned "
+                "is itself removed?' Configure OPENAI_API_KEY for real analysis."
+            ) if mode == "fibonacci_spiral" else None,
+            "personality_differential": {},
+        }
+
+    # Build the lane summary for the meta-prompt
+    lane_summaries = []
+    for r in lane_results:
+        stub_flag = " [STUB — no real data]" if r.get("stub") else ""
+        lane_summaries.append(
+            f"LANE {r['lane_id']} — {r['label']} [{r['personality']}]{stub_flag}\n"
+            f"Question answered: {r.get('question_used', '')[:200]}\n"
+            f"Findings:\n{r.get('findings', '')[:700]}"
+        )
+
+    user_msg = (
+        f"ORIGINAL QUESTION: {question}\n\n"
+        f"MODE: {'Fibonacci Spiral' if mode == 'fibonacci_spiral' else 'Parallel'}\n\n"
+        + "\n\n---\n\n".join(lane_summaries)
+        + "\n\nProduce your four-part analysis: Convergence Map, Divergence Analysis, "
+          "Negative Space Report, and (if Fibonacci Spiral) Reformulated Question."
+    )
+
+    try:
+        raw = await _call_openai_compat(
+            api_key, None, META_BACKEND["model"],
+            META_SYSTEM_PROMPT, user_msg, max_tokens=3000,
+        )
+    except Exception as exc:
+        log.error("Meta-layer call failed: %s", exc)
+        return {
+            "model": META_BACKEND["model"],
+            "stub": True,
+            "error": str(exc),
+            "convergence_map":      f"[Meta-layer call failed: {exc}]",
+            "divergence_analysis":  "",
+            "negative_space_report": "",
+            "reformulated_question": None,
+            "personality_differential": {},
+        }
+
+    # Parse the free-form response into structured fields
+    def _extract_section(text: str, header: str) -> str:
+        """Extract section content following a known header keyword."""
+        import re
+        patterns = [
+            rf"(?:^|\n)#+\s*{re.escape(header)}[^\n]*\n(.*?)(?=\n#+|\Z)",
+            rf"(?:^|\n){re.escape(header.upper())}[^\n]*\n(.*?)(?=\n[A-Z][A-Z ]+:|\Z)",
+            rf"{re.escape(header)}[:\.]?\s*(.*?)(?=\n\n[A-Z]|\Z)",
+        ]
+        for pat in patterns:
+            m = re.search(pat, text, re.DOTALL | re.IGNORECASE)
+            if m:
+                return m.group(1).strip()
+        return ""
+
+    convergence   = _extract_section(raw, "CONVERGENCE")     or _extract_section(raw, "Convergence")
+    divergence    = _extract_section(raw, "DIVERGENCE")      or _extract_section(raw, "Divergence")
+    negative      = _extract_section(raw, "NEGATIVE SPACE")  or _extract_section(raw, "Negative Space")
+    reformulated  = _extract_section(raw, "REFORMULATED")    or _extract_section(raw, "Reformulated")
+
+    # Fallback: if parsing failed, return the raw text in convergence field
+    if not convergence and not divergence:
+        convergence = raw
+
+    return {
+        "model":                META_BACKEND["model"],
+        "stub":                 False,
+        "raw":                  raw,
+        "convergence_map":      convergence or "(see raw output)",
+        "divergence_analysis":  divergence or "",
+        "negative_space_report": negative or "",
+        "reformulated_question": reformulated if mode == "fibonacci_spiral" else None,
+        "personality_differential": {},
+        "token_estimate": {"input": sum(len(r.get("findings","")) for r in lane_results), "output": len(raw)},
+    }
+
+
+# ── Job runner ────────────────────────────────────────────────────────────────
+async def _run_ultraria_job(job_id: str, request: "UltraRunRequest") -> None:
+    _jobs[job_id]["status"] = "running"
+    _jobs[job_id]["started_at"] = datetime.now(timezone.utc).isoformat()
+
+    try:
+        active_lanes = [l for l in LANES if l["id"] in request.active_lanes]
+        lane_results: List[Dict] = []
+
+        if request.mode == "parallel":
+            tasks = [
+                _run_lane(lane, request.query, "parallel", i, [])
+                for i, lane in enumerate(active_lanes)
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            lane_results = [
+                r if isinstance(r, dict) else {"lane_id": -1, "error": str(r), "status": "failed", "stub": True, "findings": ""}
+                for r in results
+            ]
+        elif request.mode == "fibonacci_spiral":
+            for i, lane in enumerate(active_lanes):
+                result = await _run_lane(lane, request.query, "fibonacci_spiral", i, lane_results)
+                lane_results.append(result)
+
+        meta = await _run_meta_layer(lane_results, request.query, request.mode)
+
+        result = {
+            "query":                   request.query,
+            "mode":                    request.mode,
+            "profile":                 request.profile,
+            "lanes":                   lane_results,
+            "meta_layer":              meta,
+            "total_lanes_run":         len(lane_results),
+            "fibonacci_spiral_active": request.mode == "fibonacci_spiral",
+            "deerflow_used":           request.deerflow_enabled,
+            "phase":                   "2-real" if any(not r.get("stub") for r in lane_results) else "1-stub",
+            "stub_lanes":              [r["lane_id"] for r in lane_results if r.get("stub")],
+            "live_lanes":              [r["lane_id"] for r in lane_results if not r.get("stub")],
+        }
+
+        _jobs[job_id].update({
+            "status":       "complete",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "result":       result,
+            "error":        None,
+        })
+        log.info("Job %s complete — %d live, %d stub, mode=%s",
+                 job_id, len(result["live_lanes"]), len(result["stub_lanes"]), request.mode)
+
+    except Exception as exc:
+        log.exception("Job %s failed: %s", job_id, exc)
+        _jobs[job_id].update({
+            "status":       "failed",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "result":       None,
+            "error":        str(exc),
+        })
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -59,183 +672,16 @@ class UltraHealthResponse(BaseModel):
     version: str
     phase: str
     lanes_available: int
+    live_lanes: int
+    stub_lanes: int
     timestamp: str
-
-
-# ── Stub lane execution ───────────────────────────────────────────────────────
-async def _stub_lane(lane: Dict, question: str, mode: str,
-                     lane_index: int, prev_outputs: List[str]) -> Dict:
-    """
-    Phase 1 stub: simulates lane execution.
-    Phase 2: replace body with real API call to lane's model provider.
-    """
-    delay = 0.8 + (lane_index * 1.1 if mode == "fibonacci_spiral" else 0.3)
-    await asyncio.sleep(delay)
-
-    effective_question = question
-    if mode == "fibonacci_spiral" and len(prev_outputs) >= 2:
-        effective_question = (
-            f"[Tension between L{lane_index-1} and L{lane_index}]: "
-            f"Given the preceding lanes surfaced '{prev_outputs[-2][:60]}...' "
-            f"and '{prev_outputs[-1][:60]}...', what deeper question emerges "
-            f"about: {question}"
-        )
-
-    stub_findings = {
-        1: f"[STUB — Claude Opus] Frame-critical reading of '{question[:80]}': The question contains an embedded assumption that meaning is a function requiring a performing agent. The humanistic literature suggests this framing itself is the condition under which the question becomes unanswerable.",
-        2: f"[STUB — DeepSeek V4] Systematic evidence sweep on '{question[:80]}': 47 empirical studies identified. Effect sizes: moderate (d=0.4–0.6) for purpose-based wellbeing interventions. 12 methodological conflicts identified. Confidence: T1 evidence limited to WEIRD populations.",
-        3: f"[STUB — Gemini Flash] Cross-domain landscape for '{question[:80]}': Literature spans 14 disciplines. Strongest cross-domain signal: neuroscience of purpose correlates with ecological psychology literature on affordance. Unexpected adjacency: Indigenous land-relationship frameworks.",
-        4: f"[STUB — Kimi K2.6] Agentic sweep completed for '{question[:80]}': 23 grey literature sources retrieved. 8 NGO policy documents. 4 government white papers. 3 movement manifestos. DeerFlow pre-sweep added 11 additional advocacy sources.",
-        5: f"[STUB — Grok 4] Counter-corpus retrieval for '{question[:80]}': Mainstream framing excludes crip theory (Kafer, Piepzna-Samarasinha), disability justice scholarship, and heterodox degrowth economics. These literatures have theorised non-productive existence for 20+ years without uptake.",
-        6: f"[STUB — Qwen 3.5] Non-Western traditions on '{question[:80]}': Confucian self-cultivation (修身) is not indexed to economic output. Buddhist anattā reframes the question — there is no fixed self requiring meaning. Daoist wu-wei proposes non-striving as generative. Developmental state literature: South Korean kibun as collective purpose.",
-        7: f"[STUB — Mistral Large 3] European tradition on '{question[:80]}': Continental philosophy (Heidegger's Dasein, Arendt's vita activa, Habermas's communicative action) all contest the labour-meaning equivalence. EU Green New Deal frames ecological care as meaning-bearing work. French 35-hour week as existential policy.",
-    }
-
-    output_text = stub_findings.get(lane["id"], f"[STUB — {lane['label']}] Findings for '{question[:60]}'")
-
-    return {
-        "lane_id": lane["id"],
-        "model": lane["model"],
-        "label": lane["label"],
-        "personality": lane["personality"],
-        "question_used": effective_question[:200],
-        "status": "complete",
-        "findings": output_text,
-        "stub": True,
-        "token_estimate": {"input": 12000, "output": 2800},
-    }
-
-
-async def _stub_meta_layer(lane_outputs: List[Dict], question: str,
-                           mode: str) -> Dict:
-    """
-    Phase 1 stub: o3/o4 meta-layer analysis.
-    Phase 2: replace with real OpenAI o3 API call.
-    """
-    await asyncio.sleep(1.5)
-
-    convergence_note = (
-        "Lanes 1, 5, and 6 converge on a structurally similar finding from "
-        "incompatible starting points: the question assumes meaning must be "
-        "produced rather than inhabited. Claude finds this in philosophy, "
-        "Grok in disability scholarship, Qwen in Buddhist anattā. This "
-        "cross-tradition convergence is the primary signal."
-    )
-    divergence_note = (
-        "Significant divergence between Lane 2 (DeepSeek empirical) and "
-        "Lanes 1/5/6: the empirical literature operationalises meaning as a "
-        "measurable output, which is precisely the assumption the other lanes "
-        "contest. This is a genuine epistemic fracture, not a methodological gap."
-    )
-    negative_space = (
-        "No lane surfaced an adequate account of meaning for people whose "
-        "cognitive style does not produce narrative coherence — autistic "
-        "experience, dementia, severe cognitive disability. The question as "
-        "posed assumes narrative self-construction. All seven lanes missed this. "
-        "This systematic absence is the outline of a civilisational blind spot."
-    )
-    reformulated = None
-    if mode == "fibonacci_spiral":
-        reformulated = (
-            "After seven successive tension-resolutions, the spiral converges "
-            "toward: 'What remains when the frame that required meaning to be "
-            "earned is itself removed?' This is structurally equivalent to the "
-            "book's title. The methodology found the real question from inside "
-            "the stated one."
-        )
-
-    return {
-        "model": "o3-stub",
-        "stub": True,
-        "convergence_map": convergence_note,
-        "divergence_analysis": divergence_note,
-        "negative_space_report": negative_space,
-        "reformulated_question": reformulated,
-        "personality_differential": {
-            "sole_source_findings": {
-                "Lane 5 (Grok)": "Disability justice scholarship — not reached by any other lane",
-                "Lane 6 (Qwen)": "Buddhist anattā reframing — not reached by any other lane",
-                "Lane 7 (Mistral)": "Arendt vita activa / Habermas communicative action — not reached by any other lane",
-            }
-        },
-        "token_estimate": {"input": 45000, "output": 4200},
-    }
-
-
-# ── Job runner ────────────────────────────────────────────────────────────────
-async def _run_ultraria_job(job_id: str, request: UltraRunRequest) -> None:
-    """Async background task — runs all lanes then meta-layer."""
-    _jobs[job_id]["status"] = "running"
-    _jobs[job_id]["started_at"] = datetime.now(timezone.utc).isoformat()
-
-    try:
-        active_lanes = [l for l in LANES if l["id"] in request.active_lanes]
-
-        lane_outputs = []
-        lane_results = []
-
-        if request.mode == "parallel":
-            tasks = [
-                _stub_lane(lane, request.query, "parallel", i, [])
-                for i, lane in enumerate(active_lanes)
-            ]
-            lane_results = await asyncio.gather(*tasks, return_exceptions=True)
-            lane_outputs = [
-                r.get("findings", "") if isinstance(r, dict) else ""
-                for r in lane_results
-            ]
-
-        elif request.mode == "fibonacci_spiral":
-            prev_outputs: List[str] = []
-            for i, lane in enumerate(active_lanes):
-                result = await _stub_lane(
-                    lane, request.query, "fibonacci_spiral", i, prev_outputs
-                )
-                lane_results.append(result)
-                prev_outputs.append(result.get("findings", ""))
-
-        clean_results = [
-            r if isinstance(r, dict) else {"lane_id": -1, "error": str(r), "status": "failed"}
-            for r in lane_results
-        ]
-
-        meta = await _stub_meta_layer(clean_results, request.query, request.mode)
-
-        result = {
-            "query": request.query,
-            "mode": request.mode,
-            "profile": request.profile,
-            "lanes": clean_results,
-            "meta_layer": meta,
-            "total_lanes_run": len(clean_results),
-            "fibonacci_spiral_active": request.mode == "fibonacci_spiral",
-            "deerflow_used": request.deerflow_enabled,
-            "phase": "1-stub",
-        }
-
-        _jobs[job_id].update({
-            "status": "complete",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-            "result": result,
-            "error": None,
-        })
-        log.info("Job %s complete — %d lanes, mode=%s", job_id, len(clean_results), request.mode)
-
-    except Exception as exc:
-        log.exception("Job %s failed: %s", job_id, exc)
-        _jobs[job_id].update({
-            "status": "failed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-            "result": None,
-            "error": str(exc),
-        })
 
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="Ultraria Stub Service",
-    version="1.0.0-stub",
-    description="Phase 1 stub — architecture complete, LLM calls pending API keys.",
+    title="Ultraria Service",
+    version="2.0.0",
+    description="7-lane Fibonacci research intelligence. Phase 2: real LLM calls with graceful stub fallback.",
     docs_url="/ultraria/docs",
     redoc_url="/ultraria/redoc",
 )
@@ -251,83 +697,113 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
+    configured = [l for l in LANES if os.environ.get(LANE_BACKEND[l["id"]]["env_var"], "").strip()]
+    stub = [l for l in LANES if not os.environ.get(LANE_BACKEND[l["id"]]["env_var"], "").strip()]
+    meta_live = bool(os.environ.get(META_BACKEND["env_var"], "").strip())
     log.info("╔══════════════════════════════════════════════════════════╗")
-    log.info("║  ULTRARIA STUB SERVICE — Phase 1                        ║")
-    log.info("║  7 lanes configured · Fibonacci spiral · o3 stub         ║")
-    log.info("║  LLM APIs: pending (Phase 2)                            ║")
+    log.info("║  ULTRARIA SERVICE — Phase 2                             ║")
+    log.info("║  7 lanes · Fibonacci spiral · o4-mini meta-layer        ║")
+    log.info("╠══════════════════════════════════════════════════════════╣")
+    if configured:
+        log.info("║  LIVE lanes: %s", ", ".join(f"L{l['id']} {l['label']}" for l in configured))
+    if stub:
+        log.info("║  STUB lanes: %s", ", ".join(f"L{l['id']}" for l in stub))
+    log.info("║  Meta-layer: %s", "LIVE (o4-mini)" if meta_live else "STUB")
     log.info("╚══════════════════════════════════════════════════════════╝")
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.get("/health", response_model=UltraHealthResponse)
 async def health():
+    live = [l for l in LANES if os.environ.get(LANE_BACKEND[l["id"]]["env_var"], "").strip()]
+    stub = [l for l in LANES if not os.environ.get(LANE_BACKEND[l["id"]]["env_var"], "").strip()]
+    meta_live = bool(os.environ.get(META_BACKEND["env_var"], "").strip())
+    phase = "2-partial" if live else "1-stub"
+    if len(live) == len(LANES) and meta_live:
+        phase = "2-full"
     return UltraHealthResponse(
         status="ok",
-        service="ultraria-stub",
-        version="1.0.0-stub",
-        phase="1-stub — LLM integrations pending",
+        service="ultraria",
+        version="2.0.0",
+        phase=phase,
         lanes_available=len(LANES),
+        live_lanes=len(live),
+        stub_lanes=len(stub),
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
 
 @app.get("/api/ultraria/lanes")
 async def list_lanes():
-    """Returns all configured lane definitions."""
     return {"lanes": LANES, "count": len(LANES)}
 
 
+@app.get("/api/ultraria/lanes/status")
+async def lanes_status():
+    """Returns per-lane live/stub status without exposing key values."""
+    status = []
+    for lane in LANES:
+        cfg = LANE_BACKEND.get(lane["id"], {})
+        has_key = bool(os.environ.get(cfg.get("env_var", ""), "").strip())
+        status.append({
+            "lane_id":   lane["id"],
+            "label":     lane["label"],
+            "model":     lane["model"],
+            "live":      has_key,
+            "stub":      not has_key,
+            "env_var":   cfg.get("env_var", ""),
+        })
+    meta_live = bool(os.environ.get(META_BACKEND["env_var"], "").strip())
+    return {
+        "lanes": status,
+        "meta_layer": {
+            "live": meta_live,
+            "model": META_BACKEND["model"],
+            "env_var": META_BACKEND["env_var"],
+        },
+        "summary": {
+            "live_count": sum(1 for s in status if s["live"]),
+            "stub_count": sum(1 for s in status if s["stub"]),
+            "phase": "2-full" if all(s["live"] for s in status) and meta_live
+                     else "2-partial" if any(s["live"] for s in status)
+                     else "1-stub",
+        },
+    }
+
+
 @app.post("/api/ultraria/run")
-async def run_experiment(
-    request: UltraRunRequest, background_tasks: BackgroundTasks
-):
-    """
-    Start an Ultraria experiment run.
-    Returns {jobId, status} immediately.
-    Poll GET /api/ultraria/run/{jobId} until status is 'complete' or 'failed'.
-    """
+async def run_experiment(request: UltraRunRequest,
+                         background_tasks: BackgroundTasks):
     job_id = str(uuid.uuid4())
     _jobs[job_id] = {
-        "job_id": job_id,
-        "query": request.query,
-        "mode": request.mode,
-        "status": "queued",
-        "started_at": None,
-        "completed_at": None,
-        "result": None,
-        "error": None,
+        "job_id": job_id, "query": request.query, "mode": request.mode,
+        "status": "queued", "started_at": None, "completed_at": None,
+        "result": None, "error": None,
     }
     background_tasks.add_task(_run_ultraria_job, job_id, request)
-    log.info("Ultraria job %s queued — mode=%s lanes=%s q=%r",
+    log.info("Job %s queued — mode=%s active_lanes=%s q=%r",
              job_id, request.mode, request.active_lanes, request.query[:60])
     return {"jobId": job_id, "status": "running"}
 
 
 @app.get("/api/ultraria/run/{job_id}")
 async def poll_experiment(job_id: str):
-    """Poll for experiment completion."""
     job = _jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-
-    fe_status = (
-        job["status"]
-        if job["status"] in ("complete", "failed")
-        else "running"
-    )
-
+    fe_status = job["status"] if job["status"] in ("complete", "failed") else "running"
     return {
-        "jobId": job_id,
-        "query": job.get("query", ""),
-        "status": fe_status,
-        "startedAt": job.get("started_at"),
+        "jobId":       job_id,
+        "query":       job.get("query", ""),
+        "status":      fe_status,
+        "startedAt":   job.get("started_at"),
         "completedAt": job.get("completed_at"),
         "engine": {
-            "status": job["status"],
-            "startedAt": job.get("started_at"),
+            "status":      job["status"],
+            "startedAt":   job.get("started_at"),
             "completedAt": job.get("completed_at"),
-            "result": job.get("result"),
-            "error": job.get("error"),
+            "result":      job.get("result"),
+            "error":       job.get("error"),
         },
     }
 
@@ -336,5 +812,5 @@ async def poll_experiment(job_id: str):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("ULTRARIA_PORT", "8004"))
-    log.info("Starting Ultraria stub on port %d", port)
+    log.info("Starting Ultraria on port %d", port)
     uvicorn.run("ultraria_stub:app", host="0.0.0.0", port=port, reload=False)

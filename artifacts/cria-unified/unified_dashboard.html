@@ -243,6 +243,8 @@ input,select,textarea{font-family:var(--font-sans);}
 .l-stat{font-size:9px;font-family:var(--font-mono);color:var(--grey2);}
 .lcard.running .l-stat{color:var(--gold);}
 .lcard.done .l-stat{color:var(--green);}
+.l-live{font-size:8px;padding:1px 5px;border-radius:3px;background:var(--green3);color:var(--green);font-family:var(--font-mono);font-weight:700;letter-spacing:.04em;}
+.l-stub{font-size:8px;padding:1px 5px;border-radius:3px;background:var(--gold3);color:var(--gold);font-family:var(--font-mono);font-weight:700;letter-spacing:.04em;}
 
 .ultra-bar{
   border-top:1px solid var(--border);padding:8px 14px;display:flex;
@@ -701,7 +703,9 @@ document.addEventListener('DOMContentLoaded', () => {
   buildQuestions();
   setMode('unified');
   checkHealth();
-  setInterval(checkHealth, 30000); // Health-check every 30s
+  fetchLaneStatus();
+  setInterval(checkHealth, 30000);
+  setInterval(fetchLaneStatus, 60000);
 });
 
 // ── Health checks ────────────────────────────────────────────────
@@ -831,6 +835,7 @@ function buildLanes() {
       <div class="l-num">L${l.n}</div>
       <div class="l-model">${l.model}</div>
       <div class="l-tag">${l.tag}</div>
+      <span class="l-stub" id="lbadge-${l.n}">STUB</span>
       <div class="l-bar"><div class="l-fill" id="lfill-${l.n}"></div></div>
       <div class="l-stat" id="lstat-${l.n}">ready</div>
     </div>`;
@@ -1267,6 +1272,45 @@ async function saveConfig() {
   }
   closeModal();
   await checkHealth();
+}
+
+// ── Lane live/stub status ─────────────────────────────────────────
+async function fetchLaneStatus() {
+  try {
+    const r = await fetch(`${CFG.ultraBase}/api/ultraria/proxy/lanes/status`, {credentials:'include'});
+    if (!r.ok) return;
+    const data = await r.json();
+    (data.lanes || []).forEach(lane => {
+      const badge = document.getElementById(`lbadge-${lane.lane_id}`);
+      if (!badge) return;
+      if (lane.live) {
+        badge.className = 'l-live';
+        badge.textContent = 'LIVE';
+      } else {
+        badge.className = 'l-stub';
+        badge.textContent = 'STUB';
+      }
+    });
+    const meta = data.meta_layer;
+    if (meta) {
+      const metaStat = document.getElementById('meta-stat');
+      if (metaStat && STATE.running === false) {
+        metaStat.textContent = meta.live ? 'live (o4-mini)' : 'stub';
+        metaStat.style.color = meta.live ? 'var(--green)' : 'var(--gold)';
+      }
+    }
+    const sum = data.summary || {};
+    const liveCount = sum.live_count || 0;
+    const hdrLabel = document.getElementById('mode-label');
+    if (hdrLabel && STATE.mode !== 'cria') {
+      const phase = sum.phase || '1-stub';
+      if (phase === '2-full')    hdrLabel.dataset.ultraPhase = '· Phase 2 — all lanes live';
+      else if (liveCount > 0)    hdrLabel.dataset.ultraPhase = `· Phase 2 — ${liveCount}/7 lanes live`;
+      else                       hdrLabel.dataset.ultraPhase = '· Phase 1 — stub mode';
+    }
+  } catch (e) {
+    console.warn('Lane status fetch failed:', e.message);
+  }
 }
 
 // ── Utilities ─────────────────────────────────────────────────────

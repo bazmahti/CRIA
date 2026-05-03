@@ -4006,7 +4006,7 @@ async def serve_unified_dashboard():
 
 @app.get(f"{BASE_PATH}/api/ultraria/proxy/health")
 async def proxy_ultraria_health():
-    """Proxies health check to Ultraria stub (port 8004)."""
+    """Proxies health check to Ultraria service (port 8004)."""
     ultraria_url = os.environ.get("ULTRARIA_URL", "http://localhost:8004")
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -4014,7 +4014,19 @@ async def proxy_ultraria_health():
             return r.json()
     except Exception as exc:
         return {"status": "offline", "error": str(exc),
-                "service": "ultraria-stub", "phase": "1-stub"}
+                "service": "ultraria", "phase": "offline"}
+
+
+@app.get(f"{BASE_PATH}/api/ultraria/proxy/lanes/status")
+async def proxy_ultraria_lanes_status():
+    """Proxies per-lane live/stub status from Ultraria service."""
+    ultraria_url = os.environ.get("ULTRARIA_URL", "http://localhost:8004")
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(f"{ultraria_url}/api/ultraria/lanes/status")
+            return r.json()
+    except Exception as exc:
+        return {"error": str(exc), "lanes": [], "summary": {"phase": "offline"}}
 
 
 @app.post(f"{BASE_PATH}/api/ultraria/proxy/run")
