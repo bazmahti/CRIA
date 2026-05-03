@@ -1,0 +1,213 @@
+DIAGNOSTIC PATCH — TypeError: The string did not match the expected pattern
+=============================================================================
+
+CONTEXT:
+Client-side TypeError thrown when user clicks Draft button on the deployed
+scaffolder.html. Server returns 200 + valid JSON. Two prior fixes
+(window.location.origin → relative BASE, removed credentials: 'include' from
+all 9 fetch calls) did not resolve. Error phrasing is WebKit-specific,
+indicating Safari / iOS browser / Replit preview iframe.
+
+GOAL OF THIS PATCH:
+Install global error handlers on scaffolder.html (and unified_dashboard.html
+if it has the same risk surface) that capture the exact file, line, column,
+and stack of the throwing line, and surface that information directly to the
+on-page status element. This is a diagnostic-only change — do not modify
+business logic, do not refactor handlers, do not "clean up" anything else
+while you are in the file. We need the error location, not a fix yet.
+
+WHY THIS MATTERS:
+The error survives fixes targeted at fetch construction, which strongly
+suggests the throw is happening either before fetch is called (in URL/ID
+construction from form input) or after fetch returns (in Date/JSON parsing
+of the response payload). The throw is likely outside the existing
+try/catch, so the user sees "Error:" rather than the catch block's
+"Draft failed:" prefix. Without DevTools access in the Replit preview
+iframe, we need the error surfaced on-page.
+
+=============================================================================
+EDITS REQUIRED
+=============================================================================
+
+FILE 1: artifacts/cria-unified/scaffolder.html (or wherever the scaffolder
+       page actually lives — find it; do not assume the path)
+
+Add the following block as the FIRST <script> tag inside <head>, before any
+other script. It must run before any other code on the page.
+
+   <script>
+   (function () {
+     function showDiagnostic(label, payload) {
+       var statusEl =
+         document.getElementById('status') ||
+         document.getElementById('draft-status') ||
+         document.getElementById('scaffolder-status') ||
+         document.querySelector('[data-role="status"]') ||
+         document.querySelector('.status') ||
+         document.body;
+       var msg =
+         '[DIAG ' + label + '] ' +
+         (payload.message || payload.reason || 'unknown') +
+         ' | location: ' +
+         (payload.filename || 'n/a') + ':' +
+         (payload.lineno || '?') + ':' +
+         (payload.colno || '?') +
+         ' | stack: ' +
+         (payload.stack || (payload.error && payload.error.stack) ||
+          (payload.reason && payload.reason.stack) || 'no stack');
+       // Surface to page
+       if (statusEl) {
+         statusEl.textContent = msg;
+         statusEl.style.whiteSpace = 'pre-wrap';
+         statusEl.style.color = '#b00';
+         statusEl.style.fontFamily = 'monospace';
+         statusEl.style.fontSize = '12px';
+       }
+       // Also write to a dedicated visible diagnostic block at top of body
+       var diagEl = document.getElementById('__diagnostic_panel__');
+       if (!diagEl) {
+         diagEl = document.createElement('pre');
+         diagEl.id = '__diagnostic_panel__';
+         diagEl.style.cssText =
+           'background:#fee;border:2px solid #b00;padding:12px;' +
+           'margin:12px;font-family:monospace;font-size:12px;' +
+           'white-space:pre-wrap;word-break:break-all;';
+         if (document.body) {
+           document.body.insertBefore(diagEl, document.body.firstChild);
+         }
+       }
+       diagEl.textContent =
+         (diagEl.textContent ? diagEl.textContent + '\n\n' : '') + msg;
+       // Also log to console for the rare case DevTools is available
+       try { console.error('[DIAG]', label, payload); } catch (e) {}
+     }
+
+     window.addEventListener('error', function (e) {
+       showDiagnostic('uncaught', {
+         message: e.message,
+         filename: e.filename,
+         lineno: e.lineno,
+         colno: e.colno,
+         error: e.error,
+         stack: e.error && e.error.stack
+       });
+     });
+
+     window.addEventListener('unhandledrejection', function (e) {
+       showDiagnostic('promise', {
+         message:
+           (e.reason && e.reason.message) ||
+           (typeof e.reason === 'string' ? e.reason : 'unhandled rejection'),
+         reason: e.reason,
+         stack: e.reason && e.reason.stack
+       });
+     });
+
+     // Probe known WebKit-strict APIs the moment the page loads, so we
+     // catch errors thrown during initialisation rather than only on click.
+     window.addEventListener('DOMContentLoaded', function () {
+       try {
+         // Touch document.baseURI / location to force any URL parse errors
+         // to surface immediately rather than at first fetch.
+         var probe = new URL('/cria-unified/scaffold/draft', document.baseURI);
+         showDiagnostic('init-ok', { message: 'baseURI parse ok: ' + probe.href });
+       } catch (err) {
+         showDiagnostic('init-url-fail', {
+           message: err.message,
+           stack: err.stack
+         });
+       }
+     });
+   })();
+   </script>
+
+FILE 2: artifacts/cria-unified/unified_dashboard.html (if it shares the
+       same fetch-construction pattern)
+
+Apply the IDENTICAL <script> block as the first <script> in <head>.
+Same code, no changes.
+
+=============================================================================
+DO NOT TOUCH (anti-scope-creep)
+=============================================================================
+
+- Do not change any existing fetch() calls.
+- Do not change any existing event handlers.
+- Do not "clean up" formatting, indentation, or comments in surrounding code.
+- Do not modify server-side code (main.py, experiment_scaffolder.py).
+- Do not modify the YAML schema or any artefact in pending_experiments/.
+- Do not add or remove dependencies.
+- Do not change replit_protection.py or any auth configuration.
+- Do not refactor the BASE constant or any URL construction.
+
+This is a diagnostic instrument. It must add information without altering
+behaviour.
+
+=============================================================================
+VERIFICATION AFTER DEPLOY
+=============================================================================
+
+1. Hard-refresh the deployed scaffolder page (Ctrl+Shift+R, or in Replit
+  preview pane: close and reopen the preview).
+
+2. Confirm a red "[DIAG init-ok]" or "[DIAG init-url-fail]" panel appears at
+  the top of the page on load. If init-url-fail appears, the error is in
+  URL construction at page load — paste that diagnostic line and STOP;
+  we have the answer.
+
+3. If init-ok appears, fill in the prose question textarea and click Draft.
+
+4. Watch for one of these to appear in the red diagnostic panel:
+  - [DIAG uncaught] ...   → synchronous throw in click handler
+  - [DIAG promise]  ...   → unhandled promise rejection in fetch chain
+  - Neither              → throw is being swallowed somewhere; report this
+
+5. Copy the entire red diagnostic panel contents — message, location, and
+  full stack trace — and paste it back into this conversation. The stack
+  trace will name the file and line number of the throwing call.
+
+=============================================================================
+EXPECTED OUTCOMES
+=============================================================================
+
+The diagnostic will identify which of these is the actual cause:
+
+A. URL construction with malformed string — likely culprit if the throw is
+  in URL(), URLSearchParams(), or an href assignment. Look for any place
+  the click handler builds a URL from form input (textarea content,
+  experiment_id slugifier output) before fetch is called.
+
+B. Date parsing of a response field — Safari is strict about ISO 8601;
+  trailing whitespace or missing timezone in a server-returned timestamp
+  throws this exact error in WebKit while passing silently in Chrome.
+
+C. JSON.parse on a non-string — if the code does JSON.parse(response)
+  instead of response.json(), this error fires. Less likely given prior
+  fetch fixes, but possible.
+
+D. RegExp construction from dynamic input — if any client-side validation
+  builds a RegExp from form data, malformed input throws this.
+
+E. document.querySelector with an invalid selector built dynamically —
+  e.g. querySelector('#field-' + name) where name contains a colon,
+  space, or other CSS-disallowed character.
+
+F. Something not on this list — tells us the hypothesis tree is wrong;
+  the stack trace will redirect investigation.
+
+Once the diagnostic panel reports the throwing line, the fix is typically
+1–3 lines (input validation before URL construction, or wrapping a parse
+in try/catch and producing a clean error). Do not attempt the fix in this
+patch. Diagnostic first. Fix in a separate, scoped patch.
+
+=============================================================================
+ROLLBACK
+=============================================================================
+
+The diagnostic block is purely additive — removing the <script> block from
+both files and hard-refreshing fully reverts. No data is written, no
+configuration changed.
+
+=============================================================================
+END PATCH
+=============================================================================

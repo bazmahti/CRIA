@@ -4,6 +4,84 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CRIA · Experiment Scaffolder</title>
+<script>
+(function () {
+  function showDiagnostic(label, payload) {
+    var statusEl =
+      document.getElementById('status') ||
+      document.getElementById('draft-status') ||
+      document.getElementById('scaffolder-status') ||
+      document.querySelector('[data-role="status"]') ||
+      document.querySelector('.status') ||
+      document.body;
+    var msg =
+      '[DIAG ' + label + '] ' +
+      (payload.message || payload.reason || 'unknown') +
+      ' | location: ' +
+      (payload.filename || 'n/a') + ':' +
+      (payload.lineno || '?') + ':' +
+      (payload.colno || '?') +
+      ' | stack: ' +
+      (payload.stack || (payload.error && payload.error.stack) ||
+       (payload.reason && payload.reason.stack) || 'no stack');
+    if (statusEl) {
+      statusEl.textContent = msg;
+      statusEl.style.whiteSpace = 'pre-wrap';
+      statusEl.style.color = '#b00';
+      statusEl.style.fontFamily = 'monospace';
+      statusEl.style.fontSize = '12px';
+    }
+    var diagEl = document.getElementById('__diagnostic_panel__');
+    if (!diagEl) {
+      diagEl = document.createElement('pre');
+      diagEl.id = '__diagnostic_panel__';
+      diagEl.style.cssText =
+        'background:#fee;border:2px solid #b00;padding:12px;' +
+        'margin:12px;font-family:monospace;font-size:12px;' +
+        'white-space:pre-wrap;word-break:break-all;';
+      if (document.body) {
+        document.body.insertBefore(diagEl, document.body.firstChild);
+      }
+    }
+    diagEl.textContent =
+      (diagEl.textContent ? diagEl.textContent + '\n\n' : '') + msg;
+    try { console.error('[DIAG]', label, payload); } catch (e) {}
+  }
+
+  window.addEventListener('error', function (e) {
+    showDiagnostic('uncaught', {
+      message: e.message,
+      filename: e.filename,
+      lineno: e.lineno,
+      colno: e.colno,
+      error: e.error,
+      stack: e.error && e.error.stack
+    });
+  });
+
+  window.addEventListener('unhandledrejection', function (e) {
+    showDiagnostic('promise', {
+      message:
+        (e.reason && e.reason.message) ||
+        (typeof e.reason === 'string' ? e.reason : 'unhandled rejection'),
+      reason: e.reason,
+      stack: e.reason && e.reason.stack
+    });
+  });
+
+  window.addEventListener('DOMContentLoaded', function () {
+    try {
+      var probe = new URL('/cria-unified/scaffold/draft', document.baseURI);
+      showDiagnostic('init-ok', { message: 'baseURI parse ok: ' + probe.href });
+    } catch (err) {
+      showDiagnostic('init-url-fail', {
+        message: err.message,
+        stack: err.stack
+      });
+    }
+  });
+})();
+</script>
 <style>
 :root{
   --bg:#0a0a14;--surface:#0f0f1e;--border:#1e1e38;--border2:#2a2a48;
