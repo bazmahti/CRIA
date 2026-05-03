@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 pnpm install --frozen-lockfile
-pnpm --filter db push
+pnpm --filter db push --force
 
 # ── Install the tracked post-commit hook ────────────────────────────────────
 # Keep .git/hooks/post-commit in sync with scripts/hooks/post-commit so that
