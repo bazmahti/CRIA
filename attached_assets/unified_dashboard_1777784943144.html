@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRIA · ULTRARIA — Unified Research Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+
+/* ── CSS Variables ────────────────────────────────── */
+:root {
+  --navy:#060d1a; --deep:#0a1628; --panel:#0d1e35; --card:#0f2040;
+  --border:rgba(90,159,212,.14); --border2:rgba(90,159,212,.07);
+  --blue:#5a9fd4; --blue2:#2e6bc4; --blue3:rgba(90,159,212,.11);
+  --violet:#8b5cf6; --violet3:rgba(139,92,246,.11);
+  --gold:#e8b84b; --gold3:rgba(232,184,75,.11);
+  --green:#3ab87a; --green3:rgba(58,184,122,.09);
+  --amber:#e07c3a; --amber3:rgba(224,124,58,.09);
+  --red:#e05a7a; --red3:rgba(224,90,122,.09);
+  --white:#e8f2ff; --grey:#6a8aaa; --grey2:#3a5a7a; --grey3:#1e3a5a;
+  --teal:#26b8a4; --font-mono:'JetBrains Mono',monospace;
+  --font-sans:'Space Grotesk',sans-serif;
+  --radius:8px; --radius-lg:12px;
+}
+
+/* ── Reset & Base ─────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--navy);}
+body{color:var(--white);font-family:var(--font-sans);display:grid;grid-template-rows:52px 1fr;height:100vh;}
+button{font-family:var(--font-sans);cursor:pointer;}
+input,select,textarea{font-family:var(--font-sans);}
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-thumb{background:var(--grey3);border-radius:2px;}
+
+/* ── Header ───────────────────────────────────────── */
+#hdr{
+  display:flex;align-items:center;padding:0 18px;gap:12px;
+  background:rgba(10,22,40,.97);border-bottom:1px solid var(--border);
+  position:relative;z-index:20;flex-shrink:0;
+}
+.logo{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;
+  white-space:nowrap;letter-spacing:.04em;color:var(--white);}
+.hdr-sep{width:1px;height:22px;background:var(--border);flex-shrink:0;}
+
+.mode-tabs{display:flex;gap:2px;background:var(--navy);border-radius:var(--radius);padding:3px;flex-shrink:0;}
+.mtab{
+  padding:5px 14px;border-radius:6px;font-size:11px;font-weight:600;
+  cursor:pointer;transition:all .2s;letter-spacing:.06em;border:none;
+  background:transparent;color:var(--grey);text-transform:uppercase;
+}
+.mtab.mc{background:var(--blue3);color:var(--blue);}
+.mtab.mu{background:var(--violet3);color:var(--violet);}
+.mtab.mx{background:var(--gold3);color:var(--gold);}
+.mtab:hover:not(.mc):not(.mu):not(.mx){color:var(--white);}
+
+.hdr-label{font-size:10px;color:var(--grey);font-family:var(--font-mono);white-space:nowrap;}
+.hdr-spacer{flex:1;}
+.hdr-pills{display:flex;gap:8px;align-items:center;}
+.hpill{
+  display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--font-mono);
+  color:var(--grey);padding:4px 9px;border-radius:20px;border:1px solid var(--border);
+  transition:all .3s;white-space:nowrap;
+}
+.hpill.live{border-color:rgba(58,184,122,.35);color:var(--green);}
+.hpill.busy{border-color:rgba(232,184,75,.35);color:var(--gold);}
+.hpill.err{border-color:rgba(224,90,122,.35);color:var(--red);}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--grey3);}
+.dot.on{background:var(--green);animation:pulse 2s ease-in-out infinite;}
+.dot.busy{background:var(--gold);animation:pulse .8s ease-in-out infinite;}
+.dot.err{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+.btn-cfg{
+  background:var(--panel);border:1px solid var(--border);color:var(--grey);
+  border-radius:6px;padding:4px 10px;font-size:10px;font-family:var(--font-mono);
+  transition:all .2s;
+}
+.btn-cfg:hover{border-color:var(--blue);color:var(--blue);}
+
+/* ── Layout ───────────────────────────────────────── */
+#main{display:grid;grid-template-columns:252px 1fr;overflow:hidden;flex:1;}
+
+/* ── Sidebar ──────────────────────────────────────── */
+#sb{
+  background:var(--deep);border-right:1px solid var(--border);
+  padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;
+}
+.sb-label{font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--grey2);margin-bottom:5px;}
+
+.sb-q{
+  background:var(--navy);border:1px solid var(--border);border-radius:var(--radius);
+  padding:9px 11px;color:var(--white);font-family:var(--font-sans);
+  font-size:12px;resize:none;width:100%;outline:none;transition:border-color .2s;line-height:1.6;
+}
+.sb-q:focus{border-color:var(--blue);}
+
+.sbsel{
+  background:var(--navy);border:1px solid var(--border);border-radius:6px;
+  padding:7px 10px;color:var(--white);font-size:12px;outline:none;width:100%;
+  cursor:pointer;transition:border-color .2s;
+}
+.sbsel:focus{border-color:var(--blue);}
+
+.tog-row{display:flex;align-items:center;justify-content:space-between;
+  font-size:11px;color:var(--grey);padding:2px 0;}
+.tog{width:30px;height:17px;background:var(--navy);border:1px solid var(--border);
+  border-radius:9px;position:relative;cursor:pointer;transition:all .2s;}
+.tog.on{background:var(--blue3);border-color:var(--blue);}
+.tog.on-v{background:var(--violet3);border-color:var(--violet);}
+.knob{width:11px;height:11px;background:var(--grey2);border-radius:50%;
+  position:absolute;top:2px;left:2px;transition:all .2s;}
+.tog.on .knob,.tog.on-v .knob{left:15px;background:var(--white);}
+
+.btn-run{
+  width:100%;padding:10px;border-radius:var(--radius);border:none;
+  background:var(--green3);color:var(--green);font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .2s;display:flex;align-items:center;
+  justify-content:center;gap:7px;letter-spacing:.06em;
+}
+.btn-run:hover{background:rgba(58,184,122,.18);}
+.btn-run.running{background:rgba(232,184,75,.13);color:var(--gold);}
+.btn-run:disabled{opacity:.5;cursor:not-allowed;}
+
+.btn-stop{
+  width:100%;padding:7px;border-radius:var(--radius);
+  border:1px solid rgba(224,90,122,.25);background:transparent;
+  color:var(--red);font-size:11px;transition:all .2s;
+}
+.btn-stop:hover{background:var(--red3);}
+
+.sys-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--grey);padding:1px 0;}
+.sys-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+
+/* ── Content panes ────────────────────────────────── */
+#content{overflow:hidden;display:flex;flex-direction:column;}
+.cpane{display:none;flex-direction:column;height:100%;overflow:hidden;}
+.cpane.active{display:flex;}
+
+/* ── Error / Status banners ───────────────────────── */
+.banner{
+  padding:8px 14px;font-size:12px;font-family:var(--font-mono);
+  display:none;align-items:center;gap:8px;flex-shrink:0;
+}
+.banner.show{display:flex;}
+.banner.err{background:rgba(224,90,122,.12);color:var(--red);border-bottom:1px solid rgba(224,90,122,.2);}
+.banner.info{background:var(--gold3);color:var(--gold);border-bottom:1px solid rgba(232,184,75,.2);}
+.banner.ok{background:var(--green3);color:var(--green);border-bottom:1px solid rgba(58,184,122,.2);}
+
+/* ── CRIA pane ────────────────────────────────────── */
+.pipe-hdr{
+  display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.pipe-title{
+  background:var(--deep);padding:8px 14px;display:flex;align-items:center;gap:8px;
+  font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+}
+.pipe-body{
+  display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);
+  flex:1;overflow:hidden;min-height:0;
+}
+.pipe-col{background:var(--navy);padding:9px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;}
+
+.ch{
+  background:var(--panel);border:1px solid var(--border);border-radius:6px;
+  padding:7px 9px;transition:border-color .4s;
+}
+.ch.running{border-color:var(--gold) !important;animation:chpulse 1.5s ease-in-out infinite;}
+.ch.done{border-color:rgba(58,184,122,.4) !important;}
+.ch.cog{border-color:rgba(90,159,212,.2);}
+.ch.epi{border-color:rgba(139,92,246,.2);}
+@keyframes chpulse{0%,100%{opacity:.8}50%{opacity:1}}
+
+.ch-top{display:flex;align-items:center;gap:6px;}
+.ch-dot{width:5px;height:5px;border-radius:50%;background:var(--grey3);flex-shrink:0;
+  transition:background .3s;}
+.ch.running .ch-dot{background:var(--gold);animation:pulse .8s ease-in-out infinite;}
+.ch.done .ch-dot{background:var(--green);}
+.ch.cog:not(.running):not(.done) .ch-dot{background:var(--blue);}
+.ch.epi:not(.running):not(.done) .ch-dot{background:var(--violet);}
+.ch-name{font-size:11px;color:var(--white);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ch-stat{font-size:9px;color:var(--grey);font-family:var(--font-mono);}
+.ch.running .ch-stat{color:var(--gold);}
+.ch.done .ch-stat{color:var(--green);}
+.ch-bar{height:2px;background:var(--navy);border-radius:1px;margin-top:4px;}
+.ch-fill{height:100%;border-radius:1px;width:0%;transition:width 1.5s ease;}
+.ch.cog .ch-fill{background:var(--blue);}
+.ch.epi .ch-fill{background:var(--violet);}
+.ch.running .ch-fill{background:var(--gold);}
+.ch.done .ch-fill{background:var(--green);}
+
+/* ── Results panel ────────────────────────────────── */
+.results-panel{
+  border-top:1px solid var(--border);background:var(--deep);flex-shrink:0;
+  display:flex;flex-direction:column;min-height:150px;max-height:210px;
+}
+.rtabs{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;}
+.rtab{
+  padding:7px 13px;font-size:11px;cursor:pointer;color:var(--grey);
+  border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;flex-shrink:0;
+}
+.rtab.active-b{color:var(--blue);border-bottom-color:var(--blue);}
+.rtab.active-v{color:var(--violet);border-bottom-color:var(--violet);}
+.rtab.active-g{color:var(--gold);border-bottom-color:var(--gold);}
+.rtab.active-r{color:var(--green);border-bottom-color:var(--green);}
+.rcontent{flex:1;padding:10px 14px;overflow-y:auto;font-size:12px;
+  color:var(--grey);line-height:1.75;font-family:var(--font-mono);}
+.rpane{display:none;}
+.rpane.active{display:block;}
+.rcontent .key{color:var(--white);font-weight:500;}
+.rcontent .hl-b{color:var(--blue);}
+.rcontent .hl-v{color:var(--violet);}
+.rcontent .hl-g{color:var(--gold);}
+.rcontent .hl-r{color:var(--green);}
+.rcontent .hl-red{color:var(--red);}
+
+/* ── Ultraria pane ────────────────────────────────── */
+.lanes-area{
+  flex:1;padding:10px;display:grid;grid-template-columns:repeat(7,1fr);
+  gap:7px;min-height:0;overflow:hidden;
+}
+.lcard{
+  background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  padding:9px 5px;display:flex;flex-direction:column;align-items:center;gap:4px;
+  text-align:center;transition:all .3s;cursor:pointer;overflow:hidden;
+}
+.lcard:hover{border-color:var(--grey);}
+.lcard.enabled{border-color:rgba(139,92,246,.25);}
+.lcard.disabled{opacity:.4;}
+.lcard.running{border-color:var(--gold);animation:chpulse 1.5s ease-in-out infinite;}
+.lcard.done{border-color:rgba(58,184,122,.4);}
+.l-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
+.l-num{font-size:9px;font-weight:700;color:var(--grey2);font-family:var(--font-mono);}
+.l-model{font-size:10px;font-weight:600;color:var(--white);line-height:1.2;}
+.l-tag{font-size:9px;color:var(--grey);line-height:1.3;}
+.l-bar{width:100%;height:2px;background:var(--navy);border-radius:1px;margin-top:auto;}
+.l-fill{height:100%;border-radius:1px;background:var(--violet);width:0%;transition:width 2s ease;}
+.lcard.running .l-fill{animation:lfill 2.5s ease-in-out infinite;}
+.lcard.done .l-fill{width:100%;background:var(--green);}
+@keyframes lfill{0%,100%{width:10%}50%{width:85%}}
+.l-stat{font-size:9px;font-family:var(--font-mono);color:var(--grey2);}
+.lcard.running .l-stat{color:var(--gold);}
+.lcard.done .l-stat{color:var(--green);}
+
+.ultra-bar{
+  border-top:1px solid var(--border);padding:8px 14px;display:flex;
+  align-items:center;gap:12px;background:var(--deep);flex-shrink:0;flex-wrap:wrap;
+}
+.spiral-tabs{display:flex;gap:2px;background:var(--navy);border-radius:6px;padding:3px;flex-shrink:0;}
+.stab{
+  padding:4px 11px;border-radius:4px;font-size:11px;cursor:pointer;
+  transition:all .2s;border:none;background:transparent;color:var(--grey);font-weight:500;
+}
+.stab.sa{background:var(--violet3);color:var(--violet);}
+.meta-box{
+  display:flex;align-items:center;gap:7px;background:var(--panel);
+  border:1px solid rgba(139,92,246,.2);border-radius:6px;
+  padding:5px 11px;font-size:10px;font-family:var(--font-mono);color:var(--grey);
+  white-space:nowrap;
+}
+
+/* ── Unified pane ─────────────────────────────────── */
+.u-top{
+  display:grid;grid-template-columns:1fr 140px 1fr;gap:1px;
+  background:var(--border);flex:1;min-height:0;overflow:hidden;
+}
+.u-col{background:var(--navy);padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;}
+.u-hdr{font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  padding-bottom:7px;border-bottom:1px solid var(--border);}
+.u-block{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 10px;}
+.u-bt{font-size:11px;font-weight:500;color:var(--white);margin-bottom:2px;display:flex;align-items:center;gap:5px;}
+.u-bs{font-size:10px;color:var(--grey);line-height:1.5;}
+.u-tags{display:flex;gap:3px;flex-wrap:wrap;margin-top:5px;}
+.utag{font-size:9px;padding:2px 6px;border-radius:3px;font-family:var(--font-mono);}
+.u-ctr{background:var(--deep);padding:10px 7px;display:flex;flex-direction:column;
+  gap:7px;align-items:center;}
+.u-ctr-lbl{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--gold);text-align:center;}
+.u-infra{width:100%;background:var(--panel);border:1px solid rgba(232,184,75,.18);
+  border-radius:7px;padding:7px;text-align:center;}
+.u-it{font-size:10px;font-weight:600;color:var(--gold);}
+.u-is{font-size:9px;color:var(--grey);margin-top:2px;}
+.u-exch{font-size:9px;color:var(--grey2);text-align:center;font-family:var(--font-mono);line-height:1.6;}
+.u-stat{font-size:10px;color:var(--grey);font-family:var(--font-mono);padding:3px 0;}
+
+/* ── Question tracker ─────────────────────────────── */
+.qtrk{border-top:1px solid var(--border);background:var(--deep);flex-shrink:0;padding:8px 14px;}
+.qtrk-hdr{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.qtrk-t{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--grey);white-space:nowrap;}
+.qpbar{flex:1;height:3px;background:var(--navy);border-radius:2px;}
+.qpfill{height:100%;border-radius:2px;background:var(--green);transition:width .5s;}
+.qpct{font-size:9px;font-family:var(--font-mono);color:var(--green);white-space:nowrap;}
+.qgrid{display:flex;flex-wrap:wrap;gap:3px;}
+.qp{
+  padding:2px 7px;border-radius:4px;font-size:9px;font-family:var(--font-mono);
+  cursor:pointer;transition:all .2s;border:1px solid transparent;
+}
+.qtodo{background:var(--blue3);color:var(--grey);border-color:var(--border);}
+.qrun{background:var(--gold3);color:var(--gold);border-color:rgba(232,184,75,.3);}
+.qdone{background:var(--green3);color:var(--green);border-color:rgba(58,184,122,.3);}
+.qsp{border-style:dashed !important;}
+.qp:hover{opacity:.8;}
+
+/* ── API Config modal ─────────────────────────────── */
+#api-modal{
+  display:none;position:fixed;inset:0;background:rgba(6,13,26,.93);z-index:50;
+  align-items:center;justify-content:center;
+}
+#api-modal.open{display:flex;}
+.modal-box{
+  background:var(--deep);border:1px solid var(--border);border-radius:14px;
+  padding:22px;width:420px;max-width:92vw;
+}
+.modal-title{font-family:'Playfair Display',serif;font-size:17px;margin-bottom:14px;color:var(--white);}
+.modal-row{margin-bottom:11px;}
+.modal-lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--grey);margin-bottom:4px;}
+.modal-inp{
+  width:100%;background:var(--navy);border:1px solid var(--border);border-radius:6px;
+  padding:7px 10px;color:var(--white);font-family:var(--font-mono);font-size:12px;outline:none;
+  transition:border-color .2s;
+}
+.modal-inp:focus{border-color:var(--blue);}
+.modal-note{font-size:11px;color:var(--grey);font-family:var(--font-mono);margin-top:10px;line-height:1.6;}
+.modal-btns{display:flex;gap:7px;margin-top:14px;}
+.modal-btn{
+  flex:1;padding:8px;border-radius:7px;font-family:var(--font-sans);
+  font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;border:none;
+}
+.btn-save{background:var(--blue3);color:var(--blue);}
+.btn-save:hover{background:rgba(90,159,212,.22);}
+.btn-cancel{background:var(--panel);color:var(--grey);border:1px solid var(--border);}
+.btn-cancel:hover{border-color:var(--grey);}
+</style>
+</head>
+<body>
+
+<!-- ══════════ HEADER ══════════ -->
+<div id="hdr">
+  <span class="logo">CRIA · ULTRARIA</span>
+  <div class="hdr-sep"></div>
+  <div class="mode-tabs">
+    <button class="mtab" onclick="setMode('cria')" id="tab-cria">CRIA</button>
+    <button class="mtab" onclick="setMode('ultraria')" id="tab-ultra">Ultraria</button>
+    <button class="mtab mx" onclick="setMode('unified')" id="tab-unified">Unified</button>
+  </div>
+  <div class="hdr-sep"></div>
+  <span class="hdr-label" id="mode-label">Integrated Research Construct</span>
+  <div class="hdr-spacer"></div>
+  <div class="hdr-pills">
+    <div class="hpill" id="pill-cria"><span class="dot" id="dot-cria"></span>CRIA</div>
+    <div class="hpill" id="pill-ultra"><span class="dot" id="dot-ultra"></span>Ultraria</div>
+    <div class="hpill" id="pill-deer"><span class="dot" id="dot-deer"></span>DeerFlow</div>
+    <button class="btn-cfg" onclick="openModal()">⚙ API Config</button>
+  </div>
+</div>
+
+<!-- ══════════ MAIN ══════════ -->
+<div id="main">
+
+<!-- ── Sidebar ── -->
+<div id="sb">
+  <div>
+    <div class="sb-label">Research Question</div>
+    <textarea class="sb-q" id="q-input" rows="4"
+      placeholder="Enter your research question...">What replaces the meaning function that labour has provided for 10,000 years?</textarea>
+  </div>
+
+  <!-- CRIA config (shown in CRIA + Unified modes) -->
+  <div id="sb-cria">
+    <div class="sb-label">Profile</div>
+    <select class="sbsel" id="profile-sel">
+      <option value="civilisational">Civilisational-Academic</option>
+      <option value="therapeutic">Therapeutic-Clinical</option>
+      <option value="ocaa">OCAA Daily Editorial</option>
+    </select>
+    <div style="margin-top:8px;">
+      <div class="sb-label">Dissonance Budget</div>
+      <select class="sbsel" id="dissonance-sel">
+        <option value="0.35">High (surface disagreement)</option>
+        <option value="0.20" selected>Medium (balanced)</option>
+        <option value="0.10">Low (clinical caution)</option>
+      </select>
+    </div>
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
+      <div class="tog-row">
+        <span>DeerFlow pre-sweep</span>
+        <div class="tog" id="tog-deer" onclick="toggleEl(this)"><div class="knob"></div></div>
+      </div>
+      <div class="tog-row">
+        <span>Counter-corpus active</span>
+        <div class="tog on" id="tog-cc" onclick="toggleEl(this)"><div class="knob"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ultraria config (shown in Ultraria + Unified modes) -->
+  <div id="sb-ultra" style="display:none;">
+    <div class="sb-label">Ultraria Mode</div>
+    <div class="spiral-tabs" style="width:100%;margin-bottom:8px;">
+      <button class="stab sa" id="stab-p" onclick="setSpiralMode('parallel')" style="flex:1;">Parallel</button>
+      <button class="stab" id="stab-s" onclick="setSpiralMode('spiral')" style="flex:1;">Fibonacci Spiral</button>
+    </div>
+  </div>
+
+  <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px;">
+    <div class="sb-label">Run Control</div>
+    <button class="btn-run" id="run-btn" onclick="startRun()">
+      <span id="run-icon">▶</span>
+      <span id="run-label">START EXPERIMENT</span>
+    </button>
+    <button class="btn-stop" id="stop-btn" onclick="cancelRun()" style="display:none;">■ CANCEL</button>
+  </div>
+
+  <div>
+    <div class="sb-label">System Status</div>
+    <div style="display:flex;flex-direction:column;gap:5px;">
+      <div class="sys-row"><div class="sys-dot" id="sys-dot-cria" style="background:var(--grey3)"></div><span id="sys-cria">CRIA: checking...</span></div>
+      <div class="sys-row"><div class="sys-dot" id="sys-dot-ultra" style="background:var(--grey3)"></div><span id="sys-ultra">Ultraria: checking...</span></div>
+      <div class="sys-row"><div class="sys-dot" style="background:var(--green)"></div><span>68 connectors loaded</span></div>
+      <div class="sys-row"><div class="sys-dot" id="sys-dot-deer" style="background:var(--grey3)"></div><span id="sys-deer">DeerFlow: offline</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ CONTENT ══════════ -->
+<div id="content">
+
+<!-- ── CRIA pane ── -->
+<div class="cpane" id="pane-cria">
+  <div class="banner" id="cria-banner"></div>
+  <div class="pipe-hdr">
+    <div class="pipe-title">
+      <span style="width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;"></span>
+      Cognitive Pipeline — 10 channels
+    </div>
+    <div class="pipe-title">
+      <span style="width:7px;height:7px;border-radius:50%;background:var(--violet);display:inline-block;"></span>
+      Epistemic Pipeline — 10 channels
+    </div>
+  </div>
+  <div class="pipe-body">
+    <div class="pipe-col" id="cog-col"></div>
+    <div class="pipe-col" id="ep-col"></div>
+  </div>
+  <div class="results-panel">
+    <div class="rtabs">
+      <div class="rtab active-b" onclick="setCriaTab('academic',this)" id="rt-academic">Academic Voice</div>
+      <div class="rtab" onclick="setCriaTab('editorial',this)" id="rt-editorial">Editorial Voice</div>
+      <div class="rtab" onclick="setCriaTab('practitioner',this)" id="rt-practitioner">Practitioner Voice</div>
+      <div class="rtab" onclick="setCriaTab('convergence',this)" id="rt-convergence">Convergence Analysis</div>
+    </div>
+    <div class="rcontent">
+      <div class="rpane active" id="r-academic"><span class="hl-b">Awaiting CRIA run.</span> The Academic Voice output will appear here with full citation apparatus and methodology disclosure.</div>
+      <div class="rpane" id="r-editorial"><span class="hl-b">Awaiting CRIA run.</span> Editorial-register output for engaged public audiences, governance implications foregrounded.</div>
+      <div class="rpane" id="r-practitioner"><span class="hl-b">Awaiting CRIA run.</span> Action-oriented practitioner guidance derived from the same evidence base.</div>
+      <div class="rpane" id="r-convergence"><span class="hl-b">Awaiting CRIA run.</span> Where Cognitive and Epistemic pipelines agreed, where they diverged, and what the divergence reveals. Includes negative-space report.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Ultraria pane ── -->
+<div class="cpane" id="pane-ultraria">
+  <div class="banner" id="ultra-banner"></div>
+  <div class="lanes-area" id="lanes-area"></div>
+  <div class="ultra-bar">
+    <div class="spiral-tabs">
+      <button class="stab sa" id="bar-p" onclick="setSpiralMode('parallel')">◈ Parallel</button>
+      <button class="stab" id="bar-s" onclick="setSpiralMode('spiral')">◉ Fibonacci Spiral</button>
+    </div>
+    <span style="font-size:10px;color:var(--grey);font-family:var(--font-mono);" id="spiral-lbl">
+      All 7 lanes run the same question simultaneously
+    </span>
+    <div class="meta-box">
+      <span class="dot" id="meta-dot"></span>
+      <span>o3 meta-layer</span>
+      <span id="meta-stat" style="color:var(--grey2);">idle</span>
+    </div>
+  </div>
+  <div class="results-panel" style="max-height:190px;">
+    <div class="rtabs">
+      <div class="rtab active-v" onclick="setUltraTab('convergence',this)">Convergence Map</div>
+      <div class="rtab" onclick="setUltraTab('divergence',this)">Divergence</div>
+      <div class="rtab" onclick="setUltraTab('negative',this)">Negative Space</div>
+      <div class="rtab" onclick="setUltraTab('question',this)">Reformulated Q</div>
+      <div class="rtab" onclick="setUltraTab('lanes-out',this)">Lane Detail</div>
+    </div>
+    <div class="rcontent">
+      <div class="rpane active" id="u-convergence"><span class="hl-v">Awaiting Ultraria run.</span> Where all seven lanes agree across incompatible frameworks — the primary epistemic signal.</div>
+      <div class="rpane" id="u-divergence"><span class="hl-v">Awaiting Ultraria run.</span> Where lanes that should converge don't — and what the gap diagnoses.</div>
+      <div class="rpane" id="u-negative"><span class="hl-v">Awaiting Ultraria run.</span> What no lane surfaced despite all seven running — the strongest signal, the outline of what current AI cannot think.</div>
+      <div class="rpane" id="u-question"><span class="hl-g">Fibonacci spiral mode only.</span> The real question the spiral converged toward after seven successive tension-resolutions.</div>
+      <div class="rpane" id="u-lanes-out"><span class="hl-v">Awaiting Ultraria run.</span> Per-lane findings will appear here.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Unified pane ── -->
+<div class="cpane active" id="pane-unified">
+  <div class="banner" id="unified-banner"></div>
+  <div class="u-top">
+    <div class="u-col">
+      <div class="u-hdr" style="color:var(--blue);">◈ CRIA — Evidence Base</div>
+      <div class="u-block">
+        <div class="u-bt"><span style="width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0;display:inline-block;"></span>Dual pipeline</div>
+        <div class="u-bs">Cognitive + Epistemic · 20 parallel channels · Claude Sonnet</div>
+        <div class="u-tags">
+          <span class="utag" style="background:var(--blue3);color:var(--blue);">10 Cognitive</span>
+          <span class="utag" style="background:var(--violet3);color:var(--violet);">10 Epistemic</span>
+        </div>
+      </div>
+      <div class="u-block">
+        <div class="u-bt"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;display:inline-block;"></span>Position-privilege weighting</div>
+        <div class="u-bs">Sovereignty-aware · counter-corpus prominent · frame-critical</div>
+        <div class="u-tags">
+          <span class="utag" style="background:var(--green3);color:var(--green);">ANCHOR</span>
+          <span class="utag" style="background:var(--gold3);color:var(--gold);">BRIDGE</span>
+          <span class="utag" style="background:var(--red3);color:var(--red);">COUNTER</span>
+        </div>
+      </div>
+      <div class="u-block">
+        <div class="u-bt"><span style="width:6px;height:6px;border-radius:50%;background:var(--violet);flex-shrink:0;display:inline-block;"></span>Convergent meta-layer</div>
+        <div class="u-bs">5 pattern strategies · Claude Opus · Layer 3 self-improvement</div>
+      </div>
+      <div class="u-block">
+        <div class="u-bt">3 output voices</div>
+        <div class="u-tags">
+          <span class="utag" style="background:var(--blue3);color:var(--blue);">Academic</span>
+          <span class="utag" style="background:var(--violet3);color:var(--violet);">Editorial</span>
+          <span class="utag" style="background:var(--green3);color:var(--green);">Practitioner</span>
+        </div>
+      </div>
+      <div class="u-stat">Status: <span id="u-cria-s" style="color:var(--grey2);">idle</span></div>
+    </div>
+
+    <div class="u-ctr">
+      <div class="u-ctr-lbl">Shared<br>Infrastructure</div>
+      <div class="u-infra">
+        <div class="u-it">DeerFlow</div>
+        <div class="u-is">Web sweep<br>Docker · :2026</div>
+      </div>
+      <div class="u-exch">↕</div>
+      <div class="u-infra">
+        <div class="u-it">Connector Pool</div>
+        <div class="u-is">68 connectors<br>T1 · T2 · T3</div>
+      </div>
+      <div class="u-exch" style="margin-top:2px;font-size:9px;">evidence ↔<br>real questions</div>
+      <div style="flex:1;"></div>
+      <div style="font-size:9px;color:var(--grey2);text-align:center;font-family:var(--font-mono);line-height:1.8;">Book 3<br>↓<br>What Remains</div>
+    </div>
+
+    <div class="u-col">
+      <div class="u-hdr" style="color:var(--violet);">◉ ULTRARIA — Real Questions</div>
+      <div class="u-block">
+        <div class="u-bt"><span style="width:6px;height:6px;border-radius:50%;background:var(--violet);flex-shrink:0;display:inline-block;"></span>Seven intelligence lanes</div>
+        <div class="u-bs">Claude · DeepSeek · Gemini · Kimi · Grok · Qwen · Mistral</div>
+        <div class="u-tags">
+          <span class="utag" style="background:var(--blue3);color:var(--blue);">Literary</span>
+          <span class="utag" style="background:var(--violet3);color:var(--violet);">Empirical</span>
+          <span class="utag" style="background:var(--green3);color:var(--green);">Cross-domain</span>
+          <span class="utag" style="background:var(--red3);color:var(--red);">Counter</span>
+        </div>
+      </div>
+      <div class="u-block">
+        <div class="u-bt"><span style="width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0;display:inline-block;"></span>Fibonacci question spiral</div>
+        <div class="u-bs">Each lane's question generated from the tension between two preceding lanes — converges on the real question beneath the stated one</div>
+      </div>
+      <div class="u-block">
+        <div class="u-bt"><span style="width:6px;height:6px;border-radius:50%;background:var(--violet);flex-shrink:0;display:inline-block;"></span>o3 meta-layer + Layer 3</div>
+        <div class="u-bs">Second-order reasoning · negative-space mapping · personality-differential · self-improving</div>
+      </div>
+      <div class="u-block">
+        <div class="u-bt">4 output types</div>
+        <div class="u-tags">
+          <span class="utag" style="background:var(--violet3);color:var(--violet);">Convergence</span>
+          <span class="utag" style="background:var(--violet3);color:var(--violet);">Divergence</span>
+          <span class="utag" style="background:var(--red3);color:var(--red);">Neg. space</span>
+          <span class="utag" style="background:var(--gold3);color:var(--gold);">Q reformed</span>
+        </div>
+      </div>
+      <div class="u-stat">Status: <span id="u-ultra-s" style="color:var(--grey2);">idle</span></div>
+    </div>
+  </div>
+
+  <!-- 26-question Book 3 tracker -->
+  <div class="qtrk">
+    <div class="qtrk-hdr">
+      <div class="qtrk-t">Book 3 Research Programme — 26 questions</div>
+      <div class="qpbar"><div class="qpfill" id="qp-fill" style="width:0%"></div></div>
+      <div class="qpct" id="qp-pct">0 / 26</div>
+    </div>
+    <div class="qgrid" id="q-grid"></div>
+  </div>
+</div>
+
+</div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ══════════ API CONFIG MODAL ══════════ -->
+<div id="api-modal">
+  <div class="modal-box">
+    <div class="modal-title">API Configuration</div>
+    <div class="modal-row">
+      <div class="modal-lbl">CRIA endpoint</div>
+      <input class="modal-inp" id="cfg-cria" value="" placeholder="https://your-cria.replit.app or http://localhost:8000">
+    </div>
+    <div class="modal-row">
+      <div class="modal-lbl">Ultraria proxy endpoint</div>
+      <input class="modal-inp" id="cfg-ultra" value="" placeholder="Same as CRIA — uses /api/ultraria/proxy/*">
+    </div>
+    <div class="modal-note">
+      Note: Ultraria calls are proxied through the CRIA service.<br>
+      Both fields should point to the same Replit URL.<br>
+      LLM API keys are configured in Replit Secrets, not here.
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn btn-save" onclick="saveConfig()">Save &amp; Test</button>
+      <button class="modal-btn btn-cancel" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── Constants ────────────────────────────────────────────────────
+const COG_CHANNELS = [
+  'Scoping & Ontology','Evidence Acquisition','Contradiction Detection',
+  'Cross-domain Synthesis','Causal Mapping','Critic & Steelman',
+  'Serendipity & Adjacency','Quality Assessment','Cultural & Comparative','Convergence Steering'
+];
+const EP_CHANNELS = [
+  'Frame-critical Reading','Position-privilege Weighting','Sovereignty Tracking',
+  'Counter-corpus Retrieval','Frame-extinction Detection','Dissonance Calibration',
+  'Refusal Pattern Mapping','Absence as Signal','Archive Excavation','Epistemic Synthesis'
+];
+const LANES = [
+  {n:1,model:'Claude Opus',  tag:'Literary · Humanistic', icon:'C',bg:'#1a4a8a',fg:'#5a9fd4'},
+  {n:2,model:'DeepSeek V4',  tag:'Systematic · Empirical',icon:'D',bg:'#2a2a3a',fg:'#8aabb0'},
+  {n:3,model:'Gemini Flash', tag:'Broad · Cross-domain',  icon:'G',bg:'#1a4a2a',fg:'#3ab87a'},
+  {n:4,model:'Kimi K2.6',    tag:'Agentic · Long-horizon',icon:'K',bg:'#3a1a6a',fg:'#a78bfa'},
+  {n:5,model:'Grok 4',       tag:'Counter-institutional', icon:'X',bg:'#5a2a1a',fg:'#e07c3a'},
+  {n:6,model:'Qwen 3.5',     tag:'Non-Western corpus',   icon:'Q',bg:'#5a1a1a',fg:'#f87171'},
+  {n:7,model:'Mistral L3',   tag:'European · Multilingual',icon:'M',bg:'#1a3a6a',fg:'#60a5fa'},
+];
+const QUESTIONS = [
+  {id:'Q1',type:'spiral',label:'Q1',name:'Meaning function of labour'},
+  {id:'Q2',type:'parallel',label:'Q2',name:'Non-Western traditions on meaning'},
+  {id:'Q3',type:'parallel',label:'Q3',name:'Disability scholarship on purpose'},
+  {id:'Q4',type:'parallel',label:'Q4',name:'Historical precedents — labour disruption'},
+  {id:'Q5',type:'parallel',label:'Q5',name:'Governance vs AI oligarchy'},
+  {id:'Q6',type:'parallel',label:'Q6',name:'Ultraria validity — strange loop'},
+  {id:'Q7',type:'parallel',label:'Q7',name:'Nervous system and meaning at scale'},
+  {id:'Q8',type:'spiral',label:'Q8',name:'Polanyian substantivism — four requirements'},
+  {id:'Q9',type:'parallel',label:'Q9',name:'Ecological work and Minskyian finance'},
+  {id:'Q10',type:'parallel',label:'Q10',name:'AI as terminal phase of creative destruction'},
+  {id:'G1',type:'parallel',label:'G1',name:'Filtering narcissistic leadership'},
+  {id:'G2',type:'parallel',label:'G2',name:'Raising civic consciousness'},
+  {id:'G3',type:'spiral',label:'G3',name:'Global coordination paradox'},
+  {id:'G4',type:'parallel',label:'G4',name:'Job Guarantee vs UBI'},
+  {id:'G5',type:'parallel',label:'G5',name:'Inequality and democracy failure'},
+  {id:'G6',type:'parallel',label:'G6',name:'Ecological stability as constitutional precondition'},
+  {id:'G7',type:'parallel',label:'G7',name:'Surveillance destroys agency'},
+  {id:'G8',type:'parallel',label:'G8',name:'Sovereignty vs AI surveillance'},
+  {id:'G9',type:'spiral',label:'G9',name:'What remains when visibility is total'},
+  {id:'G10',type:'parallel',label:'G10',name:'Individual-community tension'},
+  {id:'G11',type:'parallel',label:'G11',name:'Why capitalism and socialism both fail'},
+  {id:'G12',type:'spiral',label:'G12',name:'Competitive tension — problem or engine'},
+  {id:'S1',type:'parallel',label:'S1',name:'Ecological reverence in secular populations'},
+  {id:'S2',type:'parallel',label:'S2',name:'Indigenous cosmologies — demonstration'},
+  {id:'S3',type:'parallel',label:'S3',name:'Religion to power structure failure'},
+  {id:'S4',type:'spiral',label:'S4',name:'Consciousness, universe, and obligation'},
+];
+
+// ── State ────────────────────────────────────────────────────────
+let STATE = {
+  mode: 'unified',
+  spiral: false,
+  running: false,
+  activeLanes: new Set([1,2,3,4,5,6,7]),
+  qDone: new Set(),
+  criaJobId: null,
+  ultraJobId: null,
+  criaJobTimer: null,
+  ultraJobTimer: null,
+  criaDone: false,
+  ultraDone: false,
+};
+
+// ── Config (auto-detect origin) ──────────────────────────────────
+const CFG = {
+  criaBase: window.location.origin,
+  ultraBase: window.location.origin, // proxied via CRIA
+};
+
+// ── Initialise ───────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  buildChannels();
+  buildLanes();
+  buildQuestions();
+  setMode('unified');
+  checkHealth();
+  setInterval(checkHealth, 30000); // Health-check every 30s
+});
+
+// ── Health checks ────────────────────────────────────────────────
+async function checkHealth() {
+  // CRIA
+  try {
+    const r = await fetch(`${CFG.criaBase}/health`, {credentials:'include'});
+    if (r.ok) {
+      setPill('cria', 'live'); setSysDot('cria', 'var(--green)');
+      document.getElementById('sys-cria').textContent = 'CRIA: online';
+    } else throw new Error(r.status);
+  } catch {
+    setPill('cria', 'err'); setSysDot('cria', 'var(--red)');
+    document.getElementById('sys-cria').textContent = 'CRIA: unreachable';
+  }
+
+  // Ultraria (via proxy)
+  try {
+    const r = await fetch(`${CFG.ultraBase}/api/ultraria/proxy/health`, {credentials:'include'});
+    if (r.ok) {
+      const d = await r.json();
+      const online = d.status === 'ok';
+      setPill('ultra', online ? 'live' : 'err');
+      setSysDot('ultra', online ? 'var(--green)' : 'var(--red)');
+      document.getElementById('sys-ultra').textContent = online
+        ? `Ultraria: online (${d.phase||'stub'})` : 'Ultraria: offline';
+    } else throw new Error(r.status);
+  } catch {
+    setPill('ultra', 'err'); setSysDot('ultra', 'var(--red)');
+    document.getElementById('sys-ultra').textContent = 'Ultraria: unreachable';
+  }
+}
+
+function setPill(id, state) {
+  const pill = document.getElementById(`pill-${id}`);
+  const dot  = document.getElementById(`dot-${id}`);
+  if (!pill) return;
+  pill.className = `hpill ${state==='live'?'live':state==='busy'?'busy':'err'}`;
+  dot.className  = `dot ${state==='live'?'on':state==='busy'?'busy':'err'}`;
+}
+
+function setSysDot(id, color) {
+  const d = document.getElementById(`sys-dot-${id}`);
+  if (d) d.style.background = color;
+}
+
+// ── Mode switching ───────────────────────────────────────────────
+const MODE_LABELS = {
+  cria:     'Dual Pipeline Research',
+  ultraria: 'Seven Lane Intelligence',
+  unified:  'Integrated Research Construct',
+};
+
+function setMode(m) {
+  STATE.mode = m;
+  document.querySelectorAll('.mtab').forEach(t => t.classList.remove('mc','mu','mx'));
+  document.querySelectorAll('.cpane').forEach(p => p.classList.remove('active'));
+
+  const tabMap = {cria:'tab-cria', ultraria:'tab-ultra', unified:'tab-unified'};
+  const clsMap = {cria:'mc', ultraria:'mu', unified:'mx'};
+  document.getElementById(tabMap[m]).classList.add(clsMap[m]);
+  document.getElementById(`pane-${m==='ultraria'?'ultraria':m==='cria'?'cria':'unified'}`).classList.add('active');
+  document.getElementById('mode-label').textContent = MODE_LABELS[m];
+
+  // Sidebar visibility
+  const showCria  = m === 'cria' || m === 'unified';
+  const showUltra = m === 'ultraria' || m === 'unified';
+  document.getElementById('sb-cria').style.display  = showCria  ? '' : 'none';
+  document.getElementById('sb-ultra').style.display = showUltra ? '' : 'none';
+}
+
+// ── Spiral mode ──────────────────────────────────────────────────
+function setSpiralMode(s) {
+  STATE.spiral = (s === 'spiral');
+  ['p','s'].forEach(k => {
+    document.getElementById(`stab-${k}`)?.classList.remove('sa');
+    document.getElementById(`bar-${k}`)?.classList.remove('sa');
+  });
+  document.getElementById(`stab-${s==='spiral'?'s':'p'}`)?.classList.add('sa');
+  document.getElementById(`bar-${s==='spiral'?'s':'p'}`)?.classList.add('sa');
+  const lbl = document.getElementById('spiral-lbl');
+  if (lbl) lbl.textContent = STATE.spiral
+    ? 'Each lane question generated from tension between two preceding lanes'
+    : 'All 7 lanes run the same question simultaneously';
+}
+
+// ── Toggle ────────────────────────────────────────────────────────
+function toggleEl(el) {
+  const isOn = el.classList.contains('on') || el.classList.contains('on-v');
+  if (isOn) { el.classList.remove('on','on-v'); }
+  else       { el.classList.add('on'); }
+}
+
+// ── Build UI elements ────────────────────────────────────────────
+function buildChannels() {
+  const cog = document.getElementById('cog-col');
+  const ep  = document.getElementById('ep-col');
+  COG_CHANNELS.forEach((ch, i) => {
+    cog.innerHTML += `<div class="ch cog" id="cog-${i}">
+      <div class="ch-top">
+        <div class="ch-dot"></div>
+        <span class="ch-name">${ch}</span>
+        <span class="ch-stat" id="cs-${i}">ready</span>
+      </div>
+      <div class="ch-bar"><div class="ch-fill" id="cb-${i}"></div></div>
+    </div>`;
+  });
+  EP_CHANNELS.forEach((ch, i) => {
+    ep.innerHTML += `<div class="ch epi" id="ep-${i}">
+      <div class="ch-top">
+        <div class="ch-dot"></div>
+        <span class="ch-name">${ch}</span>
+        <span class="ch-stat" id="es-${i}">ready</span>
+      </div>
+      <div class="ch-bar"><div class="ch-fill" id="eb-${i}"></div></div>
+    </div>`;
+  });
+}
+
+function buildLanes() {
+  const area = document.getElementById('lanes-area');
+  if (!area) return;
+  area.innerHTML = '';
+  LANES.forEach(l => {
+    area.innerHTML += `<div class="lcard enabled" id="lcard-${l.n}" onclick="toggleLane(${l.n})">
+      <div class="l-icon" style="background:${l.bg};color:${l.fg};">${l.icon}</div>
+      <div class="l-num">L${l.n}</div>
+      <div class="l-model">${l.model}</div>
+      <div class="l-tag">${l.tag}</div>
+      <div class="l-bar"><div class="l-fill" id="lfill-${l.n}"></div></div>
+      <div class="l-stat" id="lstat-${l.n}">ready</div>
+    </div>`;
+  });
+}
+
+function buildQuestions() {
+  const grid = document.getElementById('q-grid');
+  if (!grid) return;
+  QUESTIONS.forEach(q => {
+    grid.innerHTML += `<div class="qp qtodo${q.type==='spiral'?' qsp':''}"
+      id="qpill-${q.id}" onclick="toggleQ('${q.id}')" title="${q.name}">
+      ${q.label}${q.type==='spiral'?' ◉':''}
+    </div>`;
+  });
+}
+
+// ── Run control ───────────────────────────────────────────────────
+async function startRun() {
+  if (STATE.running) return;
+  const q = document.getElementById('q-input').value.trim();
+  if (!q) { showBanner('all','err','Please enter a research question.'); return; }
+
+  STATE.running = true;
+  STATE.criaDone = false;
+  STATE.ultraDone = false;
+  setRunBtn(true);
+  clearBanners();
+
+  const runMode = STATE.mode;
+  const promises = [];
+
+  if (runMode === 'cria' || runMode === 'unified') {
+    promises.push(runCRIA(q));
+  }
+  if (runMode === 'ultraria' || runMode === 'unified') {
+    promises.push(runUltraria(q));
+  }
+
+  try {
+    await Promise.allSettled(promises);
+  } finally {
+    STATE.running = false;
+    setRunBtn(false);
+    if (runMode === 'unified') {
+      document.getElementById('u-cria-s').textContent = STATE.criaDone ? 'complete ✓' : 'failed';
+      document.getElementById('u-cria-s').style.color = STATE.criaDone ? 'var(--green)' : 'var(--red)';
+      document.getElementById('u-ultra-s').textContent = STATE.ultraDone ? 'complete ✓' : 'failed';
+      document.getElementById('u-ultra-s').style.color = STATE.ultraDone ? 'var(--green)' : 'var(--red)';
+    }
+  }
+}
+
+function cancelRun() {
+  STATE.running = false;
+  clearInterval(STATE.criaJobTimer);
+  clearInterval(STATE.ultraJobTimer);
+  setRunBtn(false);
+  resetChannelUI();
+  resetLaneUI();
+  showBanner('all','info','Experiment cancelled.');
+}
+
+function setRunBtn(running) {
+  const btn  = document.getElementById('run-btn');
+  const icon = document.getElementById('run-icon');
+  const lbl  = document.getElementById('run-label');
+  const stop = document.getElementById('stop-btn');
+  if (running) {
+    btn.classList.add('running'); btn.disabled = true;
+    icon.textContent = '◉'; lbl.textContent = 'RUNNING...';
+    stop.style.display = '';
+  } else {
+    btn.classList.remove('running'); btn.disabled = false;
+    icon.textContent = '▶'; lbl.textContent = 'START EXPERIMENT';
+    stop.style.display = 'none';
+  }
+}
+
+// ── CRIA run ──────────────────────────────────────────────────────
+async function runCRIA(q) {
+  setPill('cria','busy');
+  animateChannels();
+  document.getElementById('u-cria-s').textContent = 'running...';
+  document.getElementById('u-cria-s').style.color = 'var(--gold)';
+
+  const profile  = document.getElementById('profile-sel')?.value || 'civilisational';
+  const dis_el   = document.getElementById('dissonance-sel');
+  const dBudget  = parseFloat(dis_el?.value || '0.20');
+  const deerflow = document.getElementById('tog-deer')?.classList.contains('on');
+
+  try {
+    const resp = await fetch(`${CFG.criaBase}/api/research/unified`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        query: q,
+        observer_note: deerflow ? 'DeerFlow pre-sweep enabled' : '',
+        dissonance_budget: dBudget,
+        voice: 'all',
+        profile,
+        max_iterations: 2,
+      })
+    });
+    if (!resp.ok) throw new Error(`CRIA POST ${resp.status}: ${await resp.text()}`);
+    const {jobId} = await resp.json();
+    STATE.criaJobId = jobId;
+    await pollJob(jobId, 'cria');
+  } catch (err) {
+    showBanner('cria','err',`CRIA error: ${err.message}`);
+    setPill('cria','err');
+    resetChannelUI();
+    throw err;
+  }
+}
+
+// ── Ultraria run ───────────────────────────────────────────────────
+async function runUltraria(q) {
+  setPill('ultra','busy');
+  animateLanes();
+  document.getElementById('u-ultra-s').textContent = 'running...';
+  document.getElementById('u-ultra-s').style.color = 'var(--gold)';
+  const metaDot = document.getElementById('meta-dot');
+  if (metaDot) { metaDot.className = 'dot busy'; }
+  const metaStat = document.getElementById('meta-stat');
+  if (metaStat) { metaStat.textContent = 'active'; metaStat.style.color = 'var(--gold)'; }
+
+  const profile = document.getElementById('profile-sel')?.value || 'civilisational';
+  const deerflow = document.getElementById('tog-deer')?.classList.contains('on');
+
+  try {
+    const resp = await fetch(`${CFG.ultraBase}/api/ultraria/proxy/run`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        query: q,
+        mode: STATE.spiral ? 'fibonacci_spiral' : 'parallel',
+        active_lanes: [...STATE.activeLanes],
+        profile,
+        deerflow_enabled: deerflow,
+      })
+    });
+    if (!resp.ok) throw new Error(`Ultraria POST ${resp.status}: ${await resp.text()}`);
+    const {jobId} = await resp.json();
+    STATE.ultraJobId = jobId;
+    await pollJob(jobId, 'ultra');
+  } catch (err) {
+    showBanner('ultra','err',`Ultraria error: ${err.message}`);
+    setPill('ultra','err');
+    resetLaneUI();
+    throw err;
+  }
+}
+
+// ── Job polling ────────────────────────────────────────────────────
+async function pollJob(jobId, system) {
+  const isCria = system === 'cria';
+  const endpoint = isCria
+    ? `${CFG.criaBase}/api/research/unified/${jobId}`
+    : `${CFG.ultraBase}/api/ultraria/proxy/run/${jobId}`;
+  const maxAttempts = 120; // 10 minutes at 5s intervals
+  let attempts = 0;
+
+  return new Promise((resolve, reject) => {
+    const timer = setInterval(async () => {
+      if (!STATE.running && system === 'cria' && STATE.criaDone === false) {
+        clearInterval(timer); reject(new Error('Cancelled')); return;
+      }
+      attempts++;
+      if (attempts > maxAttempts) {
+        clearInterval(timer);
+        reject(new Error(`${system} timed out after ${maxAttempts * 5}s`));
+        return;
+      }
+      try {
+        const r = await fetch(endpoint, {credentials:'include'});
+        if (!r.ok) throw new Error(`Poll ${r.status}`);
+        const data = await r.json();
+        if (data.status === 'complete' || data.status === 'failed') {
+          clearInterval(timer);
+          if (data.status === 'complete') {
+            isCria ? onCRIAComplete(data) : onUltrariaComplete(data);
+            resolve(data);
+          } else {
+            const errMsg = data.engine?.error || 'Unknown error';
+            showBanner(isCria?'cria':'ultra','err',`${system} job failed: ${errMsg}`);
+            reject(new Error(errMsg));
+          }
+        }
+      } catch (e) {
+        // Non-fatal poll error — keep trying
+        console.warn(`Poll error (${system}):`, e.message);
+      }
+    }, 5000);
+
+    if (isCria) STATE.criaJobTimer = timer;
+    else STATE.ultraJobTimer = timer;
+  });
+}
+
+// ── Completion handlers ────────────────────────────────────────────
+function onCRIAComplete(data) {
+  STATE.criaDone = true;
+  setPill('cria','live');
+  completeChannelUI();
+  showBanner('cria','ok','CRIA experiment complete.');
+
+  const result = data.engine?.result;
+  if (!result) { showBanner('cria','err','CRIA returned no result data.'); return; }
+
+  // Render voice outputs
+  const voices = result.voices || result.output || result;
+  renderCriaResult('academic',    voices?.academic    || voices?.academic_voice    || JSON.stringify(voices).substring(0,800));
+  renderCriaResult('editorial',   voices?.editorial   || voices?.editorial_voice   || 'Editorial voice not returned by this profile.');
+  renderCriaResult('practitioner',voices?.practitioner|| voices?.practitioner_voice|| 'Practitioner voice not returned by this profile.');
+
+  // Convergence
+  const conv = result.convergence || result.convergence_analysis || result.meta || '';
+  const convText = typeof conv === 'string' ? conv : JSON.stringify(conv, null, 2);
+  document.getElementById('r-convergence').innerHTML =
+    `<span class="key">Convergence analysis from ${data.query?.substring(0,60)}...</span>\n\n` +
+    esc(convText.substring(0,1200)) + (convText.length > 1200 ? '\n[...truncated]' : '');
+}
+
+function onUltrariaComplete(data) {
+  STATE.ultraDone = true;
+  setPill('ultra','live');
+  completeLaneUI();
+  const metaDot = document.getElementById('meta-dot');
+  if (metaDot) { metaDot.className = 'dot on'; }
+  const metaStat = document.getElementById('meta-stat');
+  if (metaStat) { metaStat.textContent = 'complete'; metaStat.style.color = 'var(--green)'; }
+  showBanner('ultra','ok','Ultraria experiment complete.');
+
+  const result = data.engine?.result;
+  if (!result) { showBanner('ultra','err','Ultraria returned no result data.'); return; }
+
+  const meta = result.meta_layer || {};
+  document.getElementById('u-convergence').innerHTML =
+    `<span class="hl-v key">Convergence map</span>\n\n` + esc(meta.convergence_map || 'No convergence data returned.');
+  document.getElementById('u-divergence').innerHTML =
+    `<span class="hl-v key">Divergence analysis</span>\n\n` + esc(meta.divergence_analysis || 'No divergence data.');
+  document.getElementById('u-negative').innerHTML =
+    `<span class="hl-red key">Negative space report</span>\n\n` + esc(meta.negative_space_report || 'No negative space data.');
+
+  const rq = meta.reformulated_question;
+  document.getElementById('u-question').innerHTML = rq
+    ? `<span class="hl-g key">Reformulated question (Fibonacci spiral)</span>\n\n` + esc(rq)
+    : `<span class="hl-v">Reformulated question is only produced in Fibonacci Spiral mode.</span>`;
+
+  // Lane detail
+  const lanes = result.lanes || [];
+  const laneHtml = lanes.map(l =>
+    `<span class="hl-v">L${l.lane_id} · ${l.label}</span> [${l.personality}]\n` +
+    esc((l.findings||'').substring(0,300)) + '\n\n'
+  ).join('');
+  document.getElementById('u-lanes-out').innerHTML = laneHtml || 'No lane data.';
+}
+
+function renderCriaResult(tab, text) {
+  const el = document.getElementById(`r-${tab}`);
+  if (!el) return;
+  const txt = typeof text === 'object' ? JSON.stringify(text, null, 2) : String(text);
+  el.innerHTML = `<span class="key">${tab.charAt(0).toUpperCase()+tab.slice(1)} Voice</span>\n\n` + esc(txt);
+}
+
+// ── Channel / Lane animation ────────────────────────────────────────
+function animateChannels() {
+  COG_CHANNELS.forEach((_,i) => {
+    setTimeout(() => {
+      const card = document.getElementById(`cog-${i}`);
+      const stat = document.getElementById(`cs-${i}`);
+      const bar  = document.getElementById(`cb-${i}`);
+      if (!card) return;
+      card.classList.add('running'); if(stat)stat.textContent='running';
+      if(bar)bar.style.width=(30+Math.random()*50)+'%';
+    }, i*350);
+  });
+  EP_CHANNELS.forEach((_,i) => {
+    setTimeout(() => {
+      const card = document.getElementById(`ep-${i}`);
+      const stat = document.getElementById(`es-${i}`);
+      const bar  = document.getElementById(`eb-${i}`);
+      if (!card) return;
+      card.classList.add('running'); if(stat)stat.textContent='running';
+      if(bar)bar.style.width=(30+Math.random()*50)+'%';
+    }, i*400+150);
+  });
+}
+
+function completeChannelUI() {
+  COG_CHANNELS.forEach((_,i) => {
+    const card=document.getElementById(`cog-${i}`);
+    const stat=document.getElementById(`cs-${i}`);
+    const bar=document.getElementById(`cb-${i}`);
+    if(card){card.classList.remove('running');card.classList.add('done');}
+    if(stat)stat.textContent='done';
+    if(bar)bar.style.width='100%';
+  });
+  EP_CHANNELS.forEach((_,i) => {
+    const card=document.getElementById(`ep-${i}`);
+    const stat=document.getElementById(`es-${i}`);
+    const bar=document.getElementById(`eb-${i}`);
+    if(card){card.classList.remove('running');card.classList.add('done');}
+    if(stat)stat.textContent='done';
+    if(bar)bar.style.width='100%';
+  });
+}
+
+function resetChannelUI() {
+  COG_CHANNELS.forEach((_,i)=>{
+    const c=document.getElementById(`cog-${i}`);const s=document.getElementById(`cs-${i}`);
+    const b=document.getElementById(`cb-${i}`);
+    if(c){c.classList.remove('running','done');}if(s)s.textContent='ready';if(b)b.style.width='0%';
+  });
+  EP_CHANNELS.forEach((_,i)=>{
+    const c=document.getElementById(`ep-${i}`);const s=document.getElementById(`es-${i}`);
+    const b=document.getElementById(`eb-${i}`);
+    if(c){c.classList.remove('running','done');}if(s)s.textContent='ready';if(b)b.style.width='0%';
+  });
+}
+
+function animateLanes() {
+  LANES.forEach((l, i) => {
+    const delay = STATE.spiral ? i * 1000 : i * 200;
+    setTimeout(() => {
+      if (!STATE.running) return;
+      const card = document.getElementById(`lcard-${l.n}`);
+      const stat = document.getElementById(`lstat-${l.n}`);
+      if(card)card.classList.add('running');
+      if(stat){stat.textContent=STATE.spiral?`Q${i+1}`:'running';stat.style.color='var(--gold)';}
+    }, delay);
+  });
+}
+
+function completeLaneUI() {
+  LANES.forEach(l => {
+    const card=document.getElementById(`lcard-${l.n}`);
+    const stat=document.getElementById(`lstat-${l.n}`);
+    if(card){card.classList.remove('running');card.classList.add('done');}
+    if(stat){stat.textContent='done';stat.style.color='var(--green)';}
+  });
+}
+
+function resetLaneUI() {
+  LANES.forEach(l => {
+    const card=document.getElementById(`lcard-${l.n}`);
+    const stat=document.getElementById(`lstat-${l.n}`);
+    if(card){card.classList.remove('running','done');}
+    if(stat){stat.textContent='ready';stat.style.color='';}
+    const fill=document.getElementById(`lfill-${l.n}`);
+    if(fill)fill.style.width='0%';
+  });
+}
+
+function toggleLane(n) {
+  if (STATE.activeLanes.has(n)) STATE.activeLanes.delete(n);
+  else STATE.activeLanes.add(n);
+  const card = document.getElementById(`lcard-${n}`);
+  if (card) {
+    card.classList.toggle('enabled', STATE.activeLanes.has(n));
+    card.classList.toggle('disabled', !STATE.activeLanes.has(n));
+  }
+}
+
+// ── Tab management ────────────────────────────────────────────────
+function setCriaTab(id, el) {
+  document.querySelectorAll('#pane-cria .rpane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#pane-cria .rtab').forEach(t=>t.className='rtab');
+  document.getElementById(`r-${id}`)?.classList.add('active');
+  el.className='rtab active-b';
+}
+
+function setUltraTab(id, el) {
+  document.querySelectorAll('#pane-ultraria .rpane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#pane-ultraria .rtab').forEach(t=>t.className='rtab');
+  document.getElementById(`u-${id}`)?.classList.add('active');
+  el.className='rtab active-v';
+}
+
+// ── Question tracker ───────────────────────────────────────────────
+function toggleQ(id) {
+  if (STATE.qDone.has(id)) STATE.qDone.delete(id);
+  else STATE.qDone.add(id);
+  const pill = document.getElementById(`qpill-${id}`);
+  const q = QUESTIONS.find(x=>x.id===id);
+  if (pill) pill.className = `qp ${STATE.qDone.has(id)?'qdone':'qtodo'}${q?.type==='spiral'?' qsp':''}`;
+  const done = STATE.qDone.size, total = QUESTIONS.length;
+  const pct = Math.round(done/total*100);
+  const fill = document.getElementById('qp-fill');
+  const pctEl = document.getElementById('qp-pct');
+  if(fill) fill.style.width = pct+'%';
+  if(pctEl) pctEl.textContent = `${done} / ${total}`;
+}
+
+// ── Banners ───────────────────────────────────────────────────────
+function showBanner(target, type, msg) {
+  const ids = target==='all'
+    ? ['cria-banner','ultra-banner','unified-banner']
+    : [`${target==='cria'?'cria':target==='ultra'?'ultra':'unified'}-banner`];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = `banner ${type} show`;
+    el.innerHTML = `<span>${type==='err'?'⚠':type==='ok'?'✓':'ℹ'}</span><span>${msg}</span>
+      <button onclick="this.parentElement.classList.remove('show')"
+        style="margin-left:auto;background:none;border:none;color:inherit;cursor:pointer;font-size:14px;">×</button>`;
+  });
+  if (type !== 'err') setTimeout(() => clearBanners(), 6000);
+}
+
+function clearBanners() {
+  document.querySelectorAll('.banner').forEach(b => b.classList.remove('show'));
+}
+
+// ── API config modal ───────────────────────────────────────────────
+function openModal() {
+  document.getElementById('cfg-cria').value = CFG.criaBase;
+  document.getElementById('cfg-ultra').value = CFG.ultraBase;
+  document.getElementById('api-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('api-modal').classList.remove('open');
+}
+
+async function saveConfig() {
+  const criaVal = document.getElementById('cfg-cria').value.trim().replace(/\/$/,'');
+  if (criaVal) {
+    CFG.criaBase  = criaVal;
+    CFG.ultraBase = criaVal; // same origin — Ultraria is proxied through CRIA
+  }
+  closeModal();
+  await checkHealth();
+}
+
+// ── Utilities ─────────────────────────────────────────────────────
+function esc(str) {
+  return String(str||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
