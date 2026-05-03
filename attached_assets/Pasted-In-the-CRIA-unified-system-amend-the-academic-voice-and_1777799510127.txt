@@ -1,0 +1,43 @@
+In the CRIA unified system, amend the academic voice and editorial voice output rendering to follow established research publication standards regarding methodology disclosure.
+
+RULE: The AI instrument, technology stack, model names, and pipeline architecture must never appear in:
+- The abstract
+- The introduction
+- The argument body
+- The findings sections
+- The conclusion
+- The editorial voice output at any point
+
+The instrument is infrastructure, not the argument. Papers produced by CRIA should read as research papers, not AI demonstrations.
+
+WHAT TO CHANGE:
+
+1. In the academic voice renderer, locate where the output text is assembled. Remove any auto-generated text that names Claude, CRIA, Anthropic, the pipeline architecture, channel counts, or model names from the abstract, introduction, findings, and conclusion sections.
+
+2. Replace any methodology disclosure in the body with this standard formulation, inserted only in the methods section (not the abstract):
+
+"Evidence was gathered and synthesised using a multi-pipeline research architecture applying parallel epistemic analysis across mainstream academic databases (T1), grey literature and practitioner sources (T2), and advocacy and counter-corpus material (T3). Position-privilege weighting was applied to foreground sovereign and marginalised knowledge systems alongside credentialed sources. Dissonance budget: [INSERT VALUE]. Counter-corpus retrieval: active."
+
+3. Add a DISCLAIMER NOTE as a separate, clearly labelled section at the very end of the academic voice output, after the references, formatted as follows:
+
+---
+RESEARCH INSTRUMENT NOTE
+
+This research was conducted using a multi-pipeline AI-assisted research architecture (CRIA — Civilisational Research Intelligence Architecture, developed by Dr Barry Ferrier with Claude, Anthropic, 2025–2026). The architecture applies parallel cognitive and epistemic analysis across 20 channels with position-privilege weighting, frame-critical reading, and counter-corpus retrieval. Full methodological documentation is available on request. The findings, interpretations, and conclusions are the responsibility of the named researcher. This note appears in compliance with emerging AI-assisted research disclosure standards and does not form part of the abstract or argument.
+---
+
+4. The editorial voice output should contain NO methodology disclosure of any kind — no methods section, no disclaimer note, no instrument reference. It reads as journalism or public intellectual writing. The research instrument is invisible.
+
+5. The practitioner voice output should contain NO methodology disclosure. It reads as direct professional guidance.
+
+6. For the Ultraria outputs: apply the same rule. Convergence maps, divergence analyses, negative space reports, and reformulated questions should contain no reference to Ultraria, lane counts, model names, or o3. They read as analytical findings. A disclaimer note in the same format as above may be appended to the convergence map output only, substituting "CRIA" for:
+
+"CRIA-Ultraria integrated research architecture (seven-lane multi-intelligence system with Fibonacci question spiral and dedicated reasoning meta-layer)"
+
+7. In the unified dashboard HTML, add a small grey italic note beneath the results panel — visible to the researcher but styled as a footnote, not a headline — reading:
+
+"Methodology disclosure routed to methods section only. Abstract and argument are instrument-free. Disclaimer note appended to academic output."
+
+DO NOT change any pipeline logic, connector configuration, channel behaviour, or API routing. This is a rendering and output formatting change only. All changes are in the voice rendering functions and output assembly code.
+
+Verify by checking that a sample academic output contains no AI tool names before the disclaimer note section, and that the disclaimer note appears correctly formatted after the references.
