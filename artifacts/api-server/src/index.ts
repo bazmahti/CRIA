@@ -1,5 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { db, experimentsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const rawPort = process.env["PORT"];
 
@@ -15,11 +17,28 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+app.listen(port, async (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
 
   logger.info({ port }, "Server listening");
+
+  try {
+    const stuck = await db
+      .update(experimentsTable)
+      .set({ status: "failed", updatedAt: new Date() })
+      .where(eq(experimentsTable.status, "running"))
+      .returning({ id: experimentsTable.id, experimentId: experimentsTable.experimentId });
+
+    if (stuck.length > 0) {
+      logger.warn(
+        { count: stuck.length, ids: stuck.map((e) => e.experimentId) },
+        "Startup recovery — found experiments stuck in running state, marked as failed",
+      );
+    }
+  } catch (recErr) {
+    logger.error({ err: recErr }, "Startup recovery failed — could not reset stuck experiments");
+  }
 });

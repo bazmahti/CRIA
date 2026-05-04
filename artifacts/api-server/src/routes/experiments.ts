@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, ilike, inArray } from "drizzle-orm";
 import * as yaml from "js-yaml";
 import { db, experimentsTable, findingsTable } from "@workspace/db";
+import { logger } from "../lib/logger";
 import {
   ListExperimentsQueryParams,
   CreateExperimentBody,
@@ -453,7 +454,14 @@ router.post("/experiments/:id/run", async (req, res): Promise<void> => {
         });
       }
     } catch (e) {
-      // silently fail the simulation
+      logger.error({ err: e, experimentId: params.data.id }, "Experiment simulation failed — marking as failed");
+      try {
+        await db.update(experimentsTable)
+          .set({ status: "failed", updatedAt: new Date() })
+          .where(eq(experimentsTable.id, params.data.id));
+      } catch {
+        // DB update also failed — nothing more we can do
+      }
     }
   }, 3000);
 
