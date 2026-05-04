@@ -702,6 +702,20 @@ export const ListResearchJobsResponseItem = zod.object({
 export const ListResearchJobsResponse = zod.array(ListResearchJobsResponseItem);
 
 /**
+ * @summary Save a completed CRIA research run
+ */
+export const CreateResearchJobBody = zod.object({
+  jobId: zod.string(),
+  status: zod.enum(["queued", "running", "complete", "failed"]),
+  questionText: zod.string().nullish(),
+  mode: zod.string().nullish(),
+  startedAt: zod.string().nullish(),
+  completedAt: zod.string().nullish(),
+  errorText: zod.string().nullish(),
+  resultJson: zod.record(zod.string(), zod.unknown()).nullish(),
+});
+
+/**
  * @summary Get a single research job with full output
  */
 export const GetResearchJobParams = zod.object({

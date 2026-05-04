@@ -2,12 +2,14 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Layers, Brain, Microscope, GitMerge, BookOpen, Newspaper, Briefcase,
   Loader2, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp,
-  Lightbulb, AlertTriangle, FileText, Download
+  Lightbulb, AlertTriangle, FileText, Download, History
 } from "lucide-react";
+import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import ResearchDropZone from "@/components/ResearchDropZone";
+import { useCreateResearchJob } from "@workspace/api-client-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -472,6 +474,7 @@ export default function UnifiedResearch() {
   const [voice, setVoice] = useState("all");
   const [profile, setProfile] = useState("general_scholarship");
   const [showConnectorGroups, setShowConnectorGroups] = useState(false);
+  const [savedToHistory, setSavedToHistory] = useState(false);
 
   const [job, setJob] = useState<UnifiedJobState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -479,6 +482,9 @@ export default function UnifiedResearch() {
   const [pipeline, setPipeline] = useState<PipelineTab>("cognitive");
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasSavedRef = useRef(false);
+
+  const createJob = useCreateResearchJob();
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -493,17 +499,39 @@ export default function UnifiedResearch() {
       if (!resp.ok) return;
       const data = (await resp.json()) as UnifiedJobState;
       setJob(data);
-      if (data.status !== "running") stopPolling();
+      if (data.status !== "running") {
+        stopPolling();
+        if (!hasSavedRef.current) {
+          hasSavedRef.current = true;
+          createJob.mutate(
+            {
+              data: {
+                jobId: data.jobId,
+                status: data.status as "complete" | "failed",
+                questionText: data.query || null,
+                mode: "unified",
+                startedAt: data.startedAt || null,
+                completedAt: data.completedAt || null,
+                errorText: data.engine?.error || null,
+                resultJson: (data.engine?.result as Record<string, unknown>) ?? null,
+              },
+            },
+            { onSuccess: () => setSavedToHistory(true) },
+          );
+        }
+      }
     } catch {
       // swallow transient errors
     }
-  }, [stopPolling]);
+  }, [stopPolling, createJob]);
 
   const launch = async () => {
     if (!query.trim()) return;
     setLoading(true);
     setError(null);
     setJob(null);
+    setSavedToHistory(false);
+    hasSavedRef.current = false;
     stopPolling();
 
     try {
@@ -808,6 +836,14 @@ export default function UnifiedResearch() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {savedToHistory && (
+                  <Link href="/history">
+                    <span className="flex items-center gap-1.5 text-[10px] text-green-400 border border-green-500/20 bg-green-500/5 rounded-lg px-2.5 py-1.5 hover:bg-green-500/10 transition-colors cursor-pointer">
+                      <History className="w-3 h-3" />
+                      Saved to history
+                    </span>
+                  </Link>
+                )}
                 <button
                   onClick={() => {
                     const papers = (result["pipeline_papers"] ?? {}) as Record<string, Record<string, string>>;

@@ -9,7 +9,19 @@ import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { formatDistanceToNow, format } from "date-fns";
-import { ChevronLeft, Clock, BookOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronLeft, Clock, BookOpen, ChevronDown, ChevronRight, Download } from "lucide-react";
+
+function downloadMarkdown(filename: string, content: string) {
+  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.endsWith(".md") ? filename : `${filename}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 const STATUS_COLORS: Record<string, string> = {
   complete: "bg-green-500/10 text-green-400 border-green-500/20",
@@ -106,10 +118,46 @@ function JobDetail({ id }: { id: string }) {
       )}
 
       {sortedVoices.length > 0 ? (
-        <div className="space-y-2">
-          {sortedVoices.map(([key, data]) => (
-            <VoicePanel key={key} voiceKey={key} voiceData={data} />
-          ))}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground">
+              Outputs ({sortedVoices.length})
+            </p>
+            <button
+              onClick={() => {
+                const slug = (job.questionText ?? "run").slice(0, 40).replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+                sortedVoices.forEach(([key, data], i) => {
+                  if (data?.text) {
+                    setTimeout(() => downloadMarkdown(`CRIA-${key}-${slug}`, data.text!), i * 120);
+                  }
+                });
+              }}
+              className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground border border-border/40 hover:border-border/60 rounded-lg px-2.5 py-1.5 transition-colors"
+            >
+              <Download className="w-3 h-3" />
+              Download all
+            </button>
+          </div>
+          <div className="space-y-2">
+            {sortedVoices.map(([key, data]) => (
+              <div key={key} className="relative group">
+                <VoicePanel voiceKey={key} voiceData={data} />
+                {data?.text && (
+                  <button
+                    onClick={() => {
+                      const slug = (job.questionText ?? "run").slice(0, 40).replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+                      downloadMarkdown(`CRIA-${key}-${slug}`, data.text!);
+                    }}
+                    className="absolute top-2.5 right-10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground border border-border/40 rounded px-1.5 py-0.5"
+                    title={`Download ${key} as .md`}
+                  >
+                    <Download className="w-2.5 h-2.5" />
+                    .md
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="border border-border rounded p-8 text-center">

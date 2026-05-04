@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  CreateResearchJobInput,
   CrossExperimentView,
   Experiment,
   ExperimentArtefactInput,
@@ -1421,6 +1422,92 @@ export function useListResearchJobs<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Save a completed CRIA research run
+ */
+export const getCreateResearchJobUrl = () => {
+  return `/api/research-jobs`;
+};
+
+export const createResearchJob = async (
+  createResearchJobInput: CreateResearchJobInput,
+  options?: RequestInit,
+): Promise<ResearchJob> => {
+  return customFetch<ResearchJob>(getCreateResearchJobUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createResearchJobInput),
+  });
+};
+
+export const getCreateResearchJobMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createResearchJob>>,
+    TError,
+    { data: BodyType<CreateResearchJobInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createResearchJob>>,
+  TError,
+  { data: BodyType<CreateResearchJobInput> },
+  TContext
+> => {
+  const mutationKey = ["createResearchJob"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createResearchJob>>,
+    { data: BodyType<CreateResearchJobInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createResearchJob(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateResearchJobMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createResearchJob>>
+>;
+export type CreateResearchJobMutationBody = BodyType<CreateResearchJobInput>;
+export type CreateResearchJobMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Save a completed CRIA research run
+ */
+export const useCreateResearchJob = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createResearchJob>>,
+    TError,
+    { data: BodyType<CreateResearchJobInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createResearchJob>>,
+  TError,
+  { data: BodyType<CreateResearchJobInput> },
+  TContext
+> => {
+  return useMutation(getCreateResearchJobMutationOptions(options));
+};
 
 /**
  * @summary Get a single research job with full output

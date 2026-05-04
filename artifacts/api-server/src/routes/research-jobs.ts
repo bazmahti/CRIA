@@ -1,11 +1,13 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, researchJobsTable } from "@workspace/db";
 import {
   ListResearchJobsQueryParams,
   GetResearchJobParams,
   ListResearchJobsResponse,
+  ListResearchJobsResponseItem,
   GetResearchJobResponse,
+  CreateResearchJobBody,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -56,6 +58,33 @@ router.get("/research-jobs", async (req, res) => {
 
   const response = ListResearchJobsResponse.parse(rows.map(mapJob));
   res.json(response);
+});
+
+router.post("/research-jobs", async (req, res) => {
+  const body = CreateResearchJobBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Invalid body", details: body.error.issues });
+    return;
+  }
+
+  const { jobId, status, questionText, mode, startedAt, completedAt, errorText, resultJson } = body.data;
+
+  const [inserted] = await db
+    .insert(researchJobsTable)
+    .values({
+      jobId,
+      status,
+      questionText: questionText ?? null,
+      mode: mode ?? null,
+      startedAt: startedAt ? new Date(startedAt) : null,
+      completedAt: completedAt ? new Date(completedAt) : null,
+      errorText: errorText ?? null,
+      resultJson: resultJson ?? null,
+    })
+    .returning();
+
+  const response = ListResearchJobsResponseItem.parse(mapJob(inserted));
+  res.status(201).json(response);
 });
 
 router.get("/research-jobs/:id", async (req, res) => {

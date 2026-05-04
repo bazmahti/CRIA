@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./createResearchJobInput";
+export * from "./createResearchJobInputResultJson";
+export * from "./createResearchJobInputStatus";
 export * from "./crossExperimentView";
 export * from "./crossExperimentViewConvergentFindingsItem";
 export * from "./crossExperimentViewDivergentFindingsItem";

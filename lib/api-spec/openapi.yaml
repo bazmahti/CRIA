@@ -336,6 +336,23 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ResearchJob"
+    post:
+      operationId: createResearchJob
+      tags: [research-history]
+      summary: Save a completed CRIA research run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateResearchJobInput"
+      responses:
+        "201":
+          description: Job saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResearchJob"
 
   /research-jobs/{id}:
     get:
@@ -742,6 +759,37 @@ components:
         - query
         - total
         - results
+
+    CreateResearchJobInput:
+      type: object
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, complete, failed]
+        questionText:
+          type: string
+          nullable: true
+        mode:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          nullable: true
+        completedAt:
+          type: string
+          nullable: true
+        errorText:
+          type: string
+          nullable: true
+        resultJson:
+          type: object
+          nullable: true
+          additionalProperties: true
+      required:
+        - jobId
+        - status
 
     ResearchJob:
       type: object

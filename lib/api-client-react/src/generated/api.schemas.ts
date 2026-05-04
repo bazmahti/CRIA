@@ -220,6 +220,31 @@ export interface SearchResults {
   results: SearchResult[];
 }
 
+export type CreateResearchJobInputStatus =
+  (typeof CreateResearchJobInputStatus)[keyof typeof CreateResearchJobInputStatus];
+
+export const CreateResearchJobInputStatus = {
+  queued: "queued",
+  running: "running",
+  complete: "complete",
+  failed: "failed",
+} as const;
+
+export type CreateResearchJobInputResultJson = {
+  [key: string]: unknown;
+} | null;
+
+export interface CreateResearchJobInput {
+  jobId: string;
+  status: CreateResearchJobInputStatus;
+  questionText?: string | null;
+  mode?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  errorText?: string | null;
+  resultJson?: CreateResearchJobInputResultJson;
+}
+
 export type ResearchJobStatus =
   (typeof ResearchJobStatus)[keyof typeof ResearchJobStatus];
 
