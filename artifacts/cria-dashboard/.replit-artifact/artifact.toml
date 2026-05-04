@@ -60,14 +60,6 @@ localPort = 8003
 [services.development]
 run = "python /home/runner/workspace/artifacts/cria-unified/main.py"
 
-[services.production]
-
-[services.production.run]
-args = ["python", "artifacts/cria-unified/main.py"]
-
-[services.production.health.startup]
-path = "/cria-unified/health"
-
 [services.env]
 PORT = "8003"
 BASE_PATH = "/cria-unified"
