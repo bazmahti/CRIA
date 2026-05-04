@@ -387,7 +387,7 @@ components:
 
     ExperimentStatus:
       type: string
-      enum: [pending, running, complete, failed, paused]
+      enum: [pending, running, complete, failed, paused, interrupted]
 
     ExperimentProject:
       type: string

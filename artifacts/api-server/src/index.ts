@@ -28,14 +28,14 @@ app.listen(port, async (err) => {
   try {
     const stuck = await db
       .update(experimentsTable)
-      .set({ status: "failed", updatedAt: new Date() })
+      .set({ status: "interrupted", updatedAt: new Date() })
       .where(eq(experimentsTable.status, "running"))
       .returning({ id: experimentsTable.id, experimentId: experimentsTable.experimentId });
 
     if (stuck.length > 0) {
       logger.warn(
         { count: stuck.length, ids: stuck.map((e) => e.experimentId) },
-        "Startup recovery — found experiments stuck in running state, marked as failed",
+        "Startup recovery — found experiments stuck in running state, marked as interrupted",
       );
     }
   } catch (recErr) {

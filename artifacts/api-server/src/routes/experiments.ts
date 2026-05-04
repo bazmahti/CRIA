@@ -376,7 +376,7 @@ router.patch("/experiments/:id", async (req, res): Promise<void> => {
   if (!body.success) { res.status(400).json({ error: body.error.message }); return; }
 
   const updateData: Partial<typeof experimentsTable.$inferInsert> = {};
-  if (body.data.status) updateData.status = body.data.status as "pending" | "running" | "complete" | "failed" | "paused";
+  if (body.data.status) updateData.status = body.data.status as "pending" | "running" | "complete" | "failed" | "paused" | "interrupted";
   if (body.data.requireHumanReview !== undefined) updateData.requireHumanReview = body.data.requireHumanReview;
   updateData.updatedAt = new Date();
 

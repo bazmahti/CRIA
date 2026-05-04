@@ -18,6 +18,7 @@ export const experimentStatusEnum = pgEnum("experiment_status", [
   "complete",
   "failed",
   "paused",
+  "interrupted",
 ]);
 
 export const experimentProjectEnum = pgEnum("experiment_project", [

@@ -1,5 +1,4 @@
 import { useParams, useLocation } from "wouter";
-import { useState, useEffect } from "react";
 import {
   useGetExperiment,
   useGetExperimentFindings,
@@ -14,15 +13,13 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format } from "date-fns";
 import { AlertTriangle, Play, Check, ChevronLeft, Trash2, Clock, RefreshCw, RotateCcw } from "lucide-react";
 import { Link } from "wouter";
 
-const STUCK_THRESHOLD_SECONDS = 30;
+const TERMINAL_STATUSES = new Set(["complete", "failed", "paused", "interrupted"]);
 
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -30,12 +27,6 @@ export default function ExperimentDetailPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [nowSeconds, setNowSeconds] = useState(() => Date.now() / 1000);
-
-  useEffect(() => {
-    const interval = setInterval(() => setNowSeconds(Date.now() / 1000), 5000);
-    return () => clearInterval(interval);
-  }, []);
 
   const { data: exp, isLoading } = useGetExperiment(expId, {
     query: {
@@ -89,12 +80,6 @@ export default function ExperimentDetailPage() {
   const hasErrors = (exp.validationErrors?.length ?? 0) > 0;
   const awaitingReview = exp.requireHumanReview && exp.status === "complete";
   const protections = exp.protections as Record<string, boolean> | null;
-
-  const runningForSeconds = exp.status === "running"
-    ? nowSeconds - new Date(exp.updatedAt).getTime() / 1000
-    : 0;
-  const isStuck = exp.status === "running" && runningForSeconds > STUCK_THRESHOLD_SECONDS;
-
   return (
     <div className="p-8 max-w-5xl space-y-8">
       {/* Back + header */}
@@ -122,35 +107,26 @@ export default function ExperimentDetailPage() {
           </div>
           {/* Actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {exp.status === "pending" && !hasErrors && (
+            {(exp.status === "pending" || exp.status === "interrupted") && !hasErrors && (
               <Button
                 size="sm"
-                className="gap-1.5"
-                onClick={() => runExperiment.mutate({ id: expId })}
+                className={`gap-1.5 ${exp.status === "interrupted" ? "border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20" : ""}`}
+                variant={exp.status === "interrupted" ? "outline" : "default"}
+                onClick={() => {
+                  if (exp.status === "interrupted") {
+                    if (!confirm("Re-run this experiment from scratch? Previous progress was lost when the server restarted.")) return;
+                  }
+                  runExperiment.mutate({ id: expId });
+                }}
                 disabled={runExperiment.isPending}
               >
                 <Play className="w-3.5 h-3.5" />
-                Run
+                {exp.status === "interrupted" ? "Retry" : "Run"}
               </Button>
             )}
-            {exp.status === "running" && !isStuck && (
+            {exp.status === "running" && (
               <Button size="sm" variant="outline" className="gap-1.5" onClick={() => updateExperiment.mutate({ id: expId, data: { status: "paused" } })}>
                 Pause
-              </Button>
-            )}
-            {isStuck && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 border-orange-500/40 text-orange-300 hover:bg-orange-500/10"
-                onClick={() => {
-                  updateExperiment.mutate({ id: expId, data: { status: "pending" } });
-                  toast({ title: "Experiment reset to pending" });
-                }}
-                disabled={updateExperiment.isPending}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Reset
               </Button>
             )}
             {exp.status === "paused" && (
@@ -193,33 +169,40 @@ export default function ExperimentDetailPage() {
         </div>
       )}
 
+      {/* Interrupted banner */}
+      {exp.status === "interrupted" && (
+        <div className="border border-amber-500/30 bg-amber-500/5 rounded p-4 space-y-1.5">
+          <div className="flex items-center gap-2 text-amber-300">
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium">Interrupted by server restart</span>
+          </div>
+          <p className="text-[11px] text-amber-300/70 leading-relaxed">
+            This experiment was mid-run when the server restarted. All in-progress work was lost and no findings were recorded.
+            Use <strong>Retry</strong> to re-run it from scratch.
+          </p>
+        </div>
+      )}
+
       {/* Running progress */}
       {exp.status === "running" && (
-        <div className={`border rounded p-4 ${isStuck ? "border-orange-500/30 bg-orange-500/5" : "border-blue-500/20 bg-blue-500/5"}`}>
+        <div className="border border-blue-500/20 bg-blue-500/5 rounded p-4">
           <div className="flex items-center justify-between mb-3">
-            <div className={`flex items-center gap-2 ${isStuck ? "text-orange-300" : "text-blue-300"}`}>
-              <RefreshCw className={`w-3.5 h-3.5 ${isStuck ? "" : "animate-spin"}`} />
-              <span className="text-xs font-medium">{isStuck ? "Stuck — no response from server" : "Running"}</span>
+            <div className="flex items-center gap-2 text-blue-300">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span className="text-xs font-medium">Running</span>
             </div>
             <div className="flex items-center gap-4 text-[10px] font-mono text-muted-foreground">
               {exp.elapsedSeconds != null && <span><Clock className="w-3 h-3 inline mr-1" />{exp.elapsedSeconds}s</span>}
               {exp.currentIteration != null && <span>Iteration {exp.currentIteration} / {exp.iterationCap ?? "—"}</span>}
-              <span className={isStuck ? "text-orange-400" : "text-blue-400"}>${(exp.budgetConsumed ?? 0).toFixed(2)} / ${exp.budgetCapAud.toFixed(2)}</span>
+              <span className="text-blue-400">${(exp.budgetConsumed ?? 0).toFixed(2)} / ${exp.budgetCapAud.toFixed(2)}</span>
             </div>
           </div>
-          {isStuck ? (
-            <p className="text-[11px] text-orange-300/80 leading-relaxed">
-              This experiment has been running for {Math.floor(runningForSeconds)}s with no completion signal — the server may have restarted mid-run.
-              Use the <strong>Reset</strong> button above to return it to <em>pending</em> so it can be re-run.
-            </p>
-          ) : (
-            <div className="h-1.5 rounded-full bg-blue-900/40 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-blue-500 transition-all"
-                style={{ width: `${Math.min(100, ((exp.budgetConsumed ?? 0) / exp.budgetCapAud) * 100)}%` }}
-              />
-            </div>
-          )}
+          <div className="h-1.5 rounded-full bg-blue-900/40 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-blue-500 transition-all"
+              style={{ width: `${Math.min(100, ((exp.budgetConsumed ?? 0) / exp.budgetCapAud) * 100)}%` }}
+            />
+          </div>
         </div>
       )}
 

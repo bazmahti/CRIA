@@ -31,7 +31,14 @@ export const ListExperimentsResponseItem = zod.object({
   id: zod.number(),
   experimentId: zod.string().describe("snake_case identifier (from artefact)"),
   project: zod.enum(["hum", "book3", "civilisational", "art_soul_ai"]),
-  status: zod.enum(["pending", "running", "complete", "failed", "paused"]),
+  status: zod.enum([
+    "pending",
+    "running",
+    "complete",
+    "failed",
+    "paused",
+    "interrupted",
+  ]),
   question: zod.string(),
   hypothesis: zod.string().nullish(),
   expectedOutcomeTypes: zod.array(zod.string()),
@@ -130,7 +137,14 @@ export const GetExperimentsSummaryResponse = zod.object({
         .string()
         .describe("snake_case identifier (from artefact)"),
       project: zod.enum(["hum", "book3", "civilisational", "art_soul_ai"]),
-      status: zod.enum(["pending", "running", "complete", "failed", "paused"]),
+      status: zod.enum([
+        "pending",
+        "running",
+        "complete",
+        "failed",
+        "paused",
+        "interrupted",
+      ]),
       question: zod.string(),
       hypothesis: zod.string().nullish(),
       expectedOutcomeTypes: zod.array(zod.string()),
@@ -205,7 +219,14 @@ export const GetExperimentsSummaryResponse = zod.object({
         .string()
         .describe("snake_case identifier (from artefact)"),
       project: zod.enum(["hum", "book3", "civilisational", "art_soul_ai"]),
-      status: zod.enum(["pending", "running", "complete", "failed", "paused"]),
+      status: zod.enum([
+        "pending",
+        "running",
+        "complete",
+        "failed",
+        "paused",
+        "interrupted",
+      ]),
       question: zod.string(),
       hypothesis: zod.string().nullish(),
       expectedOutcomeTypes: zod.array(zod.string()),
@@ -342,7 +363,14 @@ export const GetExperimentResponse = zod.object({
   id: zod.number(),
   experimentId: zod.string().describe("snake_case identifier (from artefact)"),
   project: zod.enum(["hum", "book3", "civilisational", "art_soul_ai"]),
-  status: zod.enum(["pending", "running", "complete", "failed", "paused"]),
+  status: zod.enum([
+    "pending",
+    "running",
+    "complete",
+    "failed",
+    "paused",
+    "interrupted",
+  ]),
   question: zod.string(),
   hypothesis: zod.string().nullish(),
   expectedOutcomeTypes: zod.array(zod.string()),
@@ -419,7 +447,7 @@ export const UpdateExperimentParams = zod.object({
 
 export const UpdateExperimentBody = zod.object({
   status: zod
-    .enum(["pending", "running", "complete", "failed", "paused"])
+    .enum(["pending", "running", "complete", "failed", "paused", "interrupted"])
     .optional(),
   requireHumanReview: zod.boolean().optional(),
 });
@@ -428,7 +456,14 @@ export const UpdateExperimentResponse = zod.object({
   id: zod.number(),
   experimentId: zod.string().describe("snake_case identifier (from artefact)"),
   project: zod.enum(["hum", "book3", "civilisational", "art_soul_ai"]),
-  status: zod.enum(["pending", "running", "complete", "failed", "paused"]),
+  status: zod.enum([
+    "pending",
+    "running",
+    "complete",
+    "failed",
+    "paused",
+    "interrupted",
+  ]),
   question: zod.string(),
   hypothesis: zod.string().nullish(),
   expectedOutcomeTypes: zod.array(zod.string()),
@@ -514,7 +549,14 @@ export const RunExperimentResponse = zod.object({
   id: zod.number(),
   experimentId: zod.string().describe("snake_case identifier (from artefact)"),
   project: zod.enum(["hum", "book3", "civilisational", "art_soul_ai"]),
-  status: zod.enum(["pending", "running", "complete", "failed", "paused"]),
+  status: zod.enum([
+    "pending",
+    "running",
+    "complete",
+    "failed",
+    "paused",
+    "interrupted",
+  ]),
   question: zod.string(),
   hypothesis: zod.string().nullish(),
   expectedOutcomeTypes: zod.array(zod.string()),

@@ -6,6 +6,7 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string }
   complete: { label: "Complete", dot: "bg-green-400", text: "text-green-300" },
   failed: { label: "Failed", dot: "bg-red-400", text: "text-red-300" },
   paused: { label: "Paused", dot: "bg-orange-400", text: "text-orange-300" },
+  interrupted: { label: "Interrupted", dot: "bg-amber-400", text: "text-amber-300" },
 };
 
 export default function StatusBadge({ status }: { status: string }) {
