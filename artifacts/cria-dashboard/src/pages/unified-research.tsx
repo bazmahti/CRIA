@@ -549,6 +549,12 @@ export default function UnifiedResearch() {
       });
       if (!resp.ok) {
         const t = await resp.text();
+        const isBackendDown = resp.status >= 500 && (
+          t.includes("Internal Server Error") || t.includes("Bad Gateway") || t.trim() === ""
+        );
+        if (isBackendDown) {
+          throw new Error("__BACKEND_UNAVAILABLE__");
+        }
         throw new Error(t);
       }
       const { jobId } = await resp.json() as { jobId: string };
@@ -804,11 +810,29 @@ export default function UnifiedResearch() {
         </div>
 
         {/* Error */}
-        {error && (
+        {error && error === "__BACKEND_UNAVAILABLE__" ? (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-400">AI research pipelines unavailable in this environment</p>
+                <p className="text-xs text-amber-400/80 mt-1 leading-relaxed">
+                  The CRIA-Cognitive, CRIA-Epistemic, and CRIA-Convergent pipelines require the Python backend
+                  which only runs in development or on a Reserved VM deployment. The current published app uses
+                  Autoscale, which supports a single process only.
+                </p>
+                <p className="text-xs text-amber-400/60 mt-2">
+                  To run live research: use the development environment, or switch the deployment type to
+                  <strong className="text-amber-400/80"> Reserved VM</strong> in the Deployments pane (this preserves all services permanently).
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : error ? (
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 text-sm text-red-400">
             {error}
           </div>
-        )}
+        ) : null}
 
         {/* Progress indicator while running */}
         {job?.status === "running" && (
