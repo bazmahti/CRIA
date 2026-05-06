@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { db, experimentsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { startPythonServices, stopPythonServices } from "./lib/python-services";
 
 const rawPort = process.env["PORT"];
 
@@ -25,6 +26,11 @@ app.listen(port, async (err) => {
 
   logger.info({ port }, "Server listening");
 
+  // In dev the Python workflows run independently; only spawn as subprocesses in production.
+  if (process.env["NODE_ENV"] !== "development") {
+    startPythonServices();
+  }
+
   try {
     const stuck = await db
       .update(experimentsTable)
@@ -42,3 +48,12 @@ app.listen(port, async (err) => {
     logger.error({ err: recErr }, "Startup recovery failed — could not reset stuck experiments");
   }
 });
+
+function shutdown(signal: string) {
+  logger.info({ signal }, "Received shutdown signal");
+  stopPythonServices();
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
