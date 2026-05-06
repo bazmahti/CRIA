@@ -711,6 +711,7 @@ async def startup():
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
+@app.get("/ultraria/health", response_model=UltraHealthResponse)
 @app.get("/health", response_model=UltraHealthResponse)
 async def health():
     live = [l for l in LANES if os.environ.get(LANE_BACKEND[l["id"]]["env_var"], "").strip()]

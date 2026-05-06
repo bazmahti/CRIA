@@ -41,6 +41,9 @@ run = "python /home/runner/workspace/artifacts/cria-deepseek/main.py"
 [services.production]
 run = "/home/runner/workspace/.pythonlibs/bin/python3 /home/runner/workspace/artifacts/cria-deepseek/main.py"
 
+[services.production.health.startup]
+path = "/cria-v2/health"
+
 [services.env]
 PORT = "8001"
 
@@ -55,6 +58,9 @@ run = "python /home/runner/workspace/artifacts/cria-v4/main.py"
 [services.production]
 run = "/home/runner/workspace/.pythonlibs/bin/python3 /home/runner/workspace/artifacts/cria-v4/main.py"
 
+[services.production.health.startup]
+path = "/cria-v4/health"
+
 [services.env]
 PORT = "8002"
 
@@ -68,6 +74,9 @@ run = "python /home/runner/workspace/artifacts/cria-unified/main.py"
 
 [services.production]
 run = "/home/runner/workspace/.pythonlibs/bin/python3 /home/runner/workspace/artifacts/cria-unified/main.py"
+
+[services.production.health.startup]
+path = "/cria-unified/health"
 
 [services.env]
 PORT = "8003"
@@ -84,6 +93,9 @@ run = "python /home/runner/workspace/artifacts/cria-unified/ultraria_stub.py"
 
 [services.production]
 run = "/home/runner/workspace/.pythonlibs/bin/python3 /home/runner/workspace/artifacts/cria-unified/ultraria_stub.py"
+
+[services.production.health.startup]
+path = "/ultraria/health"
 
 [services.env]
 PORT = "8004"
