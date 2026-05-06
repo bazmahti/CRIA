@@ -12,9 +12,8 @@ interface PythonService {
 // In production, node runs from the workspace root.
 // Normalise so script paths always resolve from the workspace root.
 const cwd = process.cwd();
-const WORKSPACE_ROOT = path.basename(cwd) === "api-server"
-  ? path.resolve(cwd, "../..")
-  : cwd;
+const WORKSPACE_ROOT =
+  path.basename(cwd) === "api-server" ? path.resolve(cwd, "../..") : cwd;
 
 const SERVICES: PythonService[] = [
   {
@@ -53,13 +52,21 @@ function startService(svc: PythonService, attempt = 0): void {
   if (shuttingDown) return;
 
   const scriptPath = path.join(WORKSPACE_ROOT, svc.script);
-  const child = spawn("python3", [scriptPath], {
+
+  // Use `uv run python` so the uv-managed venv (with all pyproject.toml deps,
+  // including asyncpg) is activated.  The cwd must be WORKSPACE_ROOT so uv can
+  // locate pyproject.toml / uv.lock.
+  const child = spawn("uv", ["run", "python", scriptPath], {
+    cwd: WORKSPACE_ROOT,
     env: { ...process.env, ...svc.env },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
   children.set(svc.name, child);
-  logger.info({ service: svc.name, pid: child.pid }, "Python service started");
+  logger.info(
+    { service: svc.name, pid: child.pid, scriptPath },
+    "Python service spawned",
+  );
 
   child.stdout?.on("data", (buf: Buffer) => {
     const line = buf.toString().trim();
@@ -69,6 +76,13 @@ function startService(svc: PythonService, attempt = 0): void {
   child.stderr?.on("data", (buf: Buffer) => {
     const line = buf.toString().trim();
     if (line) logger.warn({ service: svc.name }, line);
+  });
+
+  child.on("error", (err) => {
+    logger.error(
+      { service: svc.name, err },
+      "Failed to spawn Python service — is `uv` on PATH?",
+    );
   });
 
   child.on("exit", (code, signal) => {
@@ -85,6 +99,10 @@ function startService(svc: PythonService, attempt = 0): void {
 }
 
 export function startPythonServices(): void {
+  logger.info(
+    { workspaceRoot: WORKSPACE_ROOT, count: SERVICES.length },
+    "Starting Python services via uv",
+  );
   for (const svc of SERVICES) {
     startService(svc);
   }
