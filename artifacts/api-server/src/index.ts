@@ -26,8 +26,12 @@ app.listen(port, async (err) => {
 
   logger.info({ port }, "Server listening");
 
-  // Python services are started by Replit's deployment system via artifact.toml
-  // [services.production] run commands — no subprocess spawning needed here.
+  // Spawn Python research services if they aren't already running.
+  // Port-check logic in python-services.ts skips spawn when dev workflows
+  // already occupy those ports, so this is safe to call unconditionally.
+  startPythonServices().catch((err) =>
+    logger.error({ err }, "Failed to start Python services"),
+  );
 
   try {
     const stuck = await db
