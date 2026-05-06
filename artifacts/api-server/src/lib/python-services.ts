@@ -1,4 +1,5 @@
-import { spawn, ChildProcess } from "child_process";
+import { spawn, execSync, ChildProcess } from "child_process";
+import { existsSync } from "fs";
 import net from "net";
 import path from "path";
 import { logger } from "./logger";
@@ -10,11 +11,31 @@ interface PythonService {
   env: Record<string, string>;
 }
 
-const cwd = process.cwd();
-const WORKSPACE_ROOT =
-  path.basename(cwd) === "api-server" ? path.resolve(cwd, "../..") : cwd;
+// __dirname is injected by the esbuild banner as:
+//   path.dirname(fileURLToPath(import.meta.url))
+// In the bundle this resolves to   <workspace>/artifacts/api-server/dist/
+// so three levels up is the monorepo root — reliable regardless of cwd.
+const WORKSPACE_ROOT = path.resolve(__dirname, "../../..");
 
-const PYTHON = "/home/runner/workspace/.pythonlibs/bin/python3";
+function resolvePython(): string {
+  const preferred = path.join(WORKSPACE_ROOT, ".pythonlibs/bin/python3");
+  if (existsSync(preferred)) return preferred;
+
+  // Fall back to whatever python3 is on PATH (Replit nix env always has one)
+  try {
+    const found = execSync("which python3", {
+      encoding: "utf8",
+      timeout: 3_000,
+    }).trim();
+    if (found) return found;
+  } catch {
+    // ignore
+  }
+
+  return "python3";
+}
+
+const PYTHON = resolvePython();
 
 const SERVICES: PythonService[] = [
   {
@@ -68,6 +89,11 @@ function spawnService(svc: PythonService, attempt = 0): void {
   if (shuttingDown) return;
 
   const scriptPath = path.join(WORKSPACE_ROOT, svc.script);
+
+  logger.info(
+    { service: svc.name, python: PYTHON, scriptPath, workspaceRoot: WORKSPACE_ROOT },
+    "Spawning Python service",
+  );
 
   const child = spawn(PYTHON, [scriptPath], {
     cwd: WORKSPACE_ROOT,
@@ -131,4 +157,24 @@ export function stopPythonServices(): void {
     child.kill("SIGTERM");
   }
   children.clear();
+}
+
+/** Live diagnostic snapshot — exposed at /api/debug/python */
+export async function getPythonServiceStatus() {
+  const results = await Promise.all(
+    SERVICES.map(async (svc) => ({
+      name: svc.name,
+      port: svc.port,
+      running: children.has(svc.name),
+      pid: children.get(svc.name)?.pid ?? null,
+      portReachable: await isPortInUse(svc.port),
+      scriptExists: existsSync(path.join(WORKSPACE_ROOT, svc.script)),
+    })),
+  );
+  return {
+    workspaceRoot: WORKSPACE_ROOT,
+    python: PYTHON,
+    pythonExists: existsSync(PYTHON),
+    services: results,
+  };
 }
