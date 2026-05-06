@@ -592,7 +592,7 @@ export default function ParallelResearch() {
               placeholder="What does post-AI work-meaning collapse look like across cultural traditions?"
               rows={3}
               disabled={launching || running}
-              className="w-full rounded-lg bg-background border border-border/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
+              className="w-full rounded-lg bg-background border border-border/60 px-4 py-3 text-base md:text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
             />
           </div>
           <div>
@@ -604,7 +604,7 @@ export default function ParallelResearch() {
               value={observerNote}
               onChange={(e) => setObserverNote(e.target.value)}
               placeholder="e.g. Researcher anchored in HUM/civilisational lineage; partnership-pending for Indigenous sources"
-              className="w-full rounded-lg bg-background border border-border/60 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+              className="w-full rounded-lg bg-background border border-border/60 px-4 py-2.5 text-base md:text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
             />
           </div>
           <div className="flex items-end gap-6 flex-wrap">

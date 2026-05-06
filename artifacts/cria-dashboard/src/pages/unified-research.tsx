@@ -658,7 +658,7 @@ export default function UnifiedResearch() {
                 value={observerNote}
                 onChange={(e) => setObserverNote(e.target.value)}
                 placeholder="e.g. Researcher anchored in HUM/civilisational lineage; partnership-pending for Indigenous sources"
-                className="w-full bg-background/50 border border-border/50 rounded-xl px-4 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="w-full bg-background/50 border border-border/50 rounded-xl px-4 py-2.5 text-base md:text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
             </div>
 
