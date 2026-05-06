@@ -9,44 +9,97 @@ const PYTHON_SERVICES: Array<{ basePath: string; port: number }> = [
   { basePath: "/ultraria", port: 8004 },
 ];
 
+const RETRY_TIMEOUT_MS = 45_000; // total time to wait for a service to come up
+const RETRY_INTERVAL_MS = 1_000;
+
+function attemptProxy(
+  options: http.RequestOptions,
+  bodyBuffer: Buffer,
+  deadline: number,
+  resolve: (value: { status: number; headers: http.IncomingHttpHeaders; body: Buffer }) => void,
+  reject: (err: Error) => void,
+) {
+  const req = http.request(options, (res) => {
+    const chunks: Buffer[] = [];
+    res.on("data", (chunk: Buffer) => chunks.push(chunk));
+    res.on("end", () => {
+      resolve({
+        status: res.statusCode ?? 502,
+        headers: res.headers,
+        body: Buffer.concat(chunks),
+      });
+    });
+  });
+
+  req.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "ECONNREFUSED" && Date.now() < deadline) {
+      // Python service not up yet — retry after a short pause
+      setTimeout(
+        () => attemptProxy(options, bodyBuffer, deadline, resolve, reject),
+        RETRY_INTERVAL_MS,
+      );
+    } else {
+      reject(err);
+    }
+  });
+
+  if (bodyBuffer.length > 0) {
+    req.write(bodyBuffer);
+  }
+  req.end();
+}
+
 function buildProxyHandler(basePath: string, targetPort: number) {
   return function pythonProxy(req: Request, res: Response): void {
-    const targetPath = basePath + (req.url ?? "/");
+    // Collect the raw body (express.json hasn't run yet for these routes)
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      const bodyBuffer = Buffer.concat(chunks);
+      const targetPath = basePath + (req.url ?? "/");
 
-    const forwardHeaders = { ...req.headers };
-    forwardHeaders["host"] = `127.0.0.1:${targetPort}`;
-    forwardHeaders["connection"] = "close";
-
-    const options: http.RequestOptions = {
-      hostname: "127.0.0.1",
-      port: targetPort,
-      path: targetPath,
-      method: req.method,
-      headers: forwardHeaders,
-    };
-
-    const proxyReq = http.request(options, (proxyRes) => {
-      res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
-      proxyRes.pipe(res, { end: true });
-    });
-
-    proxyReq.on("error", (err) => {
-      logger.warn(
-        { basePath, targetPort, err: err.message },
-        "Python proxy request failed",
-      );
-      if (!res.headersSent) {
-        res.writeHead(502, { "content-type": "application/json" });
-        res.end(
-          JSON.stringify({
-            error: "Python service unavailable",
-            detail: err.message,
-          }),
-        );
+      const forwardHeaders = { ...req.headers };
+      forwardHeaders["host"] = `127.0.0.1:${targetPort}`;
+      forwardHeaders["connection"] = "close";
+      if (bodyBuffer.length > 0) {
+        forwardHeaders["content-length"] = String(bodyBuffer.length);
       }
-    });
 
-    req.pipe(proxyReq, { end: true });
+      const options: http.RequestOptions = {
+        hostname: "127.0.0.1",
+        port: targetPort,
+        path: targetPath,
+        method: req.method,
+        headers: forwardHeaders,
+      };
+
+      const deadline = Date.now() + RETRY_TIMEOUT_MS;
+
+      new Promise<{ status: number; headers: http.IncomingHttpHeaders; body: Buffer }>(
+        (resolve, reject) => attemptProxy(options, bodyBuffer, deadline, resolve, reject),
+      )
+        .then(({ status, headers, body }) => {
+          if (!res.headersSent) {
+            res.writeHead(status, headers);
+            res.end(body);
+          }
+        })
+        .catch((err: Error) => {
+          logger.warn(
+            { basePath, targetPort, err: err.message },
+            "Python proxy request failed after retries",
+          );
+          if (!res.headersSent) {
+            res.writeHead(502, { "content-type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: "Python service unavailable",
+                detail: err.message,
+              }),
+            );
+          }
+        });
+    });
   };
 }
 
