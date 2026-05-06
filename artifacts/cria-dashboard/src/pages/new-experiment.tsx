@@ -63,7 +63,7 @@ export default function NewExperimentPage() {
         <p className="text-sm text-muted-foreground mt-0.5">Paste a YAML experiment artefact or start from a template.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* YAML editor */}
         <div className="col-span-2 space-y-3">
           <div className="flex items-center justify-between">

@@ -646,7 +646,7 @@ export default function UnifiedResearch() {
                 placeholder="What does post-AI work-meaning collapse look like across cultural traditions?"
                 rows={3}
                 disabled={loading || job?.status === "running"}
-                className="w-full bg-background/50 border border-border/50 rounded-xl px-4 py-3 text-sm placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="w-full bg-background/50 border border-border/50 rounded-xl px-4 py-3 text-base md:text-sm placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
             </div>
 
