@@ -1,4 +1,4 @@
-import { spawn, execSync, ChildProcess } from "child_process";
+import { spawn, ChildProcess } from "child_process";
 import path from "path";
 import { logger } from "./logger";
 
@@ -10,10 +10,14 @@ interface PythonService {
 
 // In dev, pnpm runs from the package dir (artifacts/api-server).
 // In production, node runs from the workspace root.
-// Normalise so script paths always resolve from the workspace root.
 const cwd = process.cwd();
 const WORKSPACE_ROOT =
   path.basename(cwd) === "api-server" ? path.resolve(cwd, "../..") : cwd;
+
+// Use the uv-managed virtualenv Python directly — it has all pyproject.toml
+// packages (asyncpg, fastapi, uvicorn, etc.) installed and works in both
+// dev and Autoscale production without needing uv or python3 on PATH.
+const PYTHON = "/home/runner/workspace/.pythonlibs/bin/python3";
 
 const SERVICES: PythonService[] = [
   {
@@ -48,71 +52,19 @@ const MAX_DELAY_MS = 30_000;
 const children = new Map<string, ChildProcess>();
 let shuttingDown = false;
 
-/** Write a line directly to stderr so it always appears in deployment logs. */
-function diagLog(msg: string): void {
-  process.stderr.write(`[python-services] ${msg}\n`);
-}
-
-/** Return the resolved path to a command, or null if not found. */
-function which(cmd: string): string | null {
-  try {
-    return execSync(`which ${cmd}`, { stdio: ["ignore", "pipe", "ignore"] })
-      .toString()
-      .trim();
-  } catch {
-    return null;
-  }
-}
-
-function buildCommand(): { cmd: string; args: string[] } {
-  const uvPath = which("uv");
-  const py3Path = which("python3");
-  const pyPath = which("python");
-
-  diagLog(`which uv=${uvPath ?? "not found"}`);
-  diagLog(`which python3=${py3Path ?? "not found"}`);
-  diagLog(`which python=${pyPath ?? "not found"}`);
-  diagLog(`PATH=${process.env["PATH"] ?? "(unset)"}`);
-  diagLog(`WORKSPACE_ROOT=${WORKSPACE_ROOT}`);
-
-  if (uvPath) {
-    return { cmd: uvPath, args: ["run", "python"] };
-  }
-  if (py3Path) {
-    return { cmd: py3Path, args: [] };
-  }
-  if (pyPath) {
-    return { cmd: pyPath, args: [] };
-  }
-  return { cmd: "python3", args: [] }; // last resort — will fail with ENOENT
-}
-
-function startService(
-  svc: PythonService,
-  cmd: string,
-  baseArgs: string[],
-  attempt = 0,
-): void {
+function startService(svc: PythonService, attempt = 0): void {
   if (shuttingDown) return;
 
   const scriptPath = path.join(WORKSPACE_ROOT, svc.script);
-  const fullArgs = [...baseArgs, scriptPath];
 
-  diagLog(
-    `Spawning [attempt=${attempt}]: ${cmd} ${fullArgs.join(" ")} (cwd=${WORKSPACE_ROOT})`,
-  );
-
-  const child = spawn(cmd, fullArgs, {
+  const child = spawn(PYTHON, [scriptPath], {
     cwd: WORKSPACE_ROOT,
     env: { ...process.env, ...svc.env },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
   children.set(svc.name, child);
-  logger.info(
-    { service: svc.name, pid: child.pid, scriptPath, cmd },
-    "Python service spawned",
-  );
+  logger.info({ service: svc.name, pid: child.pid }, "Python service spawned");
 
   child.stdout?.on("data", (buf: Buffer) => {
     const line = buf.toString().trim();
@@ -121,43 +73,29 @@ function startService(
 
   child.stderr?.on("data", (buf: Buffer) => {
     const line = buf.toString().trim();
-    if (line) {
-      logger.warn({ service: svc.name }, line);
-      diagLog(`[${svc.name} stderr] ${line}`);
-    }
+    if (line) logger.warn({ service: svc.name }, line);
   });
 
   child.on("error", (err) => {
-    diagLog(`Spawn error for ${svc.name}: ${err.message}`);
     logger.error({ service: svc.name, err }, "Failed to spawn Python service");
   });
 
   child.on("exit", (code, signal) => {
     children.delete(svc.name);
     if (shuttingDown) return;
-
     const delay = Math.min(BASE_DELAY_MS * 2 ** attempt, MAX_DELAY_MS);
-    diagLog(`${svc.name} exited code=${code} signal=${signal} — restarting in ${delay}ms`);
     logger.warn(
       { service: svc.name, code, signal, restartInMs: delay },
-      "Python service exited unexpectedly — restarting",
+      "Python service exited — restarting",
     );
-    setTimeout(() => startService(svc, cmd, baseArgs, attempt + 1), delay);
+    setTimeout(() => startService(svc, attempt + 1), delay);
   });
 }
 
 export function startPythonServices(): void {
-  diagLog("startPythonServices() called");
-  const { cmd, args } = buildCommand();
-  diagLog(`Selected launcher: ${cmd} ${args.join(" ")}`);
-
-  logger.info(
-    { workspaceRoot: WORKSPACE_ROOT, count: SERVICES.length, cmd },
-    "Starting Python services",
-  );
-
+  logger.info({ workspaceRoot: WORKSPACE_ROOT, python: PYTHON }, "Starting Python services");
   for (const svc of SERVICES) {
-    startService(svc, cmd, args);
+    startService(svc);
   }
 }
 
