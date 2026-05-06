@@ -79,7 +79,10 @@ export default function NewExperimentPage() {
             value={yaml}
             onChange={e => setYaml(e.target.value)}
             placeholder="Paste your YAML artefact here..."
-            className="font-mono text-xs min-h-[480px] resize-none bg-background border-border"
+            className="font-mono text-base md:text-xs min-h-[480px] resize-none bg-background border-border"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
           />
 
           {/* Validation feedback */}
