@@ -71,7 +71,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
   return (
-    <div className="flex h-screen bg-background" style={{ overflow: "clip" }}>
+    <div className="flex bg-background" style={{ height: "100dvh", overflow: "hidden" }}>
       {/* Sidebar */}
       <aside className="w-60 flex-shrink-0 flex flex-col bg-sidebar border-r border-sidebar-border">
         {/* Brand */}
