@@ -16,7 +16,7 @@ run = "pnpm --filter @workspace/api-server run dev"
 build = ["pnpm", "--filter", "@workspace/api-server", "run", "build"]
 
 [services.production.run]
-args = ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
+args = ["sh", "-c", "SPAWN_PYTHON_SERVICES=true node --enable-source-maps artifacts/api-server/dist/index.mjs"]
 
 [services.production.health.startup]
 path = "/api/healthz"

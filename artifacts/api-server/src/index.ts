@@ -27,7 +27,9 @@ app.listen(port, async (err) => {
   logger.info({ port }, "Server listening");
 
   // In dev the Python workflows run independently; only spawn as subprocesses in production.
-  if (process.env["NODE_ENV"] !== "development") {
+  // We use an explicit env var rather than NODE_ENV because bundled libraries
+  // default NODE_ENV to "development" when unset, making that check unreliable.
+  if (process.env["SPAWN_PYTHON_SERVICES"] === "true") {
     startPythonServices();
   }
 
