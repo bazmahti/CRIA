@@ -815,15 +815,10 @@ export default function UnifiedResearch() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-amber-400">AI research pipelines unavailable in this environment</p>
+                <p className="text-sm font-medium text-amber-400">Research pipelines are starting up</p>
                 <p className="text-xs text-amber-400/80 mt-1 leading-relaxed">
-                  The CRIA-Cognitive, CRIA-Epistemic, and CRIA-Convergent pipelines require the Python backend
-                  which only runs in development or on a Reserved VM deployment. The current published app uses
-                  Autoscale, which supports a single process only.
-                </p>
-                <p className="text-xs text-amber-400/60 mt-2">
-                  To run live research: use the development environment, or switch the deployment type to
-                  <strong className="text-amber-400/80"> Reserved VM</strong> in the Deployments pane (this preserves all services permanently).
+                  The AI research services are still initialising. This usually takes 15–30 seconds after the
+                  app first loads. Please wait a moment and try again.
                 </p>
               </div>
             </div>
