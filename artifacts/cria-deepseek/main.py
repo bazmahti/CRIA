@@ -1480,8 +1480,8 @@ function escapeHtml(str) {
 @app.get(f"{BASE_PATH}/", response_class=HTMLResponse)
 @app.get(f"{BASE_PATH}", response_class=HTMLResponse)
 async def serve_dashboard():
-    html = DASHBOARD_HTML.replace("BASE_PATH_PLACEHOLDER", BASE_PATH)
-    return HTMLResponse(html)
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/unified", status_code=302)
 
 @app.post(f"{BASE_PATH}/research")
 async def research_endpoint(request: ResearchRequest):
