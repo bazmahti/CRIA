@@ -26,12 +26,8 @@ app.listen(port, async (err) => {
 
   logger.info({ port }, "Server listening");
 
-  // In dev the Python workflows run independently; only spawn as subprocesses in production.
-  // We use an explicit env var rather than NODE_ENV because bundled libraries
-  // default NODE_ENV to "development" when unset, making that check unreliable.
-  if (process.env["SPAWN_PYTHON_SERVICES"] === "true") {
-    startPythonServices();
-  }
+  // Python services are started by Replit's deployment system via artifact.toml
+  // [services.production] run commands — no subprocess spawning needed here.
 
   try {
     const stuck = await db

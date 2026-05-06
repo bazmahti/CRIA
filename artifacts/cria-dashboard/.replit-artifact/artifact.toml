@@ -38,6 +38,9 @@ localPort = 8001
 [services.development]
 run = "python /home/runner/workspace/artifacts/cria-deepseek/main.py"
 
+[services.production]
+run = "/home/runner/workspace/.pythonlibs/bin/python3 /home/runner/workspace/artifacts/cria-deepseek/main.py"
+
 [services.env]
 PORT = "8001"
 
@@ -49,6 +52,9 @@ localPort = 8002
 [services.development]
 run = "python /home/runner/workspace/artifacts/cria-v4/main.py"
 
+[services.production]
+run = "/home/runner/workspace/.pythonlibs/bin/python3 /home/runner/workspace/artifacts/cria-v4/main.py"
+
 [services.env]
 PORT = "8002"
 
@@ -59,6 +65,9 @@ localPort = 8003
 
 [services.development]
 run = "python /home/runner/workspace/artifacts/cria-unified/main.py"
+
+[services.production]
+run = "/home/runner/workspace/.pythonlibs/bin/python3 /home/runner/workspace/artifacts/cria-unified/main.py"
 
 [services.env]
 PORT = "8003"
@@ -72,6 +81,9 @@ localPort = 8004
 
 [services.development]
 run = "python /home/runner/workspace/artifacts/cria-unified/ultraria_stub.py"
+
+[services.production]
+run = "/home/runner/workspace/.pythonlibs/bin/python3 /home/runner/workspace/artifacts/cria-unified/ultraria_stub.py"
 
 [services.env]
 PORT = "8004"
