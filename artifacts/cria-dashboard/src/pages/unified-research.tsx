@@ -863,27 +863,6 @@ export default function UnifiedResearch() {
                     </span>
                   </Link>
                 )}
-                <button
-                  onClick={() => {
-                    const papers = (result["pipeline_papers"] ?? {}) as Record<string, Record<string, string>>;
-                    const voices = (result["voices"] ?? {}) as Record<string, Record<string, string>>;
-                    const slug = job.query.slice(0, 40).replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-                    [
-                      ["cognitive", papers["cognitive"]?.text],
-                      ["epistemic", papers["epistemic"]?.text],
-                      ["convergent", papers["convergent"]?.text],
-                      ["synthesis-academic", voices["academic"]?.text],
-                      ["synthesis-editorial", voices["editorial"]?.text],
-                      ["synthesis-practitioner", voices["practitioner"]?.text],
-                    ].forEach(([name, text]) => {
-                      if (text) setTimeout(() => downloadMarkdown(`CRIA-${name}-${slug}`, text as string), 100);
-                    });
-                  }}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border/40 hover:border-border/70 rounded-lg px-3 py-1.5 transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Download all 6
-                </button>
                 <StatusBadge status="complete" />
               </div>
             </div>
@@ -902,6 +881,73 @@ export default function UnifiedResearch() {
             {pipeline === "publication" && (
               <PublicationPanel guidance={result["publication_guidance"] as Record<string, unknown> | null} />
             )}
+
+            {/* ── Downloads panel ─────────────────────────────────────── */}
+            {(() => {
+              const papers = (result["pipeline_papers"] ?? {}) as Record<string, Record<string, string>>;
+              const voices = (result["voices"] ?? {}) as Record<string, Record<string, string>>;
+              const slug = job.query.slice(0, 40).replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+
+              const files: { label: string; subtitle: string; key: string; content: string | undefined; color: string }[] = [
+                { label: "Cognitive Pipeline", subtitle: "CRIA-Cognitive research paper", key: `cognitive-${slug}`, content: papers["cognitive"]?.text, color: "text-blue-400 border-blue-500/30 hover:border-blue-500/60 hover:bg-blue-500/5" },
+                { label: "Epistemic Pipeline", subtitle: "CRIA-Epistemic research paper", key: `epistemic-${slug}`, content: papers["epistemic"]?.text, color: "text-violet-400 border-violet-500/30 hover:border-violet-500/60 hover:bg-violet-500/5" },
+                { label: "Convergent Pipeline", subtitle: "CRIA-Convergent synthesis paper", key: `convergent-${slug}`, content: papers["convergent"]?.text, color: "text-emerald-400 border-emerald-500/30 hover:border-emerald-500/60 hover:bg-emerald-500/5" },
+                { label: "Academic Voice", subtitle: "Synthesis — academic register", key: `synthesis-academic-${slug}`, content: voices["academic"]?.text, color: "text-amber-400 border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-500/5" },
+                { label: "Editorial Voice", subtitle: "Synthesis — editorial register", key: `synthesis-editorial-${slug}`, content: voices["editorial"]?.text, color: "text-rose-400 border-rose-500/30 hover:border-rose-500/60 hover:bg-rose-500/5" },
+                { label: "Practitioner Voice", subtitle: "Synthesis — practitioner register", key: `synthesis-practitioner-${slug}`, content: voices["practitioner"]?.text, color: "text-cyan-400 border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-500/5" },
+              ];
+
+              const available = files.filter(f => !!f.content);
+              if (available.length === 0) return null;
+
+              return (
+                <div className="mt-6 border-t border-border/30 pt-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Download className="w-4 h-4 text-muted-foreground" />
+                        Download Research Outputs
+                      </h3>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Each file is a Markdown document (.md) — open in any text editor, Obsidian, or Notion.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        available.forEach(({ key, content }, i) => {
+                          if (content) setTimeout(() => downloadMarkdown(`CRIA-${key}`, content), i * 120);
+                        });
+                      }}
+                      className="flex items-center gap-1.5 text-xs font-medium text-foreground bg-primary/10 hover:bg-primary/20 border border-primary/30 hover:border-primary/50 rounded-lg px-3 py-1.5 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download all {available.length}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {files.map(({ label, subtitle, key, content, color }) => (
+                      <button
+                        key={key}
+                        disabled={!content}
+                        onClick={() => content && downloadMarkdown(`CRIA-${key}`, content)}
+                        className={cn(
+                          "flex flex-col items-start gap-0.5 rounded-xl border px-3.5 py-3 text-left transition-colors",
+                          content
+                            ? cn("cursor-pointer", color)
+                            : "cursor-not-allowed opacity-30 border-border/30 text-muted-foreground"
+                        )}
+                      >
+                        <span className="flex items-center gap-1.5 text-xs font-medium">
+                          <Download className="w-3 h-3 shrink-0" />
+                          {label}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground pl-4">{subtitle}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
