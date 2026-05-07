@@ -31,12 +31,26 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const VOICE_LABELS: Record<string, string> = {
+  cognitive_paper: "Cognitive Pipeline Paper",
+  epistemic_paper: "Epistemic Pipeline Paper",
+  convergent_paper: "Convergent Pipeline Paper",
   academic: "Academic Voice",
   editorial: "Editorial Voice",
   practitioner: "Practitioner Voice",
   convergence_analysis: "Convergence Analysis",
   synthesis: "Synthesis",
 };
+
+const VOICE_ORDER = [
+  "cognitive_paper",
+  "epistemic_paper",
+  "convergent_paper",
+  "academic",
+  "editorial",
+  "practitioner",
+  "convergence_analysis",
+  "synthesis",
+];
 
 function VoicePanel({ voiceKey, voiceData }: { voiceKey: string; voiceData: { text?: string } | null }) {
   const [open, setOpen] = useState(voiceKey === "academic");
@@ -69,11 +83,10 @@ function JobDetail({ id }: { id: string }) {
   if (!job) return <div className="p-8 text-muted-foreground text-sm">Job not found.</div>;
 
   const voices = job.voices as Record<string, { text?: string }> | null;
-  const voiceOrder = ["academic", "editorial", "practitioner", "convergence_analysis", "synthesis"];
   const sortedVoices = voices
     ? [
-        ...voiceOrder.filter(k => k in voices).map(k => [k, voices[k]] as [string, { text?: string }]),
-        ...Object.entries(voices).filter(([k]) => !voiceOrder.includes(k)),
+        ...VOICE_ORDER.filter(k => k in voices).map(k => [k, voices[k]] as [string, { text?: string }]),
+        ...Object.entries(voices).filter(([k]) => !VOICE_ORDER.includes(k)),
       ]
     : [];
 

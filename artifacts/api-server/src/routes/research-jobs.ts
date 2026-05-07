@@ -29,11 +29,21 @@ function mapJob(job: typeof researchJobsTable.$inferSelect) {
 function mapJobDetail(job: typeof researchJobsTable.$inferSelect) {
   const base = mapJob(job);
   const result = job.resultJson as Record<string, unknown> | null;
+
+  // For unified jobs the result has both `pipeline_papers` and `voices`.
+  // Merge pipeline papers in under predictable keys so history downloads all 6.
+  const voices = result?.voices as Record<string, { text?: string }> | undefined;
+  const papers = result?.pipeline_papers as Record<string, { text?: string }> | undefined;
+
+  const merged: Record<string, { text?: string }> = {};
+  if (papers?.["cognitive"]?.text) merged["cognitive_paper"] = papers["cognitive"];
+  if (papers?.["epistemic"]?.text) merged["epistemic_paper"] = papers["epistemic"];
+  if (papers?.["convergent"]?.text) merged["convergent_paper"] = papers["convergent"];
+  if (voices) Object.assign(merged, voices);
+
   return {
     ...base,
-    voices: result?.voices
-      ? (result.voices as Record<string, { text?: string }>)
-      : null,
+    voices: Object.keys(merged).length > 0 ? merged : null,
   };
 }
 
