@@ -9,3 +9,5 @@ beautifulsoup4==4.12.2
 lxml==4.9.3
 openai>=1.0.0
 pyyaml>=6.0
+asyncpg>=0.29.0
+slowapi>=0.1.9
