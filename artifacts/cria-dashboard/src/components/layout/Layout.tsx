@@ -13,6 +13,7 @@ import {
   History,
   Search,
 } from "lucide-react";
+import StorageWarning from "@/components/StorageWarning";
 
 const NAV = [
   { href: "/research", label: "Parallel Research", icon: Zap },
@@ -154,6 +155,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main content with sticky mode bar at top */}
       <main className="flex-1 overflow-y-auto flex flex-col">
         <ModeBar location={location} />
+        <StorageWarning />
         <div className="flex-1">
           {children}
         </div>

@@ -5,6 +5,7 @@ import templatesRouter from "./templates";
 import parallelRouter from "./parallel";
 import researchJobsRouter from "./research-jobs";
 import searchRouter from "./search";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(templatesRouter);
 router.use(parallelRouter);
 router.use(researchJobsRouter);
 router.use(searchRouter);
+router.use(storageRouter);
 
 export default router;
