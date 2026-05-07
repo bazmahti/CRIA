@@ -171,14 +171,31 @@ async def _migrate(conn: asyncpg.Connection) -> None:
         "SELECT 1 FROM information_schema.tables "
         "WHERE table_name='research_jobs' AND table_schema='public'"
     )
-    if table_exists:
-        has_new_schema = await conn.fetchval(
+    if not table_exists:
+        return
+    has_result_json = await conn.fetchval(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name='research_jobs' AND column_name='result_json'"
+    )
+    if not has_result_json:
+        log.info("Old schema detected — dropping research_jobs for full migration")
+        await conn.execute("DROP TABLE research_jobs CASCADE")
+        return
+    # v2 additive migrations — add any columns introduced after initial deploy
+    for col, col_type in [
+        ("request_id", "TEXT"),
+        ("error_text", "TEXT"),
+        ("mode", "TEXT"),
+    ]:
+        has_col = await conn.fetchval(
             "SELECT 1 FROM information_schema.columns "
-            "WHERE table_name='research_jobs' AND column_name='result_json'"
+            "WHERE table_name='research_jobs' AND column_name=$1", col
         )
-        if not has_new_schema:
-            log.info("Old schema detected — dropping for migration")
-            await conn.execute("DROP TABLE research_jobs CASCADE")
+        if not has_col:
+            log.info("Adding missing column research_jobs.%s", col)
+            await conn.execute(
+                f"ALTER TABLE research_jobs ADD COLUMN IF NOT EXISTS {col} {col_type}"
+            )
 
 
 async def _init_db_pool() -> asyncpg.Pool:
@@ -3201,7 +3218,11 @@ async def research_endpoint(
         job_id=job_id,
     )
     request_id = getattr(request.state, "request_id", "")
-    await db_create_job(job_id, body.query, body.profile, request_id)
+    try:
+        await db_create_job(job_id, body.query, body.profile, request_id)
+    except Exception as e:
+        log.error("Failed to create job record: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to queue research job — database error")
     background_tasks.add_task(_run_research_job, job_id, artefact)
     log.info("Job %s queued — %r", job_id, body.query[:80])
     return {"jobId": job_id, "status": "queued", "query_class": "exploratory"}
