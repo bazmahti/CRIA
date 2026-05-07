@@ -12,8 +12,19 @@ if [ ! -x "$PYTHON" ]; then
 fi
 echo "[start.sh] Using python: $PYTHON ($($PYTHON --version 2>&1))"
 
-# Quick sanity: can we import fastapi/uvicorn?
-"$PYTHON" -c "import fastapi, uvicorn, asyncpg; print('[start.sh] Python imports OK')" 2>&1 \
+# Install / sync Python dependencies from requirements.txt
+REQUIREMENTS="$WORKSPACE_ROOT/artifacts/cria-unified/requirements.txt"
+if [ -f "$REQUIREMENTS" ]; then
+  echo "[start.sh] Installing Python dependencies from $REQUIREMENTS ..."
+  "$PYTHON" -m pip install -q -r "$REQUIREMENTS" \
+    && echo "[start.sh] pip install OK" \
+    || echo "[start.sh] WARNING: pip install failed (see above)"
+else
+  echo "[start.sh] WARNING: requirements.txt not found at $REQUIREMENTS"
+fi
+
+# Quick sanity: can we import fastapi/uvicorn/slowapi?
+"$PYTHON" -c "import fastapi, uvicorn, asyncpg, slowapi; print('[start.sh] Python imports OK')" 2>&1 \
   || echo "[start.sh] WARNING: Python import check failed (see above)"
 
 # Start services, capturing output to /tmp logs AND echoing to stdout
