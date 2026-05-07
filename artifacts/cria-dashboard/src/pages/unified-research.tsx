@@ -464,6 +464,11 @@ function PublicationPanel({ guidance }: { guidance: Record<string, unknown> | nu
   );
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const MAX_WARMUP_RETRIES = 18; // 18 × 5 s = 90 s max auto-retry window
+const WARMUP_DELAY_MS = 5_000;
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function UnifiedResearch() {
@@ -480,8 +485,12 @@ export default function UnifiedResearch() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pipeline, setPipeline] = useState<PipelineTab>("cognitive");
+  const [warmingUp, setWarmingUp] = useState(false);
+  const [warmupAttempt, setWarmupAttempt] = useState(0);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const warmupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warmupAbortRef = useRef(false);
   const hasSavedRef = useRef(false);
 
   const createJob = useCreateResearchJob();
@@ -530,36 +539,74 @@ export default function UnifiedResearch() {
     setLoading(true);
     setError(null);
     setJob(null);
+    setWarmingUp(false);
+    setWarmupAttempt(0);
     setSavedToHistory(false);
     hasSavedRef.current = false;
+    warmupAbortRef.current = false;
     stopPolling();
 
-    try {
-      const resp = await fetch("/cria-unified/research", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: query.trim(),
-          observer_note: observerNote,
-          dissonance_budget: dissonance,
-          max_iterations: iterations,
-          voice,
-          profile,
-        }),
-      });
-      if (!resp.ok) {
-        const t = await resp.text();
-        const isBackendDown = resp.status >= 500 && (
-          t.includes("Internal Server Error") || t.includes("Bad Gateway") || t.trim() === ""
-        );
-        if (isBackendDown) {
-          throw new Error("__BACKEND_UNAVAILABLE__");
+    const bodyStr = JSON.stringify({
+      query: query.trim(),
+      observer_note: observerNote,
+      dissonance_budget: dissonance,
+      max_iterations: iterations,
+      voice,
+      profile,
+    });
+
+    let jobId: string | null = null;
+
+    for (let attempt = 0; attempt <= MAX_WARMUP_RETRIES; attempt++) {
+      if (warmupAbortRef.current) break;
+      try {
+        const resp = await fetch("/cria-unified/research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: bodyStr,
+        });
+        if (!resp.ok) {
+          const t = await resp.text();
+          const isBackendDown = resp.status >= 500 && (
+            t.includes("Internal Server Error") || t.includes("Bad Gateway") ||
+            t.includes("database error") || t.trim() === ""
+          );
+          if (isBackendDown && attempt < MAX_WARMUP_RETRIES) {
+            setWarmingUp(true);
+            setWarmupAttempt(attempt + 1);
+            await new Promise<void>(resolve => {
+              warmupTimerRef.current = setTimeout(resolve, WARMUP_DELAY_MS);
+            });
+            continue;
+          }
+          throw new Error(isBackendDown ? "Research services unavailable after 90 s. Please try again." : t);
         }
-        throw new Error(t);
+        const data = await resp.json() as { jobId: string };
+        jobId = data.jobId;
+        break;
+      } catch (e) {
+        if (!warmupAbortRef.current) {
+          setError(e instanceof Error ? e.message : String(e));
+        }
+        setWarmingUp(false);
+        setLoading(false);
+        return;
       }
-      const { jobId } = await resp.json() as { jobId: string };
+    }
+
+    if (!jobId) {
+      setWarmingUp(false);
+      if (!warmupAbortRef.current) {
+        setError("Research services did not respond after 90 seconds. Please try again.");
+      }
+      setLoading(false);
+      return;
+    }
+
+    setWarmingUp(false);
+    try {
       await pollJob(jobId);
-      pollRef.current = setInterval(() => pollJob(jobId), 3000);
+      pollRef.current = setInterval(() => pollJob(jobId!), 3000);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -567,7 +614,11 @@ export default function UnifiedResearch() {
     }
   };
 
-  useEffect(() => () => stopPolling(), [stopPolling]);
+  useEffect(() => () => {
+    stopPolling();
+    warmupAbortRef.current = true;
+    if (warmupTimerRef.current) clearTimeout(warmupTimerRef.current);
+  }, [stopPolling]);
 
   const result = job?.engine?.result ?? null;
   const pipelineTabs: { key: PipelineTab; label: string }[] = [
@@ -800,7 +851,9 @@ export default function UnifiedResearch() {
               disabled={loading || !query.trim() || job?.status === "running"}
               className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl px-6 py-3 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {(loading || job?.status === "running") ? (
+              {warmingUp ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Waiting for pipelines to start…</>
+              ) : (loading || job?.status === "running") ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Running three pipelines in parallel…</>
               ) : (
                 <><Layers className="w-4 h-4" /> Launch Unified Research</>
@@ -809,17 +862,22 @@ export default function UnifiedResearch() {
           </div>
         </div>
 
-        {/* Error */}
-        {error && error === "__BACKEND_UNAVAILABLE__" ? (
+        {/* Warm-up / error banners */}
+        {warmingUp ? (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-amber-400">Research pipelines are starting up</p>
-                <p className="text-xs text-amber-400/80 mt-1 leading-relaxed">
-                  The AI research services are still initialising. This usually takes 15–30 seconds after the
-                  app first loads. Please wait a moment and try again.
+              <Loader2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 animate-spin" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-400">Research pipelines warming up — retrying automatically</p>
+                <p className="text-xs text-amber-400/80 mt-1">
+                  Attempt {warmupAttempt} of {MAX_WARMUP_RETRIES} · next retry in {WARMUP_DELAY_MS / 1000}s
                 </p>
+                <div className="mt-2 h-1 bg-amber-500/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-amber-400/60 rounded-full transition-all duration-500"
+                    style={{ width: `${(warmupAttempt / MAX_WARMUP_RETRIES) * 100}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
