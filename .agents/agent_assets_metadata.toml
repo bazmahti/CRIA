@@ -12,3 +12,9 @@ id = "j_9wHxYB3sX1vwmuurYFD"
 uri = "file://docs/JUNIPER_001_CRIA_OUTPUT.md"
 type = "text"
 title = "Juniper 001 — CRIA Three-Pipeline Research Output"
+
+[[outputs]]
+id = "k7i4K0Lm4OuG26z87NDRy"
+uri = "file://exports/CRIA_How_It_Works.md"
+type = "text"
+title = "CRIA — How It Works (Full Account)"
