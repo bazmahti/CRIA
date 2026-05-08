@@ -62,6 +62,7 @@
 
 import asyncio
 import asyncpg
+import contextvars
 import httpx
 import json
 import logging
@@ -99,6 +100,7 @@ MODEL_CHAIN: list[str] = (
     if _chain_env
     else ([MODEL_NAME] + (["gpt-5-nano"] if MODEL_NAME != "gpt-5-nano" else []))
 )
+_job_models_ctx: contextvars.ContextVar[set] = contextvars.ContextVar("job_models_used", default=set())
 MAX_QUERY_LENGTH = 8000
 MAX_OBSERVER_LENGTH = 1000
 REQUIRE_API_KEY = os.environ.get("CRIA_REQUIRE_API_KEY", "false").lower() == "true"
@@ -1018,6 +1020,10 @@ async def call_llm(
                     )
                     text = resp.choices[0].message.content or ""
                     if text:
+                        try:
+                            _job_models_ctx.get().add(model)
+                        except Exception:
+                            pass
                         if model != MODEL_CHAIN[0]:
                             log.warning("LLM succeeded on fallback model %s", model)
                         return text
@@ -3191,6 +3197,8 @@ async def verify_api_key(request: Request):
 
 async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
     log.info("Job %s starting", job_id)
+    models_used: set = set()
+    _job_models_ctx.set(models_used)
     await db_start_job(job_id)
     try:
         email = os.environ.get("CRIA_CONTACT_EMAIL")
@@ -3200,6 +3208,10 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
             email=email, semantic_key=semantic_key,
         )
         result = await orchestrator.research(artefact)
+        used_list = sorted(models_used)
+        result["models_used"] = used_list
+        result["fallback_used"] = bool(used_list and any(m != MODEL_CHAIN[0] for m in used_list))
+        result["primary_model"] = MODEL_CHAIN[0]
         await db_complete_job(job_id, result)
         log.info(
             "Job %s complete — %.1fs — cog:%d epi:%d conv:%d new_experiments:%d",

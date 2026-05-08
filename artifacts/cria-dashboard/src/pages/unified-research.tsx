@@ -925,6 +925,24 @@ export default function UnifiedResearch() {
               </div>
             </div>
 
+            {result["fallback_used"] && (
+              <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-5 text-sm text-amber-400">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-medium">Fallback model used.</span>
+                  {" "}Primary model{" "}
+                  <span className="font-mono text-xs bg-amber-500/10 px-1.5 py-0.5 rounded">
+                    {String(result["primary_model"] ?? "gpt-5-mini")}
+                  </span>
+                  {" "}was unavailable. Research completed using{" "}
+                  <span className="font-mono text-xs bg-amber-500/10 px-1.5 py-0.5 rounded">
+                    {(result["models_used"] as string[] | undefined)?.filter(m => m !== result["primary_model"]).join(", ") ?? "fallback model"}
+                  </span>
+                  . Results are valid but quality may vary.
+                </div>
+              </div>
+            )}
+
             <Tabs tabs={pipelineTabs} active={pipeline} onChange={(t) => setPipeline(t)} icons={pipelineIcons} />
 
             {pipeline === "cognitive" && (
