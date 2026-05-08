@@ -93,6 +93,12 @@ from openai import AsyncOpenAI
 
 BASE_PATH = os.environ.get("BASE_PATH", "/cria-unified")
 MODEL_NAME = os.environ.get("CRIA_MODEL_NAME", "gpt-5-mini")
+_chain_env = os.environ.get("CRIA_MODEL_CHAIN", "")
+MODEL_CHAIN: list[str] = (
+    [m.strip() for m in _chain_env.split(",") if m.strip()]
+    if _chain_env
+    else ([MODEL_NAME] + (["gpt-5-nano"] if MODEL_NAME != "gpt-5-nano" else []))
+)
 MAX_QUERY_LENGTH = 8000
 MAX_OBSERVER_LENGTH = 1000
 REQUIRE_API_KEY = os.environ.get("CRIA_REQUIRE_API_KEY", "false").lower() == "true"
@@ -993,29 +999,45 @@ async def call_llm(
         prompt = prompt + papers_block
 
     messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
-    last_err = ""
+    all_errors: list[str] = []
 
-    for attempt in range(retries + 1):
-        async with sem:
-            try:
-                resp = await client.chat.completions.create(
-                    model=MODEL_NAME,
-                    max_completion_tokens=max_tokens,
-                    messages=messages,
-                )
-                text = resp.choices[0].message.content or ""
-                if text:
-                    return text
-                last_err = "empty response"
-            except (KeyboardInterrupt, SystemExit):
-                raise
-            except Exception as e:
-                last_err = f"{type(e).__name__}: {str(e)[:200]}"
-                log.warning("LLM attempt %d/%d failed: %s", attempt + 1, retries + 1, last_err)
-        if attempt < retries:
-            await asyncio.sleep(2 ** attempt)
+    def _is_hard_failure(exc: Exception) -> bool:
+        s = str(exc)
+        return "UNSUPPORTED_MODEL" in s or '"code": 400' in s or "status_code=400" in s or "Error code: 400" in s
 
-    return f"[LLM error after {retries + 1} attempts: {last_err}]"
+    for model in MODEL_CHAIN:
+        last_err = ""
+        hard_fail = False
+        for attempt in range(retries + 1):
+            async with sem:
+                try:
+                    resp = await client.chat.completions.create(
+                        model=model,
+                        max_completion_tokens=max_tokens,
+                        messages=messages,
+                    )
+                    text = resp.choices[0].message.content or ""
+                    if text:
+                        if model != MODEL_CHAIN[0]:
+                            log.warning("LLM succeeded on fallback model %s", model)
+                        return text
+                    last_err = "empty response"
+                except (KeyboardInterrupt, SystemExit):
+                    raise
+                except Exception as e:
+                    last_err = f"{type(e).__name__}: {str(e)[:200]}"
+                    if _is_hard_failure(e):
+                        log.warning("LLM hard-fail on model %s, skipping to next: %s", model, last_err)
+                        hard_fail = True
+                        break
+                    log.warning("LLM attempt %d/%d (model=%s) failed: %s", attempt + 1, retries + 1, model, last_err)
+            if hard_fail:
+                break
+            if attempt < retries:
+                await asyncio.sleep(2 ** attempt)
+        all_errors.append(f"{model}: {last_err}")
+
+    return f"[LLM error after {retries + 1} attempts: {'; '.join(all_errors)}]"
 
 
 # ============================================================

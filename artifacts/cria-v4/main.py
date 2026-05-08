@@ -18,6 +18,14 @@ from openai import AsyncOpenAI
 
 BASE_PATH = "/cria-v4"
 
+_DEFAULT_MODEL = os.environ.get("CRIA_MODEL_NAME", "gpt-5-mini")
+_chain_env = os.environ.get("CRIA_MODEL_CHAIN", "")
+MODEL_CHAIN: list[str] = (
+    [m.strip() for m in _chain_env.split(",") if m.strip()]
+    if _chain_env
+    else ([_DEFAULT_MODEL] + (["gpt-5-nano"] if _DEFAULT_MODEL != "gpt-5-nano" else []))
+)
+
 _openai_client: Optional[AsyncOpenAI] = None
 
 def get_openai_client() -> AsyncOpenAI:
@@ -520,9 +528,9 @@ class StubbedSpecialistConnector:
 # ============================================================
 
 async def call_llm(prompt: str, system_prompt: str = "",
-                   max_tokens: int = 800, model: str = "gpt-5-mini") -> str:
+                   max_tokens: int = 800, model: str = "") -> str:
     """LLM caller using Replit AI Integrations (OpenAI-compatible).
-    CRIA v4 frame-critical research instrument."""
+    CRIA v4 frame-critical research instrument. Tries MODEL_CHAIN on hard failures."""
     client = get_openai_client()
     default_system = (
         "You are a rigorous research analyst working within CRIA v4, "
@@ -533,18 +541,38 @@ async def call_llm(prompt: str, system_prompt: str = "",
         "say so."
     )
     system = system_prompt if system_prompt else default_system
-    try:
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt}
-            ],
-            max_completion_tokens=max_tokens,
-        )
-        return response.choices[0].message.content or "[LLM returned empty response]"
-    except Exception as e:
-        return f"[LLM error: {type(e).__name__}: {str(e)[:200]}]"
+    chain = [model] + [m for m in MODEL_CHAIN if m != model] if model else MODEL_CHAIN
+
+    def _is_hard_failure(exc: Exception) -> bool:
+        s = str(exc)
+        return "UNSUPPORTED_MODEL" in s or "status_code=400" in s or "Error code: 400" in s
+
+    all_errors: list[str] = []
+    for m in chain:
+        for attempt in range(3):
+            try:
+                response = await client.chat.completions.create(
+                    model=m,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_completion_tokens=max_tokens,
+                )
+                text = response.choices[0].message.content or ""
+                if text:
+                    return text
+                all_errors.append(f"{m}: empty response")
+                break
+            except Exception as e:
+                err = f"{type(e).__name__}: {str(e)[:200]}"
+                if _is_hard_failure(e):
+                    all_errors.append(f"{m}: {err}")
+                    break
+                all_errors.append(f"{m} attempt {attempt+1}: {err}")
+                if attempt < 2:
+                    await asyncio.sleep(2 ** attempt)
+    return f"[LLM error: {'; '.join(all_errors)}]"
 
 
 # ============================================================
