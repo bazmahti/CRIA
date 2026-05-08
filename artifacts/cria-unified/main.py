@@ -92,7 +92,7 @@ from openai import AsyncOpenAI
 # ============================================================
 
 BASE_PATH = os.environ.get("BASE_PATH", "/cria-unified")
-MODEL_NAME = os.environ.get("CRIA_MODEL_NAME", "claude-sonnet-4-20250514")
+MODEL_NAME = os.environ.get("CRIA_MODEL_NAME", "claude-sonnet-4-5")
 MAX_QUERY_LENGTH = 8000
 MAX_OBSERVER_LENGTH = 1000
 REQUIRE_API_KEY = os.environ.get("CRIA_REQUIRE_API_KEY", "false").lower() == "true"
