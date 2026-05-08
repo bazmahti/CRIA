@@ -1249,9 +1249,9 @@ Return JSON:
             "classification": result,
             "gap_report": gap_report,
             "partnership_recommendation": partnership_rec,
-            "failure_type": RetrievalFailureType(
+            "failure_type": RetrievalFailureType[
                 result.get("failure_type", "TRUE_ABSENCE").upper()
-            ) if result.get("failure_type", "").upper() in [f.name for f in RetrievalFailureType]
+            ] if result.get("failure_type", "").upper() in [f.name for f in RetrievalFailureType]
             else RetrievalFailureType.TRUE_ABSENCE,
         }
 
