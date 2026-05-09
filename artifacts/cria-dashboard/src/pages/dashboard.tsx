@@ -118,13 +118,13 @@ export default function DashboardPage() {
                   <span className="text-[10px] text-muted-foreground w-4 text-right font-mono">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-xs text-foreground truncate">{f.frame.replace(/_/g, " ")}</span>
-                      <span className="text-xs font-mono text-muted-foreground ml-2">{f.count}</span>
+                      <span className="text-xs text-foreground truncate">{(f.frame ?? "").replace(/_/g, " ")}</span>
+                      <span className="text-xs font-mono text-muted-foreground ml-2">{f.count ?? 0}</span>
                     </div>
                     <div className="h-1 rounded-full bg-secondary overflow-hidden">
                       <div
                         className="h-full rounded-full bg-primary transition-all"
-                        style={{ width: `${Math.min(100, (f.count / (s.topFrames![0]?.count || 1)) * 100)}%` }}
+                        style={{ width: `${Math.min(100, ((f.count ?? 0) / (s.topFrames![0]?.count || 1)) * 100)}%` }}
                       />
                     </div>
                   </div>
