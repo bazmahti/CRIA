@@ -195,20 +195,51 @@ function VoicePanel({ voiceKey, voiceData }: { voiceKey: string; voiceData: { te
 
 // ── JobDetail ─────────────────────────────────────────────────────────────────
 function JobDetail({ id, onBack }: { id: string; onBack: () => void }) {
-  const { data: job, isLoading } = useGetResearchJob(id);
-  if (isLoading) return <div className="p-8 space-y-4">{[...Array(4)].map((_,i) => <Skeleton key={i} className="h-20" />)}</div>;
-  if (!job) return <div className="p-8 text-muted-foreground text-sm">Job not found.</div>;
+  const { data: job, isLoading, isError } = useGetResearchJob(id);
 
-  const voices = job.voices as Record<string, { text?: string }> | null;
-  const sortedVoices = voices
-    ? [
-        ...VOICE_ORDER.filter(k => k in voices).map(k => [k, voices[k]] as [string, { text?: string }]),
-        ...Object.entries(voices).filter(([k]) => !VOICE_ORDER.includes(k)),
-      ]
-    : [];
+  if (isLoading) return (
+    <div className="p-8 space-y-4">
+      {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+    </div>
+  );
 
-  const stream = classifyStream(job.mode);
-  const streamCfg = STREAM_CONFIG[stream];
+  if (isError || !job) return (
+    <div className="p-8 max-w-3xl space-y-4">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+        <ChevronLeft className="w-3.5 h-3.5" /> Research History
+      </button>
+      <div className="border border-amber-500/30 bg-amber-500/5 rounded-xl p-6">
+        <p className="text-sm font-medium text-amber-400 mb-2">Unable to load this research job</p>
+        <p className="text-xs text-muted-foreground">
+          This can happen if the job was run before history saving was configured,
+          or if the result data is in a different format. Research results are
+          always available immediately after a run on the{" "}
+          <a href="/unified" className="text-primary underline">Unified Research page</a>.
+        </p>
+      </div>
+    </div>
+  );
+
+  let voices: Record<string, { text?: string }> | null = null;
+  let sortedVoices: [string, { text?: string }][] = [];
+  try {
+    voices = job.voices as Record<string, { text?: string }> | null;
+    sortedVoices = voices
+      ? [
+          ...VOICE_ORDER.filter(k => k in voices!).map(k => [k, voices![k]] as [string, { text?: string }]),
+          ...Object.entries(voices).filter(([k]) => !VOICE_ORDER.includes(k)),
+        ]
+      : [];
+  } catch {
+    sortedVoices = [];
+  }
+
+  let stream: Stream = "general";
+  let streamCfg = STREAM_CONFIG["general"];
+  try {
+    stream = classifyStream(job.mode);
+    streamCfg = STREAM_CONFIG[stream];
+  } catch { /* use defaults */ }
 
   return (
     <div className="p-8 max-w-5xl space-y-6">

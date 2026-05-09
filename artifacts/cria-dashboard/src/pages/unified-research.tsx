@@ -573,7 +573,7 @@ export default function UnifiedResearch() {
                 jobId: data.jobId,
                 status: data.status as "complete" | "failed",
                 questionText: data.query || null,
-                mode: "unified",
+                mode: profile || "general_scholarship",
                 startedAt: data.startedAt || null,
                 completedAt: data.completedAt || null,
                 errorText: data.engine?.error || null,
