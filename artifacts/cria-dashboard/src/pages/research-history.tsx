@@ -150,6 +150,16 @@ const STATUS_COLORS: Record<string, string> = {
   queued:   "bg-secondary text-muted-foreground border-border",
 };
 
+// ── LinkedIn post type ───────────────────────────────────────────────────────
+interface LinkedInPost {
+  post?: string;
+  char_count?: number;
+  hook?: string;
+  hashtags?: string[];
+  platform?: string;
+  char_limit?: number;
+}
+
 const VOICE_LABELS: Record<string, string> = {
   cognitive_paper: "Cognitive Pipeline Paper",
   epistemic_paper: "Epistemic Pipeline Paper",
@@ -274,18 +284,22 @@ function JobDetail({ id, onBack }: { id: string; onBack: () => void }) {
     </div>
   );
 
-  let voices: Record<string, { text?: string }> | null = null;
+  let voices: Record<string, { text?: string; linkedin_post?: LinkedInPost }> | null = null;
   let sortedVoices: [string, { text?: string }][] = [];
+  let linkedInPost: LinkedInPost | null = null;
   try {
-    voices = job.voices as Record<string, { text?: string }> | null;
+    voices = job.voices as Record<string, { text?: string; linkedin_post?: LinkedInPost }> | null;
     sortedVoices = voices
       ? [
           ...VOICE_ORDER.filter(k => k in voices!).map(k => [k, voices![k]] as [string, { text?: string }]),
           ...Object.entries(voices).filter(([k]) => !VOICE_ORDER.includes(k)),
         ]
       : [];
+    // Extract LinkedIn post from editorial voice
+    linkedInPost = voices?.["editorial"]?.linkedin_post ?? null;
   } catch {
     sortedVoices = [];
+    linkedInPost = null;
   }
 
   let stream: Stream = "general";
@@ -379,6 +393,53 @@ function JobDetail({ id, onBack }: { id: string; onBack: () => void }) {
       ) : (
         <div className="border border-border rounded p-8 text-center">
           <p className="text-sm text-muted-foreground">No output available for this job.</p>
+        </div>
+      )}
+
+      {/* LinkedIn Post */}
+      {linkedInPost?.post && (
+        <div className="rounded-xl border border-[#0A66C2]/30 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-[#0A66C2]/5">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-[#0A66C2]">in</span>
+              <span className="text-sm font-semibold">LinkedIn Post</span>
+              {linkedInPost.char_count && (
+                <span className="text-[10px] text-muted-foreground">
+                  {linkedInPost.char_count} / 3,000 chars
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                const slug = (job.questionText ?? "run").slice(0, 40).replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+                downloadMarkdown(`CRIA-linkedin-${slug}`, linkedInPost!.post!);
+              }}
+              className="flex items-center gap-1.5 text-[10px] text-[#0A66C2] border border-[#0A66C2]/30 hover:border-[#0A66C2]/60 hover:bg-[#0A66C2]/5 rounded-lg px-2.5 py-1.5 transition-colors"
+            >
+              <Download className="w-3 h-3" />
+              Download
+            </button>
+          </div>
+          <div className="p-4 space-y-3">
+            {linkedInPost.hook && (
+              <div className="rounded-lg bg-[#0A66C2]/5 border border-[#0A66C2]/15 px-3 py-2">
+                <div className="text-[10px] font-semibold text-[#0A66C2] mb-1 uppercase tracking-wider">Opening hook</div>
+                <div className="text-xs italic">"{linkedInPost.hook}"</div>
+              </div>
+            )}
+            <pre className="text-xs text-foreground whitespace-pre-wrap font-sans leading-relaxed bg-background/50 rounded-lg border border-border/40 p-3">
+              {linkedInPost.post}
+            </pre>
+            {linkedInPost.hashtags && linkedInPost.hashtags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {linkedInPost.hashtags.map((tag: string) => (
+                  <span key={tag} className="px-2 py-0.5 rounded-full text-[10px] bg-[#0A66C2]/10 text-[#0A66C2] border border-[#0A66C2]/20 font-medium">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
