@@ -38,4 +38,29 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
 
+// ── Global error handler ──────────────────────────────────────────────────────
+// Must be registered AFTER all routes. The 4-argument signature tells Express
+// this is an error handler, not a regular middleware.
+// Catches: async route throws, next(err), unhandled promise rejections that
+// Express 5 forwards automatically (Express 4 needs asyncHandler wrappers,
+// but the global handler still catches anything that slips through).
+app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const status = (err as { status?: number; statusCode?: number })?.status
+    ?? (err as { statusCode?: number })?.statusCode
+    ?? 500;
+  const message = err instanceof Error ? err.message : String(err);
+  const isOperational = status < 500;
+
+  if (!isOperational) {
+    logger.error({ err, method: req.method, url: req.url }, "Unhandled route error");
+  }
+
+  if (!res.headersSent) {
+    res.status(status).json({
+      error: isOperational ? message : "Internal server error",
+      ...(process.env["NODE_ENV"] !== "production" && !isOperational ? { detail: message } : {}),
+    });
+  }
+});
+
 export default app;

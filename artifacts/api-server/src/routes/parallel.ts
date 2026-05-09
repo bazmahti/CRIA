@@ -42,6 +42,9 @@ interface UnifiedJob {
   engine: EngineState;
 }
 
+// ⚠️  IN-MEMORY STORE — jobs are lost on server restart.
+// For persistence, migrate to DB-backed storage (see research-jobs.ts pattern).
+// Current limitation: parallel job history disappears on every deploy.
 const jobs = new Map<string, ParallelJob>();
 const unifiedJobs = new Map<string, UnifiedJob>();
 

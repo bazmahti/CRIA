@@ -443,17 +443,18 @@ reflexivity_questions:
   },
 ];
 
-router.get("/templates", async (_req, res): Promise<void> => {
-  res.json(ListTemplatesResponse.parse(TEMPLATES));
+router.get("/templates", async (_req, res, next): Promise<void> => {
+  try { res.json(ListTemplatesResponse.parse(TEMPLATES)); } catch (err) { next(err); }
 });
 
-router.get("/templates/:id", async (req, res): Promise<void> => {
-  const params = GetTemplateParams.safeParse(req.params);
-  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
-
-  const template = TEMPLATES.find(t => t.id === params.data.id);
-  if (!template) { res.status(404).json({ error: "Template not found" }); return; }
-  res.json(GetTemplateResponse.parse(template));
+router.get("/templates/:id", async (req, res, next): Promise<void> => {
+  try {
+    const params = GetTemplateParams.safeParse(req.params);
+    if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+    const template = TEMPLATES.find(t => t.id === params.data.id);
+    if (!template) { res.status(404).json({ error: "Template not found" }); return; }
+    res.json(GetTemplateResponse.parse(template));
+  } catch (err) { next(err); }
 });
 
 export default router;

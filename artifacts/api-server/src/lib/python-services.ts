@@ -60,12 +60,10 @@ const SERVICES: PythonService[] = [
     port: 8002,
     env: { PORT: "8002" },
   },
-  {
-    name: "ultraria",
-    script: "artifacts/cria-unified/ultraria_stub.py",
-    port: 8004,
-    env: { PORT: "8004", ULTRARIA_PORT: "8004" },
-  },
+  // NOTE: Ultraria is now served by cria-unified on port 8003 at /cria-unified/ultraria
+  // The stub on port 8004 has been removed to eliminate the port conflict.
+  // The proxy entry for /ultraria in python-proxy.ts should also be removed or
+  // redirected to 8003 if a separate /ultraria basepath is needed.
 ];
 
 const BASE_DELAY_MS = 2_000;

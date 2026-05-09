@@ -47,27 +47,18 @@ function mapJobDetail(job: typeof researchJobsTable.$inferSelect) {
   };
 }
 
-router.get("/research-jobs", async (req, res) => {
-  const params = ListResearchJobsQueryParams.safeParse(req.query);
-  if (!params.success) {
-    res.status(400).json({ error: "Invalid query params" });
-    return;
-  }
-
-  const { status, limit = 50 } = params.data;
-
-  const conditions = [];
-  if (status) conditions.push(eq(researchJobsTable.status, status));
-
-  const rows = await db
-    .select()
-    .from(researchJobsTable)
-    .where(conditions.length ? conditions[0] : undefined)
-    .orderBy(desc(researchJobsTable.createdAt))
-    .limit(limit);
-
-  const response = ListResearchJobsResponse.parse(rows.map(mapJob));
-  res.json(response);
+router.get("/research-jobs", async (req, res, next) => {
+  try {
+    const params = ListResearchJobsQueryParams.safeParse(req.query);
+    if (!params.success) { res.status(400).json({ error: "Invalid query params" }); return; }
+    const { status, limit = 50 } = params.data;
+    const conditions = [];
+    if (status) conditions.push(eq(researchJobsTable.status, status));
+    const rows = await db.select().from(researchJobsTable)
+      .where(conditions.length ? conditions[0] : undefined)
+      .orderBy(desc(researchJobsTable.createdAt)).limit(limit);
+    res.json(ListResearchJobsResponse.parse(rows.map(mapJob)));
+  } catch (err) { next(err); }
 });
 
 router.post("/research-jobs", async (req, res) => {
@@ -97,25 +88,14 @@ router.post("/research-jobs", async (req, res) => {
   res.status(201).json(response);
 });
 
-router.get("/research-jobs/:id", async (req, res) => {
-  const params = GetResearchJobParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: "Invalid params" });
-    return;
-  }
-
-  const [job] = await db
-    .select()
-    .from(researchJobsTable)
-    .where(eq(researchJobsTable.id, params.data.id));
-
-  if (!job) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
-
-  const response = GetResearchJobResponse.parse(mapJobDetail(job));
-  res.json(response);
+router.get("/research-jobs/:id", async (req, res, next) => {
+  try {
+    const params = GetResearchJobParams.safeParse(req.params);
+    if (!params.success) { res.status(400).json({ error: "Invalid params" }); return; }
+    const [job] = await db.select().from(researchJobsTable).where(eq(researchJobsTable.id, params.data.id));
+    if (!job) { res.status(404).json({ error: "Not found" }); return; }
+    res.json(GetResearchJobResponse.parse(mapJobDetail(job)));
+  } catch (err) { next(err); }
 });
 
 export default router;
