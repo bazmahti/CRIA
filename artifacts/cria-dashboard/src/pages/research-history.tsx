@@ -477,23 +477,15 @@ function StreamGroup({
 
 // ── Main history page ─────────────────────────────────────────────────────────
 export default function ResearchHistoryPage() {
+  // ── ALL HOOKS MUST BE BEFORE ANY EARLY RETURN (Rules of Hooks) ───────────
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [streamFilter, setStreamFilter] = useState<Stream | "all">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "complete" | "failed">("all");
   const { data: jobs, isLoading } = useListResearchJobs();
 
-  if (selected) {
-    return (
-      <JobDetailErrorBoundary onBack={() => setSelected(null)}>
-        <JobDetail id={selected} onBack={() => setSelected(null)} />
-      </JobDetailErrorBoundary>
-    );
-  }
-
   const allJobs: JobItem[] = jobs ?? [];
 
-  // Filter
   const filtered = useMemo(() => {
     let result = allJobs;
     if (search.trim()) {
@@ -512,7 +504,6 @@ export default function ResearchHistoryPage() {
     return result;
   }, [allJobs, search, streamFilter, statusFilter]);
 
-  // Group by stream
   const grouped = useMemo(() => {
     const groups: Partial<Record<Stream, JobItem[]>> = {};
     for (const job of filtered) {
@@ -523,8 +514,6 @@ export default function ResearchHistoryPage() {
     return groups;
   }, [filtered]);
 
-  // Stats
-  const totalComplete = allJobs.filter(j => j.status === "complete").length;
   const streamCounts = useMemo(() => {
     const counts: Partial<Record<Stream, number>> = {};
     for (const job of allJobs) {
@@ -534,6 +523,16 @@ export default function ResearchHistoryPage() {
     return counts;
   }, [allJobs]);
 
+  // ── NOW safe to do conditional renders ───────────────────────────────────
+  if (selected) {
+    return (
+      <JobDetailErrorBoundary onBack={() => setSelected(null)}>
+        <JobDetail id={selected} onBack={() => setSelected(null)} />
+      </JobDetailErrorBoundary>
+    );
+  }
+
+  const totalComplete = allJobs.filter(j => j.status === "complete").length;
   const activeStreams = STREAM_PRIORITY.filter(s => (streamCounts[s] ?? 0) > 0);
   const hasFilters = search.trim() || streamFilter !== "all" || statusFilter !== "all";
 
@@ -551,7 +550,6 @@ export default function ResearchHistoryPage() {
 
       {/* Search + filters */}
       <div className="space-y-2">
-        {/* Search bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <input
@@ -567,7 +565,6 @@ export default function ResearchHistoryPage() {
           )}
         </div>
 
-        {/* Stream filter chips */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-muted-foreground flex items-center gap-1 mr-1">
             <Filter className="w-3 h-3" /> Stream:
@@ -603,7 +600,6 @@ export default function ResearchHistoryPage() {
             );
           })}
 
-          {/* Status filter */}
           <span className="text-[10px] text-muted-foreground flex items-center gap-1 ml-2 mr-1">
             <Clock className="w-3 h-3" /> Status:
           </span>
@@ -648,14 +644,12 @@ export default function ResearchHistoryPage() {
           )}
         </div>
       ) : streamFilter !== "all" ? (
-        // Flat list when filtered to one stream
         <div className="space-y-1.5">
           {filtered.map(job => (
             <JobRow key={job.id} job={job} onSelect={() => setSelected(job.id)} />
           ))}
         </div>
       ) : (
-        // Grouped by stream
         <div className="space-y-3">
           {STREAM_PRIORITY.filter(s => (grouped[s]?.length ?? 0) > 0).map((stream, i) => (
             <StreamGroup
