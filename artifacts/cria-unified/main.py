@@ -153,6 +153,53 @@ except ImportError:
     async def search_advocacy_connectors(q, profile, **kw): return []
     def connector_registry_summary(): return {}
 
+# ── New CRIA/Ultraria modules ─────────────────────────────────────────────────
+try:
+    from cria_channel_config import (
+        get_channel_spec, channel_model, channel_temperature,
+        channel_max_tokens, channel_disposition, log_config_summary,
+        CLAUDE_MODEL as _CFG_CLAUDE, ANALYTICAL_MODEL as _CFG_ANALYTICAL,
+    )
+    _CHANNEL_CONFIG_AVAILABLE = True
+except ImportError:
+    _CHANNEL_CONFIG_AVAILABLE = False
+    def channel_model(name): return ""
+    def channel_temperature(name): return 0.5
+    def channel_max_tokens(name): return 4000
+    def channel_disposition(name): return ""
+    def log_config_summary(log): pass
+
+try:
+    from cria_web_search import WebSearchConnector
+    _WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    _WEB_SEARCH_AVAILABLE = False
+
+try:
+    from cria_connector_ledger import (
+        ensure_ledger_schema, log_connector_use, log_partnership_recommendation,
+        RecalibrationAgent, get_connector_performance_matrix,
+    )
+    _LEDGER_AVAILABLE = True
+except ImportError:
+    _LEDGER_AVAILABLE = False
+    async def ensure_ledger_schema(pool): pass
+    async def log_connector_use(*a, **kw): pass
+    async def log_partnership_recommendation(*a, **kw): pass
+
+try:
+    from cria_output_writer import write_all_outputs
+    _OUTPUT_WRITER_AVAILABLE = True
+except ImportError:
+    _OUTPUT_WRITER_AVAILABLE = False
+    async def write_all_outputs(result, job_id, question): return {}
+
+try:
+    from ultraria_phase1 import UltraRiaOrchestrator, get_lane_status, active_lane_count
+    _ULTRARIA_AVAILABLE = True
+except ImportError:
+    _ULTRARIA_AVAILABLE = False
+
 # ============================================================
 # CONFIGURATION
 # ============================================================
@@ -4078,6 +4125,123 @@ async def connector_performance(request: Request):
 @app.get(f"{BASE_PATH}/outputs")
 @limiter.limit("30/minute")
 async def list_outputs(request: Request, q: str = ""):
+    if not _OUTPUT_WRITER_AVAILABLE:
+        return {"available": False, "files": []}
+    from cria_output_writer import OUTPUT_DIR, slugify, get_output_files_list
+    if q:
+        files = get_output_files_list(slugify(q))
+    else:
+        files = [
+            {"filename": p.name, "path": str(p), "size_kb": round(p.stat().st_size / 1024, 1)}
+            for p in sorted(OUTPUT_DIR.glob("*.md"), key=lambda f: f.stat().st_mtime, reverse=True)[:50]
+        ]
+    return {"available": True, "count": len(files), "files": files}
+
+
+# ── Ultraria endpoint ─────────────────────────────────────────────────────────
+
+class UltraRiaRequest(BaseModel):
+    query: str = Field(..., min_length=10, max_length=4000)
+    cria_job_id: str = Field("", description="Optional CRIA job ID to use as context")
+    observer_note: str = Field("", max_length=500)
+
+
+@app.post(f"{BASE_PATH}/ultraria", dependencies=[Depends(verify_api_key)])
+@limiter.limit("2/minute")
+async def ultraria_endpoint(
+    request: Request,
+    body: UltraRiaRequest,
+    background_tasks: BackgroundTasks,
+):
+    if not _ULTRARIA_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Ultraria module not available")
+    active = active_lane_count()
+    if active < 2:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Ultraria requires at least 2 active lanes. Currently active: {active}. "
+                   "Configure ULTRARIA_* API keys in Replit Secrets.",
+        )
+
+    # Optionally load CRIA result as context
+    cria_result = None
+    if body.cria_job_id and _db_pool:
+        job = await db_get_job(body.cria_job_id)
+        if job and job.get("result"):
+            cria_result = job["result"]
+
+    job_id = str(uuid.uuid4())
+    await db_create_job(job_id, body.query, "ultraria",
+                        getattr(request.state, "request_id", ""))
+
+    async def _run_ultraria():
+        await db_start_job(job_id)
+        try:
+            orch = UltraRiaOrchestrator()
+            result = await orch.run(
+                body.query, cria_result=cria_result, call_llm_fn=call_llm
+            )
+            result_dict = result.to_dict()
+            result_dict["markdown"] = result.to_markdown()
+            # Write markdown output
+            if _OUTPUT_WRITER_AVAILABLE:
+                from cria_output_writer import OUTPUT_DIR, slugify, ts
+                from pathlib import Path
+                slug = slugify(body.query)
+                path = OUTPUT_DIR / f"ULTRARIA-{slug}-{ts()}.md"
+                path.write_text(result.to_markdown(), encoding="utf-8")
+                result_dict["output_file"] = str(path)
+            await db_complete_job(job_id, result_dict)
+            log.info("Ultraria job %s complete — %d lanes completed",
+                     job_id, result.completed_lanes)
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"
+            log.error("Ultraria job %s failed: %s", job_id, err, exc_info=True)
+            await db_fail_job(job_id, err)
+
+    background_tasks.add_task(_run_ultraria)
+    return {
+        "jobId": job_id,
+        "status": "queued",
+        "active_lanes": active,
+        "lane_status": get_lane_status() if _ULTRARIA_AVAILABLE else {},
+    }
+
+
+@app.get(f"{BASE_PATH}/ultraria/lanes")
+async def ultraria_lane_status():
+    if not _ULTRARIA_AVAILABLE:
+        return {"available": False}
+    return {
+        "available": True,
+        "active_count": active_lane_count(),
+        "lanes": get_lane_status(),
+    }
+
+
+# ── Recalibration endpoint ────────────────────────────────────────────────────
+
+@app.post(f"{BASE_PATH}/connectors/recalibrate", dependencies=[Depends(verify_api_key)])
+async def trigger_recalibration():
+    if not _LEDGER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Connector ledger not available")
+    agent = RecalibrationAgent()
+    report = await agent.generate_report(_db_pool)
+    return report or {"status": "no_data"}
+
+
+@app.get(f"{BASE_PATH}/connectors/performance")
+async def connector_performance():
+    if not _LEDGER_AVAILABLE or not _db_pool:
+        return {"available": False, "matrix": []}
+    matrix = await get_connector_performance_matrix(_db_pool)
+    return {"available": True, "entries": len(matrix), "matrix": matrix[:50]}
+
+
+# ── Output files endpoint ─────────────────────────────────────────────────────
+
+@app.get(f"{BASE_PATH}/outputs")
+async def list_outputs(q: str = ""):
     if not _OUTPUT_WRITER_AVAILABLE:
         return {"available": False, "files": []}
     from cria_output_writer import OUTPUT_DIR, slugify, get_output_files_list
