@@ -70,7 +70,7 @@ interface UnifiedJobState {
   engine: EngineState;
 }
 
-type PipelineTab = "cognitive" | "epistemic" | "convergent" | "publication";
+type PipelineTab = "cognitive" | "epistemic" | "convergent" | "publication" | "linkedin";
 type VoiceTab = "academic" | "editorial" | "practitioner";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -670,12 +670,14 @@ export default function UnifiedResearch() {
     { key: "epistemic", label: "CRIA-Epistemic" },
     { key: "convergent", label: "CRIA-Convergent" },
     { key: "publication", label: "Publication Guidance" },
+    { key: "linkedin", label: "LinkedIn Post" },
   ];
   const pipelineIcons: Record<string, React.ReactNode> = {
     cognitive: <Brain className="w-3.5 h-3.5" />,
     epistemic: <Microscope className="w-3.5 h-3.5" />,
     convergent: <GitMerge className="w-3.5 h-3.5" />,
     publication: <Lightbulb className="w-3.5 h-3.5" />,
+    linkedin: <span className="text-[11px] font-bold text-[#0A66C2]">in</span>,
   };
 
   return (
@@ -1372,6 +1374,101 @@ export default function UnifiedResearch() {
             {pipeline === "publication" && (
               <PublicationPanel guidance={result["publication_guidance"] as Record<string, unknown> | null} />
             )}
+
+            {pipeline === "linkedin" && (() => {
+              const voices = (result["voices"] ?? {}) as Record<string, Record<string, unknown>>;
+              const editorialData = voices["editorial"] ?? {};
+              const linkedin = editorialData["linkedin_post"] as {
+                post?: string; char_count?: number; hook?: string; hashtags?: string[];
+              } | null | undefined;
+
+              if (!linkedin?.post) {
+                return (
+                  <div className="py-10 text-center">
+                    <span className="text-[11px] font-bold text-[#0A66C2] mr-2 text-lg">in</span>
+                    <p className="text-sm text-muted-foreground mt-3">
+                      LinkedIn posts are generated for non-academic research streams.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Select a Health, Activist, Environmental, or other specialist profile and re-run.
+                    </p>
+                  </div>
+                );
+              }
+
+              const charCount = linkedin.char_count ?? linkedin.post.length;
+              const pct = Math.min(100, Math.round((charCount / 3000) * 100));
+              const barColor = pct > 90 ? "bg-amber-500" : "bg-[#0A66C2]";
+
+              return (
+                <div className="space-y-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-bold text-[#0A66C2]">in</span>
+                      <span className="text-sm font-semibold">LinkedIn Post</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(linkedin.post ?? "");
+                      }}
+                      className="flex items-center gap-1.5 text-xs font-medium text-[#0A66C2] border border-[#0A66C2]/30 hover:border-[#0A66C2]/60 hover:bg-[#0A66C2]/5 rounded-lg px-3 py-1.5 transition-colors"
+                    >
+                      Copy to clipboard
+                    </button>
+                  </div>
+
+                  {/* Character count bar */}
+                  <div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                      <span>{charCount} characters</span>
+                      <span>3,000 limit ({pct}%)</span>
+                    </div>
+                    <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">
+                      <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+
+                  {/* Hook */}
+                  {linkedin.hook && (
+                    <div className="rounded-lg bg-[#0A66C2]/5 border border-[#0A66C2]/20 px-3 py-2">
+                      <div className="text-[10px] font-semibold text-[#0A66C2] mb-1 uppercase tracking-wider">Opening hook</div>
+                      <div className="text-sm italic text-foreground">"{linkedin.hook}"</div>
+                    </div>
+                  )}
+
+                  {/* Full post */}
+                  <div className="rounded-xl border border-border/60 bg-background/50 p-4">
+                    <pre className="text-sm text-foreground whitespace-pre-wrap font-sans leading-relaxed">
+                      {linkedin.post}
+                    </pre>
+                  </div>
+
+                  {/* Hashtags */}
+                  {linkedin.hashtags && linkedin.hashtags.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Optimised hashtags</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {linkedin.hashtags.map((tag: string) => (
+                          <span key={tag} className="px-2 py-0.5 rounded-full text-[11px] bg-[#0A66C2]/10 text-[#0A66C2] border border-[#0A66C2]/20 font-medium">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Download */}
+                  <button
+                    onClick={() => downloadMarkdown(`CRIA-linkedin-${job.query.slice(0,30).replace(/[^a-z0-9]+/gi,"-").toLowerCase()}`, `# LinkedIn Post\n\n${linkedin.post}`)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border/40 hover:border-border rounded-lg px-3 py-1.5 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Download as .md
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* ── Downloads panel ─────────────────────────────────────── */}
             {(() => {

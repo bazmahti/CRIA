@@ -356,6 +356,24 @@ async def write_all_outputs(
             files[f"voice_{voice_name}"] = filepath
             log.info("Written %s voice: %s", voice_name, filepath)
 
+    # LinkedIn post — written if present in editorial output
+    editorial_data = voices.get("editorial", {})
+    if isinstance(editorial_data, dict):
+        linkedin = editorial_data.get("linkedin_post")
+        if linkedin and linkedin.get("post"):
+            linkedin_content = (
+                f"# LinkedIn Post\n\n"
+                f"**Platform:** LinkedIn · **Char limit:** 3,000 · "
+                f"**Count:** {linkedin.get('char_count', len(linkedin['post']))} chars\n\n"
+                f"---\n\n"
+                f"{linkedin['post']}\n\n"
+                f"---\n\n"
+                f"**Hashtags:** {', '.join('#' + h for h in linkedin.get('hashtags', []))}\n"
+            )
+            filepath = write(f"CRIA-linkedin-{slug}", linkedin_content)
+            files["linkedin_post"] = filepath
+            log.info("Written LinkedIn post: %s (%d chars)", filepath, linkedin.get("char_count", 0))
+
     # Pipeline papers
     papers = result.get("pipeline_papers", {})
     for paper_key in ("cognitive_paper", "epistemic_paper", "convergent_paper"):
