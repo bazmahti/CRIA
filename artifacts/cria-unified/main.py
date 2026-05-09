@@ -1746,10 +1746,18 @@ Rules:
             channel_name="Stage0",   # routes to Claude for deep academic knowledge
         )
 
+        # Strip markdown code fences if the model wrapped the JSON
+        _raw_stripped = raw.strip()
+        if _raw_stripped.startswith("```"):
+            # Remove opening fence (```json or ```)
+            _raw_stripped = _raw_stripped.split("\n", 1)[-1]
+            # Remove closing fence
+            if _raw_stripped.rstrip().endswith("```"):
+                _raw_stripped = _raw_stripped.rstrip()[:-3].rstrip()
         try:
-            design = json.loads(raw)
+            design = json.loads(_raw_stripped)
         except json.JSONDecodeError:
-            # Fallback: minimal viable design
+            log.warning("Stage 0 JSON parse failed — raw response: %.200s", raw)
             log.warning("Stage 0 JSON parse failed — using minimal fallback design")
             design = {
                 "concept_vocabulary_map": {"general": [artefact.research_question[:50]]},

@@ -38,16 +38,10 @@ function resolvePython(): string {
 const PYTHON = resolvePython();
 
 const SERVICES: PythonService[] = [
-  {
-    name: "cria-unified",
-    script: "artifacts/cria-unified/main.py",
-    port: 8003,
-    env: {
-      PORT: "8003",
-      BASE_PATH: "/cria-unified",
-      ULTRARIA_URL: "http://localhost:8004",
-    },
-  },
+  // NOTE: cria-unified (port 8003) is always managed by the Replit workflow
+  // "artifacts/cria-dashboard: cria-unified". Do NOT add it here — if the
+  // workflow briefly restarts, the API server would race to spawn its own copy
+  // and both would fight over port 8003, causing a crash/restart loop.
   {
     name: "cria-v2",
     script: "artifacts/cria-deepseek/main.py",
@@ -60,10 +54,6 @@ const SERVICES: PythonService[] = [
     port: 8002,
     env: { PORT: "8002" },
   },
-  // NOTE: Ultraria is now served by cria-unified on port 8003 at /cria-unified/ultraria
-  // The stub on port 8004 has been removed to eliminate the port conflict.
-  // The proxy entry for /ultraria in python-proxy.ts should also be removed or
-  // redirected to 8003 if a separate /ultraria basepath is needed.
 ];
 
 const BASE_DELAY_MS = 2_000;
