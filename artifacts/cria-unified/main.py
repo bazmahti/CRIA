@@ -88,6 +88,53 @@ from slowapi.errors import RateLimitExceeded
 import uvicorn
 from openai import AsyncOpenAI
 
+# ── New CRIA/Ultraria modules ─────────────────────────────────────────────────
+try:
+    from cria_channel_config import (
+        get_channel_spec, channel_model, channel_temperature,
+        channel_max_tokens, channel_disposition, log_config_summary,
+        CLAUDE_MODEL as _CFG_CLAUDE, ANALYTICAL_MODEL as _CFG_ANALYTICAL,
+    )
+    _CHANNEL_CONFIG_AVAILABLE = True
+except ImportError:
+    _CHANNEL_CONFIG_AVAILABLE = False
+    def channel_model(name): return ""
+    def channel_temperature(name): return 0.5
+    def channel_max_tokens(name): return 4000
+    def channel_disposition(name): return ""
+    def log_config_summary(log): pass
+
+try:
+    from cria_web_search import WebSearchConnector
+    _WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    _WEB_SEARCH_AVAILABLE = False
+
+try:
+    from cria_connector_ledger import (
+        ensure_ledger_schema, log_connector_use, log_partnership_recommendation,
+        RecalibrationAgent, get_connector_performance_matrix,
+    )
+    _LEDGER_AVAILABLE = True
+except ImportError:
+    _LEDGER_AVAILABLE = False
+    async def ensure_ledger_schema(pool): pass
+    async def log_connector_use(*a, **kw): pass
+    async def log_partnership_recommendation(*a, **kw): pass
+
+try:
+    from cria_output_writer import write_all_outputs
+    _OUTPUT_WRITER_AVAILABLE = True
+except ImportError:
+    _OUTPUT_WRITER_AVAILABLE = False
+    async def write_all_outputs(result, job_id, question): return {}
+
+try:
+    from ultraria_phase1 import UltraRiaOrchestrator, get_lane_status, active_lane_count
+    _ULTRARIA_AVAILABLE = True
+except ImportError:
+    _ULTRARIA_AVAILABLE = False
+
 # ============================================================
 # CONFIGURATION
 # ============================================================
@@ -242,6 +289,9 @@ async def _init_db_pool() -> asyncpg.Pool:
         await _migrate(conn)
         await conn.execute(_SCHEMA_SQL)
     log.info("DB pool ready")
+    if _LEDGER_AVAILABLE:
+        await ensure_ledger_schema(pool)
+    log_config_summary(log)
     return pool
 
 
@@ -978,10 +1028,22 @@ async def call_llm(
     retries: int = 2,
     enforce_evidence_firewall: bool = False,
     retrieved_papers: Optional[List[Paper]] = None,
+    channel_name: str = "",        # NEW: route to channel-specific model
+    override_model: str = "",      # NEW: explicit model override
 ) -> str:
-    """Call the LLM with optional evidence firewall enforcement."""
+    """Call the LLM with optional evidence firewall enforcement and channel routing."""
     client = get_llm_client()
     sem = get_llm_semaphore()
+    # Channel-aware model selection
+    if override_model:
+        _channel_model = override_model
+    elif channel_name and _CHANNEL_CONFIG_AVAILABLE:
+        _channel_model = channel_model(channel_name) or MODEL_CHAIN[0]
+    else:
+        _channel_model = MODEL_CHAIN[0]
+    # Channel-aware max_tokens if not caller-specified
+    if channel_name and _CHANNEL_CONFIG_AVAILABLE and max_tokens == 4000:
+        max_tokens = channel_max_tokens(channel_name)
 
     default_system = (
         "You are a rigorous research analyst. Be specific and evidence-based. "
@@ -1011,7 +1073,9 @@ async def call_llm(
         s = str(exc)
         return "UNSUPPORTED_MODEL" in s or '"code": 400' in s or "status_code=400" in s or "Error code: 400" in s
 
-    for model in MODEL_CHAIN:
+    # Use channel-specific model if configured, else fall through MODEL_CHAIN
+    _model_chain = ([_channel_model] + [m for m in MODEL_CHAIN if m != _channel_model]) if _channel_model else MODEL_CHAIN
+    for model in _model_chain:
         last_err = ""
         hard_fail = False
         for attempt in range(retries + 1):
@@ -1123,10 +1187,12 @@ Rules:
         raw = await call_llm(
             prompt,
             system_prompt=(
-                "You are a research design expert. Produce precise, actionable "
+                "You are a research design expert with deep knowledge of academic literature. "
+                "Identify landmark papers and key researchers. Produce precise, actionable "
                 "search design. Return only valid JSON with no markdown fences."
             ),
             max_tokens=2000,
+            channel_name="Stage0",   # routes to Claude for deep academic knowledge
         )
 
         try:
@@ -3217,14 +3283,25 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
         result["fallback_used"] = bool(used_list and any(m != MODEL_CHAIN[0] for m in used_list))
         result["primary_model"] = MODEL_CHAIN[0]
         await db_complete_job(job_id, result)
+        # Write ALL outputs to .md files (meta-layer, pipeline papers, etc.)
+        output_files = {}
+        if _OUTPUT_WRITER_AVAILABLE:
+            try:
+                output_files = await write_all_outputs(
+                    result, job_id, artefact.research_question
+                )
+                result["output_files"] = output_files
+            except Exception as oe:
+                log.warning("Output writer error: %s", oe)
         log.info(
-            "Job %s complete — %.1fs — cog:%d epi:%d conv:%d new_experiments:%d",
+            "Job %s complete — %.1fs — cog:%d epi:%d conv:%d new_experiments:%d files:%d",
             job_id,
             result.get("duration_seconds", 0),
             len(result.get("cognitive_pipeline", {}).get("findings", [])),
             len(result.get("epistemic_pipeline", {}).get("findings", [])),
             len(result.get("convergent_pipeline", {}).get("findings", [])),
             len(result.get("new_experiments", [])),
+            len(output_files),
         )
     except (KeyboardInterrupt, SystemExit):
         raise
@@ -3328,6 +3405,123 @@ async def list_connectors():
             for c in ALL_CONNECTORS
         ],
     }
+
+
+# ── Ultraria endpoint ─────────────────────────────────────────────────────────
+
+class UltraRiaRequest(BaseModel):
+    query: str = Field(..., min_length=10, max_length=4000)
+    cria_job_id: str = Field("", description="Optional CRIA job ID to use as context")
+    observer_note: str = Field("", max_length=500)
+
+
+@app.post(f"{BASE_PATH}/ultraria", dependencies=[Depends(verify_api_key)])
+@limiter.limit("2/minute")
+async def ultraria_endpoint(
+    request: Request,
+    body: UltraRiaRequest,
+    background_tasks: BackgroundTasks,
+):
+    if not _ULTRARIA_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Ultraria module not available")
+    active = active_lane_count()
+    if active < 2:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Ultraria requires at least 2 active lanes. Currently active: {active}. "
+                   "Configure ULTRARIA_* API keys in Replit Secrets.",
+        )
+
+    # Optionally load CRIA result as context
+    cria_result = None
+    if body.cria_job_id and _db_pool:
+        job = await db_get_job(body.cria_job_id)
+        if job and job.get("result"):
+            cria_result = job["result"]
+
+    job_id = str(uuid.uuid4())
+    await db_create_job(job_id, body.query, "ultraria",
+                        getattr(request.state, "request_id", ""))
+
+    async def _run_ultraria():
+        await db_start_job(job_id)
+        try:
+            orch = UltraRiaOrchestrator()
+            result = await orch.run(
+                body.query, cria_result=cria_result, call_llm_fn=call_llm
+            )
+            result_dict = result.to_dict()
+            result_dict["markdown"] = result.to_markdown()
+            # Write markdown output
+            if _OUTPUT_WRITER_AVAILABLE:
+                from cria_output_writer import OUTPUT_DIR, slugify, ts
+                from pathlib import Path
+                slug = slugify(body.query)
+                path = OUTPUT_DIR / f"ULTRARIA-{slug}-{ts()}.md"
+                path.write_text(result.to_markdown(), encoding="utf-8")
+                result_dict["output_file"] = str(path)
+            await db_complete_job(job_id, result_dict)
+            log.info("Ultraria job %s complete — %d lanes completed",
+                     job_id, result.completed_lanes)
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"
+            log.error("Ultraria job %s failed: %s", job_id, err, exc_info=True)
+            await db_fail_job(job_id, err)
+
+    background_tasks.add_task(_run_ultraria)
+    return {
+        "jobId": job_id,
+        "status": "queued",
+        "active_lanes": active,
+        "lane_status": get_lane_status() if _ULTRARIA_AVAILABLE else {},
+    }
+
+
+@app.get(f"{BASE_PATH}/ultraria/lanes")
+async def ultraria_lane_status():
+    if not _ULTRARIA_AVAILABLE:
+        return {"available": False}
+    return {
+        "available": True,
+        "active_count": active_lane_count(),
+        "lanes": get_lane_status(),
+    }
+
+
+# ── Recalibration endpoint ────────────────────────────────────────────────────
+
+@app.post(f"{BASE_PATH}/connectors/recalibrate", dependencies=[Depends(verify_api_key)])
+async def trigger_recalibration():
+    if not _LEDGER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Connector ledger not available")
+    agent = RecalibrationAgent()
+    report = await agent.generate_report(_db_pool)
+    return report or {"status": "no_data"}
+
+
+@app.get(f"{BASE_PATH}/connectors/performance")
+async def connector_performance():
+    if not _LEDGER_AVAILABLE or not _db_pool:
+        return {"available": False, "matrix": []}
+    matrix = await get_connector_performance_matrix(_db_pool)
+    return {"available": True, "entries": len(matrix), "matrix": matrix[:50]}
+
+
+# ── Output files endpoint ─────────────────────────────────────────────────────
+
+@app.get(f"{BASE_PATH}/outputs")
+async def list_outputs(q: str = ""):
+    if not _OUTPUT_WRITER_AVAILABLE:
+        return {"available": False, "files": []}
+    from cria_output_writer import OUTPUT_DIR, slugify, get_output_files_list
+    if q:
+        files = get_output_files_list(slugify(q))
+    else:
+        files = [
+            {"filename": p.name, "path": str(p), "size_kb": round(p.stat().st_size / 1024, 1)}
+            for p in sorted(OUTPUT_DIR.glob("*.md"), key=lambda f: f.stat().st_mtime, reverse=True)[:50]
+        ]
+    return {"available": True, "count": len(files), "files": files}
 
 
 @app.get(f"{BASE_PATH}/health")
