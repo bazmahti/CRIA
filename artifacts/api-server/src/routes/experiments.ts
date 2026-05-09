@@ -422,23 +422,105 @@ router.post("/experiments/:id/run", async (req, res): Promise<void> => {
 
   req.log.info({ experimentId: params.data.id }, "Started experiment run");
 
-  // Simulate async completion after a short delay
-  setTimeout(async () => {
-    try {
-      const elapsed = Math.floor(Math.random() * 120) + 30;
-      const iterations = Math.min(exp.iterationCap ?? 15, Math.floor(Math.random() * 10) + 3);
-      const budget = Math.min(exp.budgetCapAud, parseFloat((Math.random() * exp.budgetCapAud * 0.7).toFixed(2)));
-      const truncated = budget >= exp.budgetCapAud * 0.95;
+  // Dispatch to CRIA-Unified Python pipeline (no simulation)
+  const criaUrl = process.env["CRIA_UNIFIED_URL"] ?? "http://localhost:8003/cria-unified/research";
+  const startedAt = Date.now();
 
-      const outcomeTypes = exp.expectedOutcomeTypes ?? [];
-      const findingsMd = generateFindingsMarkdown(exp, iterations, budget);
+  (async () => {
+    try {
+      // Submit research job to Python pipeline
+      const submitResp = await fetch(criaUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: exp.question,
+          observer_note: exp.observerNote ?? "",
+          dissonance_budget: exp.dissonanceBudget ?? 0.20,
+          max_iterations: Math.min(exp.iterationCap ?? 2, 5),
+          voice: "all",
+          profile: exp.project ?? "general_scholarship",
+        }),
+        signal: AbortSignal.timeout(30_000),
+      });
+
+      if (!submitResp.ok) {
+        throw new Error(`CRIA submit failed: HTTP ${submitResp.status}`);
+      }
+
+      const { jobId } = await submitResp.json() as { jobId: string };
+      if (!jobId) throw new Error("No jobId returned from CRIA pipeline");
+
+      // Poll for completion
+      const pollUrl = `http://localhost:8003/cria-unified/research/${jobId}`;
+      const deadline = Date.now() + (exp.timeCapSeconds ?? 600) * 1000;
+      let pollData: { status: string; result?: Record<string, unknown>; error?: string } | null = null;
+
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 8_000));
+        try {
+          const pollResp = await fetch(pollUrl, { signal: AbortSignal.timeout(15_000) });
+          if (pollResp.ok) {
+            const raw = await pollResp.json() as { status: string; engine?: { status: string; result?: Record<string, unknown>; error?: string } };
+            const engine = raw.engine ?? raw;
+            pollData = { status: engine.status, result: engine.result as Record<string, unknown>, error: engine.error };
+            if (pollData.status === "complete" || pollData.status === "failed") break;
+          }
+        } catch { /* transient poll error — continue */ }
+      }
+
+      const elapsed = Math.round((Date.now() - startedAt) / 1000);
+
+      if (!pollData || pollData.status !== "complete" || !pollData.result) {
+        throw new Error(pollData?.error ?? "CRIA pipeline timed out or returned no result");
+      }
+
+      const result = pollData.result;
+
+      // Extract real findings from pipeline outputs
+      const voices = result.voices as Record<string, { text?: string }> | undefined;
+      const papers = result.pipeline_papers as Record<string, { text?: string }> | undefined;
+
+      // Build findings markdown from actual CRIA output
+      const sections: string[] = [`# CRIA Findings — ${exp.experimentId}`, `
+**Question:** ${exp.question}
+`];
+      if (papers?.["cognitive"]?.text) sections.push(`## Cognitive Pipeline
+
+${papers["cognitive"].text}`);
+      if (papers?.["epistemic"]?.text) sections.push(`## Epistemic Pipeline
+
+${papers["epistemic"].text}`);
+      if (papers?.["convergent"]?.text) sections.push(`## Convergent Analysis
+
+${papers["convergent"].text}`);
+      if (voices?.["academic"]?.text) sections.push(`## Academic Voice
+
+${voices["academic"].text}`);
+      const findingsMd = sections.join("
+
+---
+
+");
+
+      // Extract real citations from retrieved papers
+      const cogPipeline = result.cognitive_pipeline as { findings?: Array<{ evidence?: string[] }> } | undefined;
+      const realCitations: string[] = [];
+      for (const f of cogPipeline?.findings ?? []) {
+        for (const e of f.evidence ?? []) {
+          if (e && !realCitations.includes(e)) realCitations.push(e);
+        }
+      }
+
+      const retrievedCount = (result.cognitive_pipeline as { retrieved_paper_count?: number })?.retrieved_paper_count ?? 0;
+      const budgetConsumed = Math.min(exp.budgetCapAud, parseFloat((retrievedCount * 0.05).toFixed(2)));
+      const isTruncated = !!(result.retrieval_status as { exhaustion_detected?: boolean })?.exhaustion_detected;
 
       await db.update(experimentsTable).set({
         status: "complete",
         elapsedSeconds: elapsed,
-        currentIteration: iterations,
-        budgetConsumed: budget,
-        isTruncated: truncated,
+        currentIteration: (result.iterations as number) ?? 1,
+        budgetConsumed,
+        isTruncated,
         completedAt: new Date(),
         updatedAt: new Date(),
       }).where(eq(experimentsTable.id, params.data.id));
@@ -448,22 +530,23 @@ router.post("/experiments/:id/run", async (req, res): Promise<void> => {
         await db.insert(findingsTable).values({
           experimentId: params.data.id,
           findingsMarkdown: findingsMd,
-          outcomeTypes,
-          citations: generateCitations(exp.includeLayers ?? []),
+          outcomeTypes: exp.expectedOutcomeTypes ?? [],
+          citations: realCitations.slice(0, 20),
           generatedAt: new Date(),
         });
       }
-    } catch (e) {
-      logger.error({ err: e, experimentId: params.data.id }, "Experiment simulation failed — marking as failed");
-      try {
-        await db.update(experimentsTable)
-          .set({ status: "failed", updatedAt: new Date() })
-          .where(eq(experimentsTable.id, params.data.id));
-      } catch {
-        // DB update also failed — nothing more we can do
-      }
+
+      logger.info({ experimentId: params.data.id, elapsed, retrievedCount }, "Experiment complete — real CRIA findings stored");
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error({ err, experimentId: params.data.id }, "Experiment run failed — marking as failed");
+      await db.update(experimentsTable)
+        .set({ status: "failed", updatedAt: new Date(), validationErrors: [msg] })
+        .where(eq(experimentsTable.id, params.data.id))
+        .catch(() => {/* best effort */});
     }
-  }, 3000);
+  })();
 
   res.json(RunExperimentResponse.parse(mapExperiment(updated)));
 });
@@ -517,69 +600,8 @@ router.post("/experiments/:id/validate", async (req, res): Promise<void> => {
   res.json(ValidateExperimentResponse.parse({ valid: errors.length === 0, errors }));
 });
 
-function generateFindingsMarkdown(exp: typeof experimentsTable.$inferSelect, iterations: number, budget: number): string {
-  const channel = exp.channel ? `**Channel:** ${exp.channel.replace(/_/g, " ")}` : "**Scope:** Cross-channel civilisational";
-  const outcomeTypes = exp.expectedOutcomeTypes ?? [];
 
-  return `# CRIA Findings Report
+// Simulation functions removed — findings now come from real CRIA pipeline output.
 
-**Experiment:** \`${exp.experimentId}\`  
-**Project:** ${exp.project}  
-${channel}  
-**Patterns Applied:** ${(exp.patterns ?? []).map(p => `P${p}`).join(", ") || "None specified"}  
-**Iterations Completed:** ${iterations}  
-**Budget Consumed:** AUD $${budget.toFixed(2)}
-
----
-
-## Research Question
-
-${exp.question}
-
-${exp.hypothesis ? `## Hypothesis\n\n${exp.hypothesis}\n\n---` : ""}
-
-## Summary of Findings
-
-${outcomeTypes.includes("convergence")
-    ? `### Convergent Evidence\n\nAcross the corpus layers examined, there is notable convergence around the core framing of the research question. Evidence from credentialed research, ${(exp.framesExpected ?? []).slice(0, 2).join(", ")} traditions shows consistent directional alignment.\n\n`
-    : ""}${outcomeTypes.includes("divergence")
-    ? `### Divergent Evidence\n\nSignificant tension was identified between the ${(exp.framesExpected ?? []).slice(0, 1)} and ${(exp.framesExpected ?? []).slice(1, 2)} frameworks. This divergence appears structural rather than superficial, suggesting the question may be framing-dependent.\n\n`
-    : ""}${outcomeTypes.includes("frame_extinction")
-    ? `### Frame Extinction\n\nSeveral frames that were prominent in earlier literature have significantly diminished representation in current scholarship. This signals a possible paradigm shift in how this domain is conceptualised.\n\n`
-    : ""}
-
-## Evidence Tier Assessment
-
-Evidence meets the **${exp.evidenceTierThreshold}** threshold required for this experiment. The falsification step ${(exp.protections as Record<string, boolean> | null)?.p1_falsification !== false ? "was applied and did not substantially undermine the findings" : "was not applied (per artefact configuration)"}.
-
-## Convergence Assessment
-
-**Convergence requirement:** \`${exp.convergenceRequirement}\`
-
-${exp.convergenceRequirement === "strong_with_falsification"
-    ? "Strong convergence with falsification was achieved. Findings are robust across the corpus layers sampled."
-    : "Partial convergence is indicated. Some signal was found across multiple frameworks, though full corroboration is incomplete."}
-
-## Observer Context
-
-${exp.observerNote}
-
----
-
-*Generated by CRIA — Convergent Research Intelligence Architecture*
-`;
-}
-
-function generateCitations(layers: string[]): string[] {
-  const base = [
-    "Frankl, V. (1985). Man's Search for Meaning. Washington Square Press.",
-    "Deci, E. & Ryan, R. (2000). Self-determination theory and the facilitation of intrinsic motivation. American Psychologist.",
-    "Atlan, H. (1979). Entre le cristal et la fumée. Seuil, Paris.",
-    "Maturana, H. & Varela, F. (1980). Autopoiesis and Cognition. Reidel.",
-  ];
-  if (layers.includes("L5")) base.push("Tuhiwai Smith, L. (1999). Decolonizing Methodologies. Zed Books.");
-  if (layers.includes("L4")) base.push("Wilson, S. (2008). Research Is Ceremony: Indigenous Research Methods. Fernwood.");
-  return base.slice(0, 3 + Math.floor(Math.random() * 2));
-}
 
 export default router;

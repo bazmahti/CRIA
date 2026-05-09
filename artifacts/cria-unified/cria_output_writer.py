@@ -338,9 +338,13 @@ async def write_all_outputs(
     files: Dict[str, str] = {}
 
     def write(name: str, content: str) -> str:
-        path = OUTPUT_DIR / f"{name}.md"
-        path.write_text(content, encoding="utf-8")
-        return str(path)
+        # Path traversal protection: resolve and verify path stays within OUTPUT_DIR
+        safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "-", name)[:200]
+        candidate = (OUTPUT_DIR / f"{safe_name}.md").resolve()
+        if not str(candidate).startswith(str(OUTPUT_DIR.resolve())):
+            raise ValueError(f"Path traversal attempt blocked: {name}")
+        candidate.write_text(content, encoding="utf-8")
+        return str(candidate)
 
     # Voice renders
     voices = result.get("voices", {})
@@ -410,8 +414,10 @@ async def write_all_outputs(
 
 def get_output_files_list(slug: str) -> List[Dict[str, str]]:
     """Return list of output files for a given question slug."""
+    # Sanitise slug to prevent glob injection
+    safe_slug = re.sub(r"[^a-zA-Z0-9_\-]", "-", slug)[:100]
     results = []
-    for path in OUTPUT_DIR.glob(f"*{slug}*.md"):
+    for path in OUTPUT_DIR.glob(f"*{safe_slug}*.md"):
         results.append({
             "filename": path.name,
             "path": str(path),

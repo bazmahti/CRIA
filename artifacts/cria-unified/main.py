@@ -3478,7 +3478,8 @@ async def ultraria_endpoint(
 
 
 @app.get(f"{BASE_PATH}/ultraria/lanes")
-async def ultraria_lane_status():
+@limiter.limit("20/minute")
+async def ultraria_lane_status(request: Request):
     if not _ULTRARIA_AVAILABLE:
         return {"available": False}
     return {
@@ -3500,7 +3501,8 @@ async def trigger_recalibration():
 
 
 @app.get(f"{BASE_PATH}/connectors/performance")
-async def connector_performance():
+@limiter.limit("20/minute")
+async def connector_performance(request: Request):
     if not _LEDGER_AVAILABLE or not _db_pool:
         return {"available": False, "matrix": []}
     matrix = await get_connector_performance_matrix(_db_pool)
@@ -3510,7 +3512,8 @@ async def connector_performance():
 # ── Output files endpoint ─────────────────────────────────────────────────────
 
 @app.get(f"{BASE_PATH}/outputs")
-async def list_outputs(q: str = ""):
+@limiter.limit("30/minute")
+async def list_outputs(request: Request, q: str = ""):
     if not _OUTPUT_WRITER_AVAILABLE:
         return {"available": False, "files": []}
     from cria_output_writer import OUTPUT_DIR, slugify, get_output_files_list
