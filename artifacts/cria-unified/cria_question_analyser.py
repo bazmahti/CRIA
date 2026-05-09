@@ -28,10 +28,43 @@ version (original or modified) is what Stage 0 receives.
 
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional, Literal
 
+import httpx
+
 log = logging.getLogger("cria-analyser")
+
+# ── Direct Anthropic API call (bypasses OpenAI-compatible proxy) ─────────────
+# The OpenAI-compatible modelfarm path rejects Claude model names with 400
+# UNSUPPORTED_MODEL. When ANTHROPIC_API_KEY is set, call the Anthropic
+# Messages API directly — same pattern as _call_anthropic() in ultraria_stub.py.
+
+_ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+_ANTHROPIC_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-5")
+
+
+async def _call_anthropic_direct(system: str, prompt: str, max_tokens: int = 3000) -> str:
+    """Direct httpx call to Anthropic Messages API — no SDK, no proxy."""
+    async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=10.0)) as client:
+        r = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": _ANTHROPIC_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": _ANTHROPIC_MODEL,
+                "max_tokens": max_tokens,
+                "system": system,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        )
+        r.raise_for_status()
+        data = r.json()
+        return data["content"][0]["text"]
 
 
 @dataclass
@@ -233,17 +266,30 @@ Rules:
 
 Return ONLY valid JSON. No preamble, no markdown fences."""
 
-    raw = await call_llm_fn(
-        prompt,
-        system_prompt=(
-            "You are a research methodology adviser with deep knowledge of academic literature "
-            "across all disciplines. You help researchers understand their questions more clearly "
-            "without imposing your own framings. You are honest about what research can and cannot "
-            "answer. You never rewrite questions — you illuminate them."
-        ),
-        max_tokens=3000,
-        channel_name="Stage0",  # routes to Claude
+    _system = (
+        "You are a research methodology adviser with deep knowledge of academic literature "
+        "across all disciplines. You help researchers understand their questions more clearly "
+        "without imposing your own framings. You are honest about what research can and cannot "
+        "answer. You never rewrite questions — you illuminate them."
     )
+
+    # Use Anthropic API directly if key is available — avoids OpenAI proxy 400 on Claude names
+    if _ANTHROPIC_KEY:
+        try:
+            raw = await _call_anthropic_direct(_system, prompt, max_tokens=3000)
+            log.info("QuestionAnalyser: used Anthropic direct API (%s)", _ANTHROPIC_MODEL)
+        except Exception as e:
+            log.warning("Anthropic direct call failed (%s) — falling back to call_llm_fn: %s",
+                        _ANTHROPIC_MODEL, e)
+            raw = await call_llm_fn(prompt, system_prompt=_system, max_tokens=3000)
+    else:
+        log.info("QuestionAnalyser: ANTHROPIC_API_KEY not set — using call_llm_fn fallback")
+        raw = await call_llm_fn(
+            prompt,
+            system_prompt=_system,
+            max_tokens=3000,
+            channel_name="Stage0",
+        )
 
     try:
         # Strip any markdown fences
