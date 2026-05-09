@@ -142,6 +142,12 @@ except ImportError:
     _ULTRARIA_AVAILABLE = False
 
 try:
+    from cria_question_analyser import analyse_question, QuestionAnalysis
+    _ANALYSER_AVAILABLE = True
+except ImportError:
+    _ANALYSER_AVAILABLE = False
+
+try:
     from cria_health_connectors import (
         search_health_connectors, health_registry_summary,
         ALL_HEALTH_CONNECTORS, STRUCTURED_HEALTH_APIS,
@@ -4378,6 +4384,45 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
         err = f"{type(e).__name__}: {e}"
         log.error("Job %s failed: %s", job_id, err, exc_info=True)
         await db_fail_job(job_id, err)
+
+
+# ── Question Analysis endpoint (Stage -1) ────────────────────────────────────
+
+class AnalyseRequest(BaseModel):
+    query: str = Field(..., min_length=10, max_length=MAX_QUERY_LENGTH)
+    observer_note: str = Field("", max_length=MAX_OBSERVER_LENGTH)
+    profile: str = Field("general_scholarship", max_length=100)
+
+    @field_validator("query")
+    @classmethod
+    def sanitise_query(cls, v: str) -> str:
+        v = v.replace("\x00", "").strip()
+        if not v:
+            raise ValueError("query cannot be empty after sanitisation")
+        return v
+
+
+@app.post(f"{BASE_PATH}/analyse")
+@limiter.limit("20/minute")
+async def analyse_endpoint(request: Request, body: AnalyseRequest):
+    """
+    Stage -1: Transparent question analysis.
+    Returns structured analysis for researcher review BEFORE the research run begins.
+    Does not start a research job. Does not modify the question.
+    """
+    if not _ANALYSER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Question analyser not available")
+    try:
+        analysis = await analyse_question(
+            question=body.query,
+            observer_note=body.observer_note,
+            profile=body.profile,
+            call_llm_fn=call_llm,
+        )
+        return analysis.to_dict()
+    except Exception as e:
+        log.error("Question analysis failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)[:200]}")
 
 
 @app.post(f"{BASE_PATH}/research",

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Layers, Brain, Microscope, GitMerge, BookOpen, Newspaper, Briefcase,
   Loader2, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp,
-  Lightbulb, AlertTriangle, FileText, Download, History
+  Lightbulb, AlertTriangle, FileText, Download, History,
+  Sparkles, Wand2, BookMarked, MessageSquare, AlertCircle, CheckCheck
 } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,43 @@ import ResearchDropZone from "@/components/ResearchDropZone";
 import { useCreateResearchJob } from "@workspace/api-client-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+interface VocabularyCluster {
+  concept: string;
+  disciplinary_terms: Record<string, string[]>;
+  note: string;
+}
+interface AmbiguityFlag {
+  excerpt: string;
+  reading_a: string;
+  reading_b: string;
+  recommendation: string;
+  severity: "minor" | "moderate" | "significant";
+}
+interface FramingObservation {
+  observation: string;
+  example_phrase: string;
+  what_cria_will_do: string;
+  options: string[];
+}
+interface ScopeSignal {
+  assessment: "well_scoped" | "likely_absence" | "too_broad" | "sovereign_territory";
+  explanation: string;
+  suggestion: string;
+}
+interface QuestionAnalysis {
+  original_question: string;
+  vocabulary_clusters: VocabularyCluster[];
+  ambiguity_flags: AmbiguityFlag[];
+  framing_observations: FramingObservation[];
+  scope_signal: ScopeSignal;
+  observer_note_suggestion: { suggested_note: string; reasoning: string } | null;
+  profile_suggestion: string;
+  profile_reasoning: string;
+  cria_readiness: "ready" | "refine_recommended" | "refine_strongly_recommended";
+  readiness_explanation: string;
+  analysis_note: string;
+}
 
 type EngineStatus = "pending" | "running" | "complete" | "failed";
 
@@ -480,6 +518,11 @@ export default function UnifiedResearch() {
   const [profile, setProfile] = useState("general_scholarship");
   const [showConnectorGroups, setShowConnectorGroups] = useState(false);
   const [activeStream, setActiveStream] = useState<string>("general");
+  const [analysis, setAnalysis] = useState<QuestionAnalysis | null>(null);
+  const [analysing, setAnalysing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisExpanded, setAnalysisExpanded] = useState(true);
+  const [confirmedQuery, setConfirmedQuery] = useState<string>("");
   const [savedToHistory, setSavedToHistory] = useState(false);
 
   const [job, setJob] = useState<UnifiedJobState | null>(null);
@@ -1007,21 +1050,231 @@ export default function UnifiedResearch() {
               );
             })()}
 
-            <button
-              onClick={launch}
-              disabled={loading || !query.trim() || job?.status === "running"}
-              className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl px-6 py-3 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {warmingUp ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Waiting for pipelines to start…</>
-              ) : (loading || job?.status === "running") ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Running three pipelines in parallel…</>
-              ) : (
-                <><Layers className="w-4 h-4" /> Launch Unified Research</>
-              )}
-            </button>
+            {/* Analyse button + Launch button */}
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  if (!query.trim()) return;
+                  setAnalysing(true);
+                  setAnalysisError(null);
+                  setAnalysis(null);
+                  setAnalysisExpanded(true);
+                  try {
+                    const BASE = import.meta.env.VITE_CRIA_UNIFIED_BASE_URL || "";
+                    const resp = await fetch(`${BASE}/cria-unified/analyse`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ query, observer_note: observerNote, profile }),
+                    });
+                    if (!resp.ok) throw new Error(`Analysis failed: HTTP ${resp.status}`);
+                    const data = await resp.json() as QuestionAnalysis;
+                    setAnalysis(data);
+                    setConfirmedQuery(query);
+                  } catch (e) {
+                    setAnalysisError(e instanceof Error ? e.message : String(e));
+                  } finally {
+                    setAnalysing(false);
+                  }
+                }}
+                disabled={analysing || !query.trim() || loading}
+                className="flex-1 flex items-center justify-center gap-2 bg-background border border-border rounded-xl px-4 py-3 text-sm font-medium hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {analysing
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Analysing…</>
+                  : <><Sparkles className="w-4 h-4" /> Analyse Question</>}
+              </button>
+              <button
+                onClick={launch}
+                disabled={loading || !query.trim() || job?.status === "running"}
+                className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl px-6 py-3 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {warmingUp ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Warming up…</>
+                ) : (loading || job?.status === "running") ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Running…</>
+                ) : (
+                  <><Layers className="w-4 h-4" /> Launch Research</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* ── Question Analysis Panel (Stage -1) ─────────────────────────── */}
+        {(analysis || analysing || analysisError) && (
+          <div className="mb-6 rounded-xl border border-border/60 overflow-hidden">
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-4 py-3 bg-muted/40 cursor-pointer"
+              onClick={() => setAnalysisExpanded(e => !e)}
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold">Question Analysis — Stage -1</span>
+                {analysis && (
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                    analysis.cria_readiness === "ready" ? "bg-green-500/15 text-green-600" :
+                    analysis.cria_readiness === "refine_recommended" ? "bg-amber-500/15 text-amber-600" :
+                    "bg-red-500/15 text-red-600"
+                  )}>
+                    {analysis.cria_readiness === "ready" ? "✓ Ready to launch" :
+                     analysis.cria_readiness === "refine_recommended" ? "⚠ Refinement recommended" :
+                     "⚠ Refinement strongly recommended"}
+                  </span>
+                )}
+              </div>
+              {analysisExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+            </div>
+
+            {analysisExpanded && (
+              <div className="p-4 space-y-4">
+                {analysing && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-4 justify-center">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Analysing your research question with Claude…
+                  </div>
+                )}
+                {analysisError && (
+                  <div className="text-sm text-red-500 bg-red-500/10 rounded-lg p-3">{analysisError}</div>
+                )}
+                {analysis && (<>
+                  {/* Readiness explanation */}
+                  <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2 italic">
+                    {analysis.readiness_explanation}
+                  </div>
+
+                  {/* Vocabulary clusters */}
+                  {analysis.vocabulary_clusters.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <BookMarked className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Vocabulary Across Disciplines</span>
+                      </div>
+                      <div className="space-y-2">
+                        {analysis.vocabulary_clusters.map((vc, i) => (
+                          <div key={i} className="rounded-lg border border-border/40 p-3 bg-background/50">
+                            <div className="text-xs font-semibold mb-1">"{vc.concept}"</div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
+                              {Object.entries(vc.disciplinary_terms).map(([disc, terms]) => (
+                                <div key={disc} className="text-[10px]">
+                                  <span className="font-medium text-muted-foreground">{disc}: </span>
+                                  <span>{(terms as string[]).join(", ")}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {vc.note && <div className="text-[10px] text-muted-foreground mt-1.5 italic">{vc.note}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ambiguity flags */}
+                  {analysis.ambiguity_flags.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <MessageSquare className="w-3.5 h-3.5 text-amber-500" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ambiguities Worth Clarifying</span>
+                      </div>
+                      <div className="space-y-2">
+                        {analysis.ambiguity_flags.map((flag, i) => (
+                          <div key={i} className={cn(
+                            "rounded-lg border p-3 text-[11px]",
+                            flag.severity === "significant" ? "border-amber-500/40 bg-amber-500/5" : "border-border/40 bg-background/50"
+                          )}>
+                            <div className="font-medium mb-1">"{flag.excerpt}"</div>
+                            <div className="text-muted-foreground space-y-0.5">
+                              <div><span className="font-medium">Reading A:</span> {flag.reading_a}</div>
+                              <div><span className="font-medium">Reading B:</span> {flag.reading_b}</div>
+                            </div>
+                            <div className="mt-1.5 text-[10px] italic text-muted-foreground">{flag.recommendation}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Framing observations */}
+                  {analysis.framing_observations.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Lightbulb className="w-3.5 h-3.5 text-blue-500" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Implicit Framings</span>
+                      </div>
+                      <div className="space-y-2">
+                        {analysis.framing_observations.map((obs, i) => (
+                          <div key={i} className="rounded-lg border border-border/40 p-3 bg-background/50 text-[11px]">
+                            <div className="font-medium mb-1">{obs.observation}</div>
+                            <div className="text-muted-foreground mb-1">Phrase: <span className="italic">"{obs.example_phrase}"</span></div>
+                            <div className="text-[10px] text-blue-600/80 mb-1.5">CRIA will: {obs.what_cria_will_do}</div>
+                            {obs.options.map((opt, j) => (
+                              <div key={j} className="text-[10px] text-muted-foreground">• {opt}</div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Scope signal */}
+                  <div className={cn(
+                    "rounded-lg border p-3 text-[11px]",
+                    analysis.scope_signal.assessment === "well_scoped" ? "border-green-500/30 bg-green-500/5" :
+                    analysis.scope_signal.assessment === "sovereign_territory" ? "border-purple-500/30 bg-purple-500/5" :
+                    "border-amber-500/30 bg-amber-500/5"
+                  )}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      {analysis.scope_signal.assessment === "well_scoped" ? <CheckCheck className="w-3.5 h-3.5 text-green-600" /> : <AlertCircle className="w-3.5 h-3.5 text-amber-500" />}
+                      <span className="font-semibold">
+                        {analysis.scope_signal.assessment === "well_scoped" ? "Well scoped" :
+                         analysis.scope_signal.assessment === "likely_absence" ? "Evidence may be sparse" :
+                         analysis.scope_signal.assessment === "too_broad" ? "Consider narrowing" :
+                         "Sovereign territory — partnership recommended"}
+                      </span>
+                    </div>
+                    <div className="text-muted-foreground">{analysis.scope_signal.explanation}</div>
+                    <div className="mt-1 italic text-[10px]">{analysis.scope_signal.suggestion}</div>
+                  </div>
+
+                  {/* Profile suggestion */}
+                  {analysis.profile_suggestion && analysis.profile_suggestion !== profile && (
+                    <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-[11px]">
+                      <div className="font-semibold mb-1">Profile suggestion: <span className="text-primary">{analysis.profile_suggestion}</span></div>
+                      <div className="text-muted-foreground">{analysis.profile_reasoning}</div>
+                      <button
+                        onClick={() => setProfile(analysis.profile_suggestion)}
+                        className="mt-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium hover:bg-primary/20 transition-colors"
+                      >
+                        Apply suggested profile
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Observer note suggestion */}
+                  {analysis.observer_note_suggestion && !observerNote.trim() && (
+                    <div className="rounded-lg border border-border/40 bg-background/50 p-3 text-[11px]">
+                      <div className="font-semibold mb-1">Observer note suggestion</div>
+                      <div className="text-muted-foreground italic mb-1">"{analysis.observer_note_suggestion.suggested_note}"</div>
+                      <div className="text-[10px] text-muted-foreground mb-2">{analysis.observer_note_suggestion.reasoning}</div>
+                      <button
+                        onClick={() => setObserverNote(analysis!.observer_note_suggestion!.suggested_note)}
+                        className="px-3 py-1 rounded-full bg-muted/60 border border-border/50 text-[10px] font-medium hover:bg-muted transition-colors"
+                      >
+                        Use this suggestion
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Disclaimer */}
+                  <div className="text-[10px] text-muted-foreground italic border-t border-border/30 pt-3">
+                    {analysis.analysis_note}
+                  </div>
+                </>)}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Warm-up / error banners */}
         {warmingUp ? (
