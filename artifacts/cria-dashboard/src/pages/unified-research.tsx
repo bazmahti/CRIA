@@ -774,6 +774,19 @@ export default function UnifiedResearch() {
                     <option value="neurodiversity_health">Neurodiversity and Health</option>
                     <option value="therapeutic_clinical">Therapeutic-Clinical</option>
                   </optgroup>
+                  <optgroup label="Health and medicine">
+                    <option value="clinical_biomedical">Clinical and Biomedical</option>
+                    <option value="mental_health">Mental Health and Psychology</option>
+                    <option value="contemplative_neuroscience">Contemplative Neuroscience</option>
+                    <option value="psychedelic_research">Psychedelic and Expanded-States Research</option>
+                    <option value="integrative_medicine">Integrative and Functional Medicine</option>
+                    <option value="neurofeedback_health">Neurofeedback and Biofeedback</option>
+                    <option value="public_health">Public Health and Epidemiology</option>
+                    <option value="health_equity">Health Equity and Social Determinants</option>
+                    <option value="indigenous_health">Indigenous and Community-Controlled Health</option>
+                    <option value="nutrition_gut_brain">Nutrition and Gut-Brain Axis</option>
+                    <option value="longevity_ageing">Longevity and Ageing</option>
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -829,6 +842,17 @@ export default function UnifiedResearch() {
                   active: ["mainstream_academic", "web_foundational", "food_sovereignty_advocacy", "biodiversity", "climate_energy", "regenerative_agriculture", "plastic_pollution"],
                   inactive: ["clinical_medical", "neurodiversity_community", "ai_alignment", "civilisational_philosophy"],
                 },
+                clinical_biomedical: { active: ["mainstream_academic", "web_foundational", "clinical_biomedical", "cochrane", "nice_evidence"], inactive: ["integrative_medicine", "contemplative_neuroscience"] },
+                mental_health: { active: ["mainstream_academic", "web_foundational", "mental_health", "medrxiv"], inactive: ["integrative_medicine", "psychedelic_research"] },
+                contemplative_neuroscience: { active: ["mainstream_academic", "web_foundational", "contemplative_neuroscience", "open_neuro"], inactive: ["psychedelic_research"] },
+                psychedelic_research: { active: ["mainstream_academic", "web_foundational", "psychedelic_research", "clinical_trials"], inactive: ["integrative_medicine"] },
+                integrative_medicine: { active: ["mainstream_academic", "web_foundational", "integrative_medicine", "nccih"], inactive: ["clinical_biomedical"] },
+                neurofeedback_health: { active: ["mainstream_academic", "web_foundational", "neurofeedback", "open_neuro"], inactive: ["clinical_biomedical"] },
+                public_health: { active: ["mainstream_academic", "web_foundational", "public_health", "who_gho", "aihw"], inactive: ["clinical_biomedical"] },
+                health_equity: { active: ["mainstream_academic", "web_foundational", "health_equity"], inactive: ["clinical_biomedical"] },
+                indigenous_health: { active: ["mainstream_academic", "web_foundational", "indigenous_health"], inactive: ["clinical_biomedical"] },
+                nutrition_gut_brain: { active: ["mainstream_academic", "web_foundational", "nutrition_gut_brain"], inactive: ["clinical_biomedical"] },
+                longevity_ageing: { active: ["mainstream_academic", "web_foundational", "longevity_ageing", "clinical_trials"], inactive: ["clinical_biomedical"] },
               };
               const groups = PROFILE_GROUPS[profile];
               if (!groups) return null;
@@ -853,6 +877,24 @@ export default function UnifiedResearch() {
                 clinical_medical: "PubMed · Cochrane · CINAHL · PsycINFO",
                 our_world_in_data: "Our World in Data — data-driven synthesis on global issues",
                 australian_institutional: "AustLII · ARDC · NIAA · AHRC · ABS",
+                clinical_biomedical: "Cochrane · BMJ · NEJM · Lancet · JAMA · AHRQ · NICE Evidence · ClinicalTrials.gov v2",
+                mental_health: "NIMH · APA · APS · Black Dog Institute · Orygen · headspace · medRxiv",
+                contemplative_neuroscience: "Mind and Life Institute · Stanford CCARE · Oxford Mindfulness · Frontiers Human Neuroscience · OpenNeuro",
+                psychedelic_research: "MAPS · Beckley Foundation · Imperial Psychedelics · Johns Hopkins PSR · Chacruna · ClinicalTrials.gov",
+                integrative_medicine: "NCCIH · Andrew Weil Center · IFM · American Botanical Council · Europe PMC",
+                neurofeedback: "ISNR · NeuroRegulation Journal (OA) · AAPB · Biofeedback Foundation Europe · OpenNeuro",
+                public_health: "WHO · CDC · ECDC · AIHW · Lancet Public Health · IHME Global Burden of Disease",
+                health_equity: "WHO Social Determinants · RWJF · Kaiser Family Foundation · Commonwealth Fund · Office Minority Health",
+                indigenous_health: "Lowitja Institute · NACCHO · AIHW Indigenous · IPHRC Canada · Whānau Ora · Te Whatu Ora",
+                nutrition_gut_brain: "Nutrition Journal · AJCN · Harvard Nutrition Source · Gut Microbiota for Health · Microbiome Journal",
+                longevity_ageing: "NIA · SENS Research · Lifespan.io · Aging Journal · Blue Zones · ClinicalTrials.gov",
+                open_neuro: "OpenNeuro — open neuroimaging datasets (EEG, fMRI, MEG)",
+                who_gho: "WHO Global Health Observatory API — global health statistics",
+                cochrane: "Cochrane Library — gold standard systematic reviews",
+                nccih: "NCCIH — US National Center for Complementary and Integrative Health",
+                clinical_trials: "ClinicalTrials.gov v2 API — registered clinical trials",
+                medrxiv: "medRxiv — medical preprints (free API)",
+                aihw: "Australian Institute of Health and Welfare",
               };
               return (
                 <div className="mt-1">
