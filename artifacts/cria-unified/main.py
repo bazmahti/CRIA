@@ -780,7 +780,414 @@ EPISTEMIC_CONNECTORS: List[ConnectorSpec] = [
                   notes="PARTNERSHIP-GATED. Community-controlled health."),
 ]
 
-ALL_CONNECTORS = COGNITIVE_CONNECTORS + EPISTEMIC_CONNECTORS
+ADVOCACY_CONNECTOR_SPECS: List[ConnectorSpec] = [
+    ConnectorSpec("Plastic Pollution Coalition", "https://plasticpollutioncoalition.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Advocacy and research on plastic pollution reduction"),
+
+    ConnectorSpec("Break Free From Plastic", "https://breakfreefromplastic.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Global movement against plastic pollution"),
+
+    ConnectorSpec("NOAA Marine Debris Program", "https://marinedebris.noaa.gov",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="US federal marine debris science and monitoring"),
+
+    ConnectorSpec("IPBES", "https://ipbes.net",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Intergovernmental Science-Policy Platform on Biodiversity and Ecosystem Services"),
+
+    ConnectorSpec("IUCN", "https://iucn.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="International Union for Conservation of Nature publications"),
+
+    ConnectorSpec("Convention on Biological Diversity", "https://cbd.int",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="UN biodiversity treaty publications and data"),
+
+    ConnectorSpec("Stockholm Resilience Centre", "https://stockholmresilience.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Planetary boundaries, resilience theory, social-ecological systems"),
+
+    ConnectorSpec("IRENA", "https://irena.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="International Renewable Energy Agency — energy transition statistics and analysi"),
+
+    ConnectorSpec("REN21", "https://ren21.net",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Global Status Report on renewable energy"),
+
+    ConnectorSpec("NREL", "https://nrel.gov",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="National Renewable Energy Laboratory publications and data"),
+
+    ConnectorSpec("Global Carbon Atlas", "https://globalcarbonatlas.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Carbon flux data and visualisations"),
+
+    ConnectorSpec("Climate Policy Initiative", "https://climatepolicyinitiative.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Climate finance and policy analysis"),
+
+    ConnectorSpec("Carbon Brief", "https://carbonbrief.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Science and policy journalism on climate change"),
+
+    ConnectorSpec("Rodale Institute", "https://rodaleinstitute.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Organic and regenerative agriculture research"),
+
+    ConnectorSpec("Regeneration International", "https://regenerationinternational.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Global regenerative agriculture movement research"),
+
+    ConnectorSpec("ATTRA Sustainable Agriculture", "https://attra.ncat.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="NCAT sustainable agriculture publications and guides"),
+
+    ConnectorSpec("Savory Institute", "https://savory.global",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Holistic planned grazing and land restoration"),
+
+    ConnectorSpec("Agroecology Europe", "https://agroecology-europe.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="European agroecology research and practice"),
+
+    ConnectorSpec("GRAIN", "https://grain.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Research on food sovereignty, seed systems, and corporate agriculture"),
+
+    ConnectorSpec("La Via Campesina", "https://viacampesina.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="International peasants movement — food sovereignty position papers"),
+
+    ConnectorSpec("ETC Group", "https://etcgroup.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Research on erosion, technology, concentration in food and agriculture"),
+
+    ConnectorSpec("FAO", "https://fao.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="UN Food and Agriculture Organization publications"),
+
+    ConnectorSpec("IPES-Food", "https://ipes-food.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="International Panel of Experts on Sustainable Food Systems"),
+
+    ConnectorSpec("Food First / Institute for Food and Development Policy", "https://foodfirst.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Research on food sovereignty and agroecology"),
+
+    ConnectorSpec("New Economics Foundation", "https://neweconomics.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Research on wellbeing economy, inequality, democratic economy"),
+
+    ConnectorSpec("Doughnut Economics Action Lab", "https://doughnuteconomics.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Kate Raworth's doughnut economics research and case studies"),
+
+    ConnectorSpec("Institute for New Economic Thinking", "https://ineteconomics.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Heterodox economics, financial reform, post-neoliberal frameworks"),
+
+    ConnectorSpec("Post Carbon Institute", "https://postcarbon.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Research on energy transition, resilience, degrowth"),
+
+    ConnectorSpec("Degrowth Research Network", "https://degrowth.info",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Academic research on degrowth and post-growth economics"),
+
+    ConnectorSpec("Common Weal", "https://commonweal.co.uk",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Policy research on co-operative and commons-based economics"),
+
+    ConnectorSpec("US Solidarity Economy Network", "https://solidarityeconomy.net",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Cooperative, commons, social economy research"),
+
+    ConnectorSpec("Club of Rome", "https://clubofrome.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Limits to Growth research, planetary emergency reports"),
+
+    ConnectorSpec("Nesta", "https://nesta.org.uk",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Innovation, public services, mission-oriented economy research"),
+
+    ConnectorSpec("Pluriverse", "https://pluriverse.world",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Post-development alternatives and cosmovisions"),
+
+    ConnectorSpec("Alignment Forum (web)", "https://alignmentforum.org",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="AI alignment research community publications"),
+
+    ConnectorSpec("LessWrong", "https://lesswrong.com",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Rationality, AI risk, decision theory research"),
+
+    ConnectorSpec("UK AI Safety Institute", "https://aisi.gov.uk",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Government AI safety research and evaluations"),
+
+    ConnectorSpec("Center for Human-Compatible AI", "https://humancompatible.ai",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Stuart Russell's CHAI — value alignment research"),
+
+    ConnectorSpec("Future of Life Institute", "https://futureoflife.org",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Existential risk, AI governance, biosecurity"),
+
+    ConnectorSpec("AI Safety Support", "https://aisafety.org",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="AI safety research landscape and career resources"),
+
+    ConnectorSpec("Anthropic Interpretability Research", "https://transformer-circuits.pub",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Mechanistic interpretability publications"),
+
+    ConnectorSpec("PauseAI", "https://pauseai.info",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="AI development moratorium advocacy and research"),
+
+    ConnectorSpec("AI Snake Oil", "https://aisnakeoil.com",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Critical AI claims research — Arvind Narayanan"),
+
+    ConnectorSpec("Stanford AI Index", "https://aiindex.stanford.edu",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Annual AI progress and policy measurements"),
+
+    ConnectorSpec("V-Dem Institute", "https://v-dem.net",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Varieties of Democracy — comprehensive democracy measurement data"),
+
+    ConnectorSpec("Freedom House", "https://freedomhouse.org",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Freedom in the World annual assessments"),
+
+    ConnectorSpec("International IDEA", "https://idea.int",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Electoral, constitutional, and democratic governance data"),
+
+    ConnectorSpec("Carnegie Endowment for International Peace", "https://carnegieendowment.org",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Democracy, governance, and geopolitics research"),
+
+    ConnectorSpec("openDemocracy", "https://opendemocracy.net",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Civil society, democratic innovation, power analysis journalism/research"),
+
+    ConnectorSpec("Participatory Democracy Network", "https://participatorydemocracy.org",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Research on participatory and deliberative democracy"),
+
+    ConnectorSpec("Alliance of Democracies Foundation", "https://fordemocracy.net",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Democracy metrics, authoritarian backsliding research"),
+
+    ConnectorSpec("National Democratic Institute", "https://ndi.org",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Democracy support and election observation reports"),
+
+    ConnectorSpec("Autistic Self Advocacy Network", "https://autisticadvocacy.org",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Community-controlled autism research priorities and policy"),
+
+    ConnectorSpec("PARC", "https://participatoryautismresearch.wordpress.com",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Participatory Autism Research Collective — community-led research"),
+
+    ConnectorSpec("AASPIRE", "https://aaspire.org",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Academic Autistic Spectrum Partnership in Research and Education"),
+
+    ConnectorSpec("Autism RISE Network", "https://autismrisenetwork.org",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Community-engaged autism research"),
+
+    ConnectorSpec("NeuroRegulation Journal", "https://neuroregulation.org",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Open access journal on neurofeedback and biofeedback"),
+
+    ConnectorSpec("ISNR", "https://isnr.org",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="International Society for Neuroregulation and Research"),
+
+    ConnectorSpec("CHADD", "https://chadd.org",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Children and Adults with ADHD — research summaries"),
+
+    ConnectorSpec("Neurodiversity Ireland", "https://neurodiversityireland.com",
+                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Neurodiversity rights and research"),
+
+    ConnectorSpec("Cascade Institute", "https://cascadeinstitute.org",
+                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Polycrisis research, complex system risks, societal disruption"),
+
+    ConnectorSpec("The Millennium Project", "https://millennium-project.org",
+                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Global futures research, scenarios, collective intelligence"),
+
+    ConnectorSpec("Santa Fe Institute", "https://santafe.edu",
+                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Complexity science, emergence, collective behaviour"),
+
+    ConnectorSpec("Greater Than the Sum", "https://greaterthanthesum.net",
+                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Collective intelligence and societal transition research"),
+
+    ConnectorSpec("Collective Intelligence Project", "https://collectiveintelligenceproject.org",
+                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Democratic AI governance, collective decision-making"),
+
+    ConnectorSpec("Deep Adaptation Forum", "https://deep-adaptation.org",
+                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Research on societal collapse adaptation — Professor Jem Bendell"),
+
+    ConnectorSpec("Transition Network", "https://transitionnetwork.org",
+                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Community resilience, localisation, post-carbon transition research"),
+
+    ConnectorSpec("The Great Simplification", "https://thegreatsimplification.com",
+                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Nate Hagens research on energy, finance, and civilisational overshoot"),
+
+    ConnectorSpec("Center for Ecoliteracy", "https://ecoliteracy.org",
+                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Ecological systems thinking and education"),
+
+    ConnectorSpec("Center for Humans and Nature", "https://humansandnature.org",
+                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Philosophy of nature, ecological citizenship, cultural change"),
+
+    ConnectorSpec("Wellbeing Economy Alliance", "https://wellbeingeconomy.org",
+                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Post-GDP economics, flourishing metrics, policy transformation"),
+
+    ConnectorSpec("GBIF", "https://api.gbif.org/v1",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Global Biodiversity Information Facility — 2.5B occurrence records, Tier 1 API"),
+
+    ConnectorSpec("Biodiversity Heritage Library", "https://www.biodiversitylibrary.org/api3",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="60M pages historical ecology literature, Tier 1 API"),
+
+    ConnectorSpec("Alignment Forum API", "https://www.alignmentforum.org/graphql",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="AI alignment research — real-time GraphQL API"),
+
+    ConnectorSpec("IUCN Red List API", "https://apiv3.iucnredlist.org/api/v3",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Species threat assessments — free key: IUCN_API_KEY"),
+
+    ConnectorSpec("Our World in Data", "https://ourworldindata.org",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.BRIDGE,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Data-driven global synthesis on climate, health, inequality"),
+
+    ConnectorSpec("PsyArXiv", "https://psyarxiv.com",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Psychology and neuroscience preprints — Open Science Framework"),
+
+    ConnectorSpec("SSRN", "https://www.ssrn.com",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Social science preprints — economics, law, political science"),
+
+    ConnectorSpec("Journal of Scientific Exploration", "https://journalofscientificexploration.org",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Peer-reviewed anomalous phenomena and frontier science"),
+
+    ConnectorSpec("Frontiers in Human Neuroscience", "https://www.frontiersin.org/journals/human-neuroscience",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Open access neuroscience — contemplative, cognitive, clinical"),
+
+    ConnectorSpec("Rhine Research Center", "https://www.rhine.org",
+                  PositionPrivileged.GREY_PRACTITIONER, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Parapsychology research archive"),
+
+]
+
 
 
 def active_connectors() -> List[ConnectorSpec]:
