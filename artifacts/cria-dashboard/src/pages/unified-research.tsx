@@ -758,10 +758,21 @@ export default function UnifiedResearch() {
                     <option value="general_scholarship">General Scholarship</option>
                     <option value="partnership_sensitive">Partnership-Sensitive</option>
                   </optgroup>
-                  <optgroup label="Three-configuration architecture">
+                  <optgroup label="Civilisational and systems">
                     <option value="civilisational_academic">Civilisational-Academic</option>
-                    <option value="therapeutic_clinical">Therapeutic-Clinical</option>
+                    <option value="post_ai_flourishing">Post-AI Flourishing</option>
+                    <option value="new_economy">New Economy / Post-Growth</option>
+                    <option value="democracy_governance">Democracy and Governance</option>
+                  </optgroup>
+                  <optgroup label="Environmental and ecological">
+                    <option value="environmental_polycrisis">Environmental Polycrisis</option>
+                    <option value="food_sovereignty">Food Sovereignty and Agriculture</option>
                     <option value="ocaa_daily_editorial">OCAA Daily Editorial</option>
+                  </optgroup>
+                  <optgroup label="Technology and mind">
+                    <option value="ai_alignment">AI Alignment and Safety</option>
+                    <option value="neurodiversity_health">Neurodiversity and Health</option>
+                    <option value="therapeutic_clinical">Therapeutic-Clinical</option>
                   </optgroup>
                 </select>
               </div>
@@ -771,40 +782,76 @@ export default function UnifiedResearch() {
             {(() => {
               const PROFILE_GROUPS: Record<string, { active: string[]; inactive: string[] }> = {
                 general_scholarship: {
-                  active: ["mainstream_academic"],
-                  inactive: ["agriculture_food_systems", "biodiversity_conservation", "ecological_economics", "food_sovereignty_advocacy", "clinical_medical"],
+                  active: ["mainstream_academic", "web_foundational"],
+                  inactive: ["biodiversity", "climate_energy", "food_sovereignty", "new_economy", "ai_alignment", "neurodiversity", "civilisational"],
                 },
                 partnership_sensitive: {
-                  active: ["mainstream_academic", "indigenous_sovereign"],
-                  inactive: ["agriculture_food_systems", "biodiversity_conservation", "ecological_economics", "food_sovereignty_advocacy", "clinical_medical"],
+                  active: ["mainstream_academic", "web_foundational", "indigenous_sovereign"],
+                  inactive: ["biodiversity", "climate_energy", "food_sovereignty", "new_economy"],
                 },
                 civilisational_academic: {
-                  active: ["mainstream_academic", "civilisational_philosophy", "ecological_economics"],
-                  inactive: ["agriculture_food_systems", "biodiversity_conservation", "food_sovereignty_advocacy", "indigenous_food_sovereignty", "australian_government_environment", "clinical_medical"],
+                  active: ["mainstream_academic", "web_foundational", "civilisational_philosophy", "new_economy", "polycrisis"],
+                  inactive: ["food_sovereignty", "biodiversity", "indigenous_sovereign", "clinical_medical"],
+                },
+                post_ai_flourishing: {
+                  active: ["mainstream_academic", "web_foundational", "ai_alignment", "civilisational_philosophy", "new_economy", "polycrisis"],
+                  inactive: ["food_sovereignty", "indigenous_sovereign", "clinical_medical"],
+                },
+                environmental_polycrisis: {
+                  active: ["mainstream_academic", "web_foundational", "biodiversity", "climate_energy", "plastic_pollution", "regenerative_agriculture"],
+                  inactive: ["food_sovereignty", "new_economy", "ai_alignment", "clinical_medical"],
+                },
+                food_sovereignty: {
+                  active: ["mainstream_academic", "web_foundational", "food_sovereignty_advocacy", "regenerative_agriculture", "indigenous_food_sovereignty"],
+                  inactive: ["biodiversity", "climate_energy", "new_economy", "clinical_medical"],
+                },
+                new_economy: {
+                  active: ["mainstream_academic", "web_foundational", "new_economy", "civilisational_philosophy", "our_world_in_data"],
+                  inactive: ["food_sovereignty_advocacy", "biodiversity", "ai_alignment", "clinical_medical"],
+                },
+                democracy_governance: {
+                  active: ["mainstream_academic", "web_foundational", "democracy_governance", "civilisational_philosophy"],
+                  inactive: ["food_sovereignty", "biodiversity", "ai_alignment", "clinical_medical"],
+                },
+                ai_alignment: {
+                  active: ["mainstream_academic", "web_foundational", "ai_alignment", "alignment_forum"],
+                  inactive: ["food_sovereignty", "biodiversity", "clinical_medical", "indigenous_sovereign"],
+                },
+                neurodiversity_health: {
+                  active: ["mainstream_academic", "web_foundational", "neurodiversity_community", "neurofeedback", "clinical_medical"],
+                  inactive: ["food_sovereignty", "biodiversity", "ai_alignment", "indigenous_sovereign"],
                 },
                 therapeutic_clinical: {
-                  active: ["mainstream_academic", "clinical_medical", "neurodiversity_specific", "indigenous_sovereign", "australian_institutional"],
-                  inactive: ["agriculture_food_systems", "biodiversity_conservation", "ecological_economics", "food_sovereignty_advocacy", "indigenous_food_sovereignty", "civilisational_philosophy"],
+                  active: ["mainstream_academic", "web_foundational", "clinical_medical", "neurodiversity_community", "indigenous_sovereign", "australian_institutional"],
+                  inactive: ["food_sovereignty", "biodiversity", "ai_alignment", "new_economy"],
                 },
                 ocaa_daily_editorial: {
-                  active: ["mainstream_academic", "agriculture_food_systems", "biodiversity_conservation", "ecological_economics", "food_sovereignty_advocacy", "indigenous_food_sovereignty", "australian_government_environment"],
-                  inactive: ["clinical_medical", "neurodiversity_specific", "civilisational_philosophy"],
+                  active: ["mainstream_academic", "web_foundational", "food_sovereignty_advocacy", "biodiversity", "climate_energy", "regenerative_agriculture", "plastic_pollution"],
+                  inactive: ["clinical_medical", "neurodiversity_community", "ai_alignment", "civilisational_philosophy"],
                 },
               };
               const groups = PROFILE_GROUPS[profile];
               if (!groups) return null;
               const GROUP_NOTES: Record<string, string> = {
                 mainstream_academic: "Semantic Scholar · OpenAlex · Crossref · PubMed · arXiv",
+                web_foundational: "Brave Search + landmark paper resolver — finds what academic DBs miss",
                 indigenous_sovereign: "AIATSIS · Lowitja · NACCHO · NATSILS (partnership-gated)",
-                agriculture_food_systems: "Agroecology · Renewable Ag · FAO · ABARES",
-                biodiversity_conservation: "Conservation Biology · Biological Conservation · IPBES",
-                ecological_economics: "Ecological Economics · Environmental Values · Political Ecology",
-                food_sovereignty_advocacy: "La Via Campesina · GRAIN · ETC Group",
+                biodiversity: "GBIF · IPBES · IUCN Red List · Biodiversity Heritage Library · CBD",
+                climate_energy: "IRENA · REN21 · NREL · Carbon Brief · Climate Policy Initiative",
+                plastic_pollution: "Plastic Pollution Coalition · Break Free From Plastic · NOAA Marine Debris",
+                regenerative_agriculture: "Rodale Institute · Savory Institute · ATTRA · Agroecology Europe",
+                food_sovereignty_advocacy: "La Via Campesina · GRAIN · ETC Group · IPES-Food · FAO",
                 indigenous_food_sovereignty: "IFKSN (partnership-gated — sovereign source only)",
-                australian_government_environment: "DCCEEW · CSIRO Environment",
-                civilisational_philosophy: "PhilPapers · SEP · Constructivist Foundations · nLab",
+                new_economy: "New Economics Foundation · Doughnut Economics · INET · Post Carbon Institute · Club of Rome",
+                polycrisis: "Cascade Institute · Millennium Project · Santa Fe Institute · Deep Adaptation · Transition Network",
+                civilisational_philosophy: "PhilPapers · SEP · Constructivist Foundations · Humansandnature.org",
+                ai_alignment: "Alignment Forum · LessWrong · UK AISI · CHAI · Future of Life Institute",
+                alignment_forum: "Alignment Forum GraphQL API — cutting-edge AI safety research",
+                democracy_governance: "V-Dem · Freedom House · International IDEA · Carnegie · openDemocracy",
+                neurodiversity_community: "ASAN · PARC · AASPIRE · Autism RISE Network — community-controlled research",
+                neurofeedback: "NeuroRegulation Journal (OA) · ISNR · Biofeedback research",
                 clinical_medical: "PubMed · Cochrane · CINAHL · PsycINFO",
-                neurodiversity_specific: "Autism Science Foundation · PARC · ASAN",
+                our_world_in_data: "Our World in Data — data-driven synthesis on global issues",
                 australian_institutional: "AustLII · ARDC · NIAA · AHRC · ABS",
               };
               return (

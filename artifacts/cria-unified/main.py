@@ -135,6 +135,18 @@ try:
 except ImportError:
     _ULTRARIA_AVAILABLE = False
 
+try:
+    from cria_advocacy_connectors import (
+        search_advocacy_connectors, connector_registry_summary,
+        get_connector_by_name, ALL_ADVOCACY_CONNECTORS,
+        STRUCTURED_API_CONNECTORS, gbif, bhl, alignment_forum,
+    )
+    _ADVOCACY_AVAILABLE = True
+except ImportError:
+    _ADVOCACY_AVAILABLE = False
+    async def search_advocacy_connectors(q, profile, **kw): return []
+    def connector_registry_summary(): return {}
+
 # ============================================================
 # CONFIGURATION
 # ============================================================
@@ -1528,13 +1540,18 @@ class CogC2_Evidence(BaseChannel):
 
     def __init__(self, semantic_key: Optional[str] = None, email: Optional[str] = None):
         super().__init__(2, "Evidence Acquisition",
-                         "Searches academic databases using Stage 0 routing",
+                         "Searches web (foundational) + academic databases using Stage 0 routing",
                          Pipeline.COGNITIVE)
         self.semantic = SemanticScholarAPI(semantic_key)
         self.openalex = OpenAlexAPI(email)
         self.pubmed = PubMedAPI()
         self.arxiv = ArxivAPI()
         self.crossref = CrossrefAPI()
+        # Web search — the foundational strand. Runs first, finds landmark papers.
+        self._web_connector = None
+        if _WEB_SEARCH_AVAILABLE:
+            from cria_web_search import WebSearchConnector
+            self._web_connector = WebSearchConnector()
         self._api_map = {
             "Semantic Scholar": self.semantic,
             "OpenAlex": self.openalex,
@@ -1555,7 +1572,55 @@ class CogC2_Evidence(BaseChannel):
 
     async def research(self, artefact: ResearchArtefact, context: Dict[str, Any]) -> Finding:
         design: Optional[ResearchDesignRecord] = context.get("design_record")
+        profile = getattr(artefact, "profile", "general_scholarship") or "general_scholarship"
 
+        # ── FOUNDATIONAL WEB SEARCH (runs first, before academic DBs) ──────
+        # Uses Stage 0 landmark paper identification + broad web search.
+        # Finds what academic DBs miss: recent preprints, grey literature,
+        # advocacy sources, and landmark papers by author name.
+        web_papers: List[Paper] = []
+        if self._web_connector and design:
+            try:
+                stage0_queries = list(design.search_strings.values())[:3]
+                raw_web = await self._web_connector.search_with_landmarks(
+                    artefact.research_question,
+                    stage0_queries,
+                    call_llm_fn=lambda p, **kw: call_llm(p, channel_name="Stage0", **kw),
+                    count_per_query=6,
+                )
+                for wp in raw_web:
+                    web_papers.append(Paper(
+                        title=wp.title,
+                        authors=wp.authors if hasattr(wp, "authors") else [],
+                        year=wp.year,
+                        abstract=wp.snippet if hasattr(wp, "snippet") else "",
+                        source=f"Web ({wp.source})",
+                        doi=wp.doi,
+                        cited_by=0,
+                        is_stub=False,
+                    ))
+                log.info("Web search foundation: %d papers", len(web_papers))
+            except Exception as e:
+                log.warning("Web search foundation failed: %s", e)
+
+        # ── ADVOCACY CONNECTORS (profile-specific) ──────────────────────────
+        advocacy_papers: List[Paper] = []
+        if _ADVOCACY_AVAILABLE and profile not in ("general_scholarship", ""):
+            try:
+                raw_adv = await search_advocacy_connectors(
+                    artefact.research_question, profile, limit_per_connector=4, max_connectors=4,
+                )
+                for p in raw_adv:
+                    advocacy_papers.append(Paper(
+                        title=p.title, authors=p.authors, year=p.year,
+                        abstract=p.abstract, source=p.source,
+                        doi=p.doi, cited_by=p.cited_by, is_stub=False,
+                    ))
+                log.info("Advocacy search: %d papers for profile=%s", len(advocacy_papers), profile)
+            except Exception as e:
+                log.warning("Advocacy search failed: %s", e)
+
+        # ── ACADEMIC DATABASE SEARCH ─────────────────────────────────────────
         # Determine which connectors and queries to use
         if design and design.search_strings:
             # Stage 0 routing: use designed queries for selected connectors
@@ -1583,6 +1648,9 @@ class CogC2_Evidence(BaseChannel):
         raw_results = await asyncio.gather(*search_tasks, return_exceptions=True)
 
         all_papers: List[Paper] = []
+        # Web and advocacy results go FIRST (foundational layer)
+        all_papers.extend(web_papers)
+        all_papers.extend(advocacy_papers)
         for r in raw_results:
             if isinstance(r, list):
                 all_papers.extend(r)
@@ -3386,7 +3454,7 @@ async def list_experiments(request: Request, status: Optional[str] = None):
 
 @app.get(f"{BASE_PATH}/connectors")
 async def list_connectors():
-    return {
+    base = {
         "total": len(ALL_CONNECTORS),
         "active": len(active_connectors()),
         "inactive": len(inactive_connectors()),
@@ -3405,6 +3473,10 @@ async def list_connectors():
             for c in ALL_CONNECTORS
         ],
     }
+    if _ADVOCACY_AVAILABLE:
+        base["advocacy_registry"] = connector_registry_summary()
+        base["advocacy_total"] = connector_registry_summary().get("total", 0)
+    return base
 
 
 # ── Ultraria endpoint ─────────────────────────────────────────────────────────
