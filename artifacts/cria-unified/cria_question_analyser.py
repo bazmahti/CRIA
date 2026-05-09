@@ -73,6 +73,9 @@ class VocabularyCluster:
     concept: str                    # the term as the researcher used it
     disciplinary_terms: dict        # {discipline: [terms]}
     note: str = ""                  # any important distinctions
+    suggested_expansions: List[str] = field(default_factory=list)
+    # Specific phrases the researcher could add/substitute to capture broader vocab
+    # e.g. "...or what contemplative neuroscience calls 'absorption states'"
 
 
 @dataclass
@@ -83,6 +86,9 @@ class AmbiguityFlag:
     reading_b: str                  # second interpretation
     recommendation: str             # what to do about it
     severity: Literal["minor", "moderate", "significant"] = "moderate"
+    clarification_a: str = ""       # how to rewrite to commit to reading A
+    clarification_b: str = ""       # how to rewrite to commit to reading B
+    clarification_both: str = ""    # how to explicitly hold both readings
 
 
 @dataclass
@@ -92,6 +98,9 @@ class FramingObservation:
     example_phrase: str             # the phrase that carries it
     what_cria_will_do: str          # how the Epistemic pipeline will respond
     options: List[str]              # choices the researcher can make
+    suggested_additions: List[str] = field(default_factory=list)
+    # Specific phrases to add to the question that make the framing explicit
+    # or deliberately widen it — e.g. "...including dissenting perspectives"
 
 
 @dataclass
@@ -100,6 +109,10 @@ class ScopeSignal:
     assessment: Literal["well_scoped", "likely_absence", "too_broad", "sovereign_territory"]
     explanation: str
     suggestion: str                 # what to do — not a command, an option
+    suggested_narrowings: List[str] = field(default_factory=list)
+    # If too_broad: 2-3 more focused versions of the question
+    suggested_broadening: str = ""
+    # If likely_absence: a broader framing that adjacent literature addresses
 
 
 @dataclass
@@ -122,10 +135,13 @@ class QuestionAnalysis:
     profile_reasoning: str
     cria_readiness: Literal["ready", "refine_recommended", "refine_strongly_recommended"]
     readiness_explanation: str
+    suggested_question_variants: List[str] = field(default_factory=list)
+    # 2-3 complete alternative question formulations synthesising the improvements
+    # These are starting points, not prescriptions — researcher modifies freely
     analysis_note: str = (
-        "This analysis is for your information only. Nothing here changes your question "
-        "unless you choose to change it. The research will proceed with whatever version "
-        "you confirm — original or modified."
+        "This analysis is for your information only. Each suggestion below can be "
+        "applied or ignored independently. Use the refinement builder at the bottom "
+        "to construct your preferred version, or proceed with your original question."
     )
 
     def to_dict(self) -> dict:
@@ -136,6 +152,7 @@ class QuestionAnalysis:
                     "concept": c.concept,
                     "disciplinary_terms": c.disciplinary_terms,
                     "note": c.note,
+                    "suggested_expansions": c.suggested_expansions,
                 }
                 for c in self.vocabulary_clusters
             ],
@@ -146,6 +163,9 @@ class QuestionAnalysis:
                     "reading_b": f.reading_b,
                     "recommendation": f.recommendation,
                     "severity": f.severity,
+                    "clarification_a": f.clarification_a,
+                    "clarification_b": f.clarification_b,
+                    "clarification_both": f.clarification_both,
                 }
                 for f in self.ambiguity_flags
             ],
@@ -155,6 +175,7 @@ class QuestionAnalysis:
                     "example_phrase": o.example_phrase,
                     "what_cria_will_do": o.what_cria_will_do,
                     "options": o.options,
+                    "suggested_additions": o.suggested_additions,
                 }
                 for o in self.framing_observations
             ],
@@ -162,6 +183,8 @@ class QuestionAnalysis:
                 "assessment": self.scope_signal.assessment,
                 "explanation": self.scope_signal.explanation,
                 "suggestion": self.scope_signal.suggestion,
+                "suggested_narrowings": self.scope_signal.suggested_narrowings,
+                "suggested_broadening": self.scope_signal.suggested_broadening,
             },
             "observer_note_suggestion": {
                 "suggested_note": self.observer_note_suggestion.suggested_note,
@@ -171,6 +194,7 @@ class QuestionAnalysis:
             "profile_reasoning": self.profile_reasoning,
             "cria_readiness": self.cria_readiness,
             "readiness_explanation": self.readiness_explanation,
+            "suggested_question_variants": self.suggested_question_variants,
             "analysis_note": self.analysis_note,
         }
 
@@ -210,7 +234,11 @@ Return ONLY valid JSON with this exact structure:
         "discipline_name": ["term1", "term2"],
         "another_discipline": ["term3"]
       }},
-      "note": "any important distinctions between how disciplines use these terms"
+      "note": "any important distinctions between how disciplines use these terms",
+      "suggested_expansions": [
+        "specific phrase to append to the question to capture discipline A vocabulary",
+        "specific phrase to append to the question to capture discipline B vocabulary"
+      ]
     }}
   ],
   "ambiguity_flags": [
@@ -219,7 +247,10 @@ Return ONLY valid JSON with this exact structure:
       "reading_a": "first plausible interpretation",
       "reading_b": "second plausible interpretation",
       "recommendation": "what the researcher might consider clarifying",
-      "severity": "minor|moderate|significant"
+      "severity": "minor|moderate|significant",
+      "clarification_a": "rewrite of just the ambiguous phrase to commit to reading A",
+      "clarification_b": "rewrite of just the ambiguous phrase to commit to reading B",
+      "clarification_both": "rewrite of the phrase that explicitly holds both readings open"
     }}
   ],
   "framing_observations": [
@@ -230,36 +261,56 @@ Return ONLY valid JSON with this exact structure:
       "options": [
         "Option A: leave as is (the Epistemic pipeline will challenge it naturally)",
         "Option B: explicit alternative the researcher could consider"
+      ],
+      "suggested_additions": [
+        "...including dissenting and community-controlled perspectives",
+        "...and what critical traditions say about this framing itself"
       ]
     }}
   ],
   "scope_signal": {{
     "assessment": "well_scoped|likely_absence|too_broad|sovereign_territory",
     "explanation": "why this assessment",
-    "suggestion": "what the researcher might consider — not a command"
+    "suggestion": "what the researcher might consider — not a command",
+    "suggested_narrowings": [
+      "more focused version A of the question",
+      "more focused version B of the question"
+    ],
+    "suggested_broadening": "broader framing if likely_absence — empty string otherwise"
   }},
   "observer_note_suggestion": {{"suggested_note": "...", "reasoning": "..."}} or null if observer note already provided and adequate,
   "profile_suggestion": "profile_name",
   "profile_reasoning": "why this profile would activate the most relevant connectors",
   "cria_readiness": "ready|refine_recommended|refine_strongly_recommended",
-  "readiness_explanation": "honest assessment of what this question will produce in CRIA"
+  "readiness_explanation": "honest assessment of what this question will produce in CRIA",
+  "suggested_question_variants": [
+    "complete alternative question incorporating the most important improvements",
+    "second complete alternative with a different framing emphasis",
+    "third variant if there is a meaningfully different third approach — else omit"
+  ]
 }}
 
 Rules:
 - vocabulary_clusters: identify 2-4 key concepts. For each, show how 3-5 disciplines name it.
   Do not replace the researcher's terms — map alternatives alongside them.
+  suggested_expansions: 1-2 specific phrases (5-15 words each) the researcher could
+  append to their question to capture the broader vocabulary. Must be natural English
+  additions, not abstract instructions. E.g. "...or what neuroscience calls gamma synchrony"
 - ambiguity_flags: only flag genuine ambiguities, not stylistic preferences. 0-3 flags.
+  clarification_a/b/both: rewrite ONLY the ambiguous excerpt, not the whole question.
+  These are drop-in replacements for the flagged phrase, not whole question rewrites.
 - framing_observations: 1-3 observations. Be specific about the phrase that carries the framing.
-  Always include what CRIA will do about it — the researcher should know the pipeline
-  will challenge consensus framings even if they don't change the question.
-- scope_signal: be honest. If this question is likely to return an absence (no literature),
-  say so. If it's so broad that 2 iterations won't cover it, say so.
-  "sovereign_territory" = question substantially involves Indigenous knowledge where
-  partnership rather than search is the appropriate pathway.
-- observer_note_suggestion: only if no observer note was provided or the one provided
-  is very thin. Offer a suggestion but make clear it's optional.
-- profile_suggestion: choose from the available profiles. If contemplative neuroscience,
-  psychedelic research, AI alignment, health equity etc are relevant, say so.
+  suggested_additions: 1-2 specific phrases (5-20 words) to append to the question.
+  These should make implicit framings explicit or deliberately widen scope.
+  Must be grammatically appendable to the original question.
+- scope_signal:
+  suggested_narrowings: if too_broad, provide 2 complete focused versions of the question.
+  suggested_broadening: if likely_absence, provide one complete broader question formulation.
+  Otherwise leave these as empty lists/string.
+- suggested_question_variants: 2-3 complete, research-ready question formulations that
+  synthesise the most important improvements. These are concrete starting points for
+  the researcher to modify further — not abstractions like "consider adding X".
+  Each variant should be a complete, natural research question.
 - cria_readiness: "ready" = proceed as is. "refine_recommended" = would benefit from
   clarification but will produce useful output either way.
   "refine_strongly_recommended" = the question as stated will likely produce poor results.
@@ -325,6 +376,7 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
             concept=c.get("concept", ""),
             disciplinary_terms=c.get("disciplinary_terms", {}),
             note=c.get("note", ""),
+            suggested_expansions=c.get("suggested_expansions", []),
         )
         for c in data.get("vocabulary_clusters", [])
     ]
@@ -336,6 +388,9 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
             reading_b=f.get("reading_b", ""),
             recommendation=f.get("recommendation", ""),
             severity=f.get("severity", "moderate"),
+            clarification_a=f.get("clarification_a", ""),
+            clarification_b=f.get("clarification_b", ""),
+            clarification_both=f.get("clarification_both", ""),
         )
         for f in data.get("ambiguity_flags", [])
     ]
@@ -346,6 +401,7 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
             example_phrase=o.get("example_phrase", ""),
             what_cria_will_do=o.get("what_cria_will_do", ""),
             options=o.get("options", []),
+            suggested_additions=o.get("suggested_additions", []),
         )
         for o in data.get("framing_observations", [])
     ]
@@ -355,6 +411,8 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
         assessment=scope_data.get("assessment", "well_scoped"),
         explanation=scope_data.get("explanation", ""),
         suggestion=scope_data.get("suggestion", ""),
+        suggested_narrowings=scope_data.get("suggested_narrowings", []),
+        suggested_broadening=scope_data.get("suggested_broadening", ""),
     )
 
     obs_data = data.get("observer_note_suggestion")
@@ -364,6 +422,10 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
             suggested_note=obs_data.get("suggested_note", ""),
             reasoning=obs_data.get("reasoning", ""),
         )
+
+    variants = data.get("suggested_question_variants", [])
+    if isinstance(variants, list):
+        variants = [v for v in variants if v and len(v) > 20][:3]
 
     return QuestionAnalysis(
         original_question=question,
@@ -376,4 +438,5 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
         profile_reasoning=data.get("profile_reasoning", ""),
         cria_readiness=data.get("cria_readiness", "ready"),
         readiness_explanation=data.get("readiness_explanation", ""),
+        suggested_question_variants=variants,
     )

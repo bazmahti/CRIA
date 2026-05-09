@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   useListResearchJobs,
   useGetResearchJob,
@@ -32,14 +32,14 @@ type Stream = "health" | "environmental" | "activist" | "technology" | "civilisa
 
 const STREAM_CONFIG: Record<Stream, {
   label: string;
-  icon: React.ReactNode;
+  iconEl: () => React.ReactElement;
   color: string;
   bg: string;
   profiles: string[];
 }> = {
   health: {
     label: "Health & Medicine",
-    icon: <Heart className="w-3.5 h-3.5" />,
+    iconEl: () => <Heart className="w-3.5 h-3.5" />,
     color: "text-rose-400",
     bg: "bg-rose-500/8 border-rose-500/20",
     profiles: [
@@ -52,7 +52,7 @@ const STREAM_CONFIG: Record<Stream, {
   },
   environmental: {
     label: "Environmental & Ecological",
-    icon: <Leaf className="w-3.5 h-3.5" />,
+    iconEl: () => <Leaf className="w-3.5 h-3.5" />,
     color: "text-emerald-400",
     bg: "bg-emerald-500/8 border-emerald-500/20",
     profiles: [
@@ -61,7 +61,7 @@ const STREAM_CONFIG: Record<Stream, {
   },
   activist: {
     label: "Activist & Issue Research",
-    icon: <Zap className="w-3.5 h-3.5" />,
+    iconEl: () => <Zap className="w-3.5 h-3.5" />,
     color: "text-amber-400",
     bg: "bg-amber-500/8 border-amber-500/20",
     profiles: [
@@ -70,7 +70,7 @@ const STREAM_CONFIG: Record<Stream, {
   },
   technology: {
     label: "Technology & Mind",
-    icon: <Brain className="w-3.5 h-3.5" />,
+    iconEl: () => <Brain className="w-3.5 h-3.5" />,
     color: "text-violet-400",
     bg: "bg-violet-500/8 border-violet-500/20",
     profiles: [
@@ -79,7 +79,7 @@ const STREAM_CONFIG: Record<Stream, {
   },
   civilisational: {
     label: "Civilisational & Systems",
-    icon: <Globe className="w-3.5 h-3.5" />,
+    iconEl: () => <Globe className="w-3.5 h-3.5" />,
     color: "text-blue-400",
     bg: "bg-blue-500/8 border-blue-500/20",
     profiles: [
@@ -89,7 +89,7 @@ const STREAM_CONFIG: Record<Stream, {
   },
   general: {
     label: "General Scholarship",
-    icon: <Layers className="w-3.5 h-3.5" />,
+    iconEl: () => <Layers className="w-3.5 h-3.5" />,
     color: "text-muted-foreground",
     bg: "bg-muted/20 border-border/40",
     profiles: ["general_scholarship", "partnership_sensitive", ""],
@@ -226,7 +226,7 @@ function JobDetail({ id, onBack }: { id: string; onBack: () => void }) {
             {job.status}
           </span>
           <span className={cn("flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border", streamCfg.bg, streamCfg.color)}>
-            {streamCfg.icon}
+            {streamCfg.iconEl()}
             {streamCfg.label}
           </span>
           {job.mode && job.mode !== "general_scholarship" && (
@@ -323,7 +323,7 @@ function JobRow({ job, onSelect }: { job: JobItem; onSelect: () => void }) {
             {job.status}
           </span>
           <span className={cn("flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full border", cfg.bg, cfg.color)}>
-            {cfg.icon}
+            {cfg.iconEl()}
             {cfg.label}
           </span>
           {keywords.map(kw => (
@@ -367,7 +367,7 @@ function StreamGroup({
       >
         <div className="flex items-center gap-2">
           <span className={cn("flex items-center gap-1.5 text-xs font-semibold", cfg.color)}>
-            {cfg.icon}
+            {cfg.iconEl()}
             {cfg.label}
           </span>
           <span className="text-[10px] text-muted-foreground">
@@ -508,7 +508,7 @@ export default function ResearchHistoryPage() {
                     : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
                 )}
               >
-                {cfg.icon}
+                {cfg.iconEl()}
                 {cfg.label} ({count})
               </button>
             );

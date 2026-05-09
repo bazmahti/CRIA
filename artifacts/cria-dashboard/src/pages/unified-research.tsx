@@ -18,6 +18,7 @@ interface VocabularyCluster {
   concept: string;
   disciplinary_terms: Record<string, string[]>;
   note: string;
+  suggested_expansions: string[];
 }
 interface AmbiguityFlag {
   excerpt: string;
@@ -25,17 +26,23 @@ interface AmbiguityFlag {
   reading_b: string;
   recommendation: string;
   severity: "minor" | "moderate" | "significant";
+  clarification_a: string;
+  clarification_b: string;
+  clarification_both: string;
 }
 interface FramingObservation {
   observation: string;
   example_phrase: string;
   what_cria_will_do: string;
   options: string[];
+  suggested_additions: string[];
 }
 interface ScopeSignal {
   assessment: "well_scoped" | "likely_absence" | "too_broad" | "sovereign_territory";
   explanation: string;
   suggestion: string;
+  suggested_narrowings: string[];
+  suggested_broadening: string;
 }
 interface QuestionAnalysis {
   original_question: string;
@@ -48,6 +55,7 @@ interface QuestionAnalysis {
   profile_reasoning: string;
   cria_readiness: "ready" | "refine_recommended" | "refine_strongly_recommended";
   readiness_explanation: string;
+  suggested_question_variants: string[];
   analysis_note: string;
 }
 
@@ -523,6 +531,9 @@ export default function UnifiedResearch() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisExpanded, setAnalysisExpanded] = useState(true);
   const [confirmedQuery, setConfirmedQuery] = useState<string>("");
+  // Refinement builder state
+  const [refinedQuestion, setRefinedQuestion] = useState<string>("");
+  const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
   const [savedToHistory, setSavedToHistory] = useState(false);
 
   const [job, setJob] = useState<UnifiedJobState | null>(null);
@@ -1062,6 +1073,8 @@ export default function UnifiedResearch() {
                   setAnalysisError(null);
                   setAnalysis(null);
                   setAnalysisExpanded(true);
+                  setRefinedQuestion("");
+                  setAppliedSuggestions(new Set());
                   try {
                     const BASE = import.meta.env.VITE_CRIA_UNIFIED_BASE_URL || "";
                     const resp = await fetch(`${BASE}/cria-unified/analyse`, {
@@ -1073,6 +1086,7 @@ export default function UnifiedResearch() {
                     const data = await resp.json() as QuestionAnalysis;
                     setAnalysis(data);
                     setConfirmedQuery(query);
+                    setRefinedQuestion(query);
                   } catch (e) {
                     setAnalysisError(e instanceof Error ? e.message : String(e));
                   } finally {
@@ -1103,7 +1117,7 @@ export default function UnifiedResearch() {
           </div>
         </div>
 
-        {/* ── Question Analysis Panel (Stage -1) ─────────────────────────── */}
+                {/* ── Question Analysis Panel (Stage -1) ─────────────────────────── */}
         {(analysis || analysing || analysisError) && (
           <div className="mb-6 rounded-xl border border-border/60 overflow-hidden">
             {/* Header */}
@@ -1121,9 +1135,14 @@ export default function UnifiedResearch() {
                     analysis.cria_readiness === "refine_recommended" ? "bg-amber-500/15 text-amber-600" :
                     "bg-red-500/15 text-red-600"
                   )}>
-                    {analysis.cria_readiness === "ready" ? "✓ Ready to launch" :
+                    {analysis.cria_readiness === "ready" ? "✓ Ready" :
                      analysis.cria_readiness === "refine_recommended" ? "⚠ Refinement recommended" :
                      "⚠ Refinement strongly recommended"}
+                  </span>
+                )}
+                {appliedSuggestions.size > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/15 text-primary">
+                    {appliedSuggestions.size} suggestion{appliedSuggestions.size !== 1 ? "s" : ""} applied
                   </span>
                 )}
               </div>
@@ -1131,155 +1150,354 @@ export default function UnifiedResearch() {
             </div>
 
             {analysisExpanded && (
-              <div className="p-4 space-y-4">
+              <div className="p-4 space-y-5">
                 {analysing && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground py-4 justify-center">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Analysing your research question with Claude…
+                    Analysing your research question…
                   </div>
                 )}
                 {analysisError && (
                   <div className="text-sm text-red-500 bg-red-500/10 rounded-lg p-3">{analysisError}</div>
                 )}
-                {analysis && (<>
-                  {/* Readiness explanation */}
-                  <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2 italic">
-                    {analysis.readiness_explanation}
-                  </div>
 
-                  {/* Vocabulary clusters */}
-                  {analysis.vocabulary_clusters.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <BookMarked className="w-3.5 h-3.5 text-primary" />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Vocabulary Across Disciplines</span>
-                      </div>
-                      <div className="space-y-2">
-                        {analysis.vocabulary_clusters.map((vc, i) => (
-                          <div key={i} className="rounded-lg border border-border/40 p-3 bg-background/50">
-                            <div className="text-xs font-semibold mb-1">"{vc.concept}"</div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
-                              {Object.entries(vc.disciplinary_terms).map(([disc, terms]) => (
-                                <div key={disc} className="text-[10px]">
-                                  <span className="font-medium text-muted-foreground">{disc}: </span>
-                                  <span>{(terms as string[]).join(", ")}</span>
+                {analysis && (() => {
+                  // Helper to apply a suggestion to the refined question
+                  const applySuggestion = (id: string, text: string, mode: "append" | "replace_excerpt" | "replace_all" = "append", excerpt?: string) => {
+                    setAppliedSuggestions(prev => {
+                      const next = new Set(prev);
+                      if (next.has(id)) {
+                        next.delete(id);
+                        // Revert — rebuild from scratch (just reset to original for simplicity)
+                        setRefinedQuestion(analysis.original_question);
+                      } else {
+                        next.add(id);
+                        setRefinedQuestion(prev_q => {
+                          const base = prev_q || analysis.original_question;
+                          if (mode === "replace_all") return text;
+                          if (mode === "replace_excerpt" && excerpt) {
+                            return base.replace(excerpt, text);
+                          }
+                          // append — add with space, avoid double-space
+                          const trimmed = base.trimEnd();
+                          const addition = text.startsWith("...") ? text.slice(3) : text;
+                          return trimmed + " " + addition;
+                        });
+                      }
+                      return next;
+                    });
+                  };
+
+                  const SuggestionChip = ({ id, label, text, mode = "append" as const, excerpt }: {
+                    id: string; label: string; text: string;
+                    mode?: "append" | "replace_excerpt" | "replace_all";
+                    excerpt?: string;
+                  }) => {
+                    const applied = appliedSuggestions.has(id);
+                    return (
+                      <button
+                        onClick={() => applySuggestion(id, text, mode, excerpt)}
+                        title={text}
+                        className={cn(
+                          "flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full border transition-all",
+                          applied
+                            ? "bg-primary/15 border-primary/50 text-primary font-medium"
+                            : "border-border/50 bg-background/60 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                        )}
+                      >
+                        {applied ? "✓" : "+"} {label}
+                      </button>
+                    );
+                  };
+
+                  return (<>
+                    {/* Readiness */}
+                    <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2 italic">
+                      {analysis.readiness_explanation}
+                    </div>
+
+                    {/* ── Vocabulary clusters ── */}
+                    {analysis.vocabulary_clusters.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <BookMarked className="w-3.5 h-3.5 text-primary" />
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Vocabulary Across Disciplines</span>
+                        </div>
+                        <div className="space-y-2">
+                          {analysis.vocabulary_clusters.map((vc, i) => (
+                            <div key={i} className="rounded-lg border border-border/40 p-3 bg-background/50">
+                              <div className="text-xs font-semibold mb-1">"{vc.concept}"</div>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 mb-2">
+                                {Object.entries(vc.disciplinary_terms).map(([disc, terms]) => (
+                                  <div key={disc} className="text-[10px]">
+                                    <span className="font-medium text-muted-foreground">{disc}: </span>
+                                    <span>{(terms as string[]).join(", ")}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              {vc.note && <div className="text-[10px] text-muted-foreground mb-2 italic">{vc.note}</div>}
+                              {vc.suggested_expansions.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  <span className="text-[10px] text-muted-foreground self-center">Add to question:</span>
+                                  {vc.suggested_expansions.map((exp, j) => (
+                                    <SuggestionChip
+                                      key={`vocab-${i}-${j}`}
+                                      id={`vocab-${i}-${j}`}
+                                      label={exp.length > 35 ? exp.slice(0, 35) + "…" : exp}
+                                      text={exp}
+                                      mode="append"
+                                    />
+                                  ))}
                                 </div>
-                              ))}
+                              )}
                             </div>
-                            {vc.note && <div className="text-[10px] text-muted-foreground mt-1.5 italic">{vc.note}</div>}
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Ambiguity flags */}
-                  {analysis.ambiguity_flags.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <MessageSquare className="w-3.5 h-3.5 text-amber-500" />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ambiguities Worth Clarifying</span>
-                      </div>
-                      <div className="space-y-2">
-                        {analysis.ambiguity_flags.map((flag, i) => (
-                          <div key={i} className={cn(
-                            "rounded-lg border p-3 text-[11px]",
-                            flag.severity === "significant" ? "border-amber-500/40 bg-amber-500/5" : "border-border/40 bg-background/50"
-                          )}>
-                            <div className="font-medium mb-1">"{flag.excerpt}"</div>
-                            <div className="text-muted-foreground space-y-0.5">
-                              <div><span className="font-medium">Reading A:</span> {flag.reading_a}</div>
-                              <div><span className="font-medium">Reading B:</span> {flag.reading_b}</div>
+                    {/* ── Ambiguity flags ── */}
+                    {analysis.ambiguity_flags.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <MessageSquare className="w-3.5 h-3.5 text-amber-500" />
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ambiguities — Choose a Clarification</span>
+                        </div>
+                        <div className="space-y-2">
+                          {analysis.ambiguity_flags.map((flag, i) => (
+                            <div key={i} className={cn(
+                              "rounded-lg border p-3 text-[11px]",
+                              flag.severity === "significant" ? "border-amber-500/40 bg-amber-500/5" : "border-border/40 bg-background/50"
+                            )}>
+                              <div className="font-medium mb-1">"{flag.excerpt}"</div>
+                              <div className="text-muted-foreground space-y-0.5 mb-2">
+                                <div><span className="font-medium">Reading A:</span> {flag.reading_a}</div>
+                                <div><span className="font-medium">Reading B:</span> {flag.reading_b}</div>
+                              </div>
+                              <div className="text-[10px] italic text-muted-foreground mb-2">{flag.recommendation}</div>
+                              {(flag.clarification_a || flag.clarification_b || flag.clarification_both) && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  <span className="text-[10px] text-muted-foreground self-center">Clarify as:</span>
+                                  {flag.clarification_a && (
+                                    <SuggestionChip
+                                      id={`ambig-${i}-a`}
+                                      label={`Reading A: "${flag.clarification_a.slice(0,30)}…"`}
+                                      text={flag.clarification_a}
+                                      mode="replace_excerpt"
+                                      excerpt={flag.excerpt}
+                                    />
+                                  )}
+                                  {flag.clarification_b && (
+                                    <SuggestionChip
+                                      id={`ambig-${i}-b`}
+                                      label={`Reading B: "${flag.clarification_b.slice(0,30)}…"`}
+                                      text={flag.clarification_b}
+                                      mode="replace_excerpt"
+                                      excerpt={flag.excerpt}
+                                    />
+                                  )}
+                                  {flag.clarification_both && (
+                                    <SuggestionChip
+                                      id={`ambig-${i}-both`}
+                                      label={`Hold both: "${flag.clarification_both.slice(0,30)}…"`}
+                                      text={flag.clarification_both}
+                                      mode="replace_excerpt"
+                                      excerpt={flag.excerpt}
+                                    />
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <div className="mt-1.5 text-[10px] italic text-muted-foreground">{flag.recommendation}</div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Framing observations ── */}
+                    {analysis.framing_observations.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Lightbulb className="w-3.5 h-3.5 text-blue-500" />
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Implicit Framings — Widen or Leave</span>
+                        </div>
+                        <div className="space-y-2">
+                          {analysis.framing_observations.map((obs, i) => (
+                            <div key={i} className="rounded-lg border border-border/40 p-3 bg-background/50 text-[11px]">
+                              <div className="font-medium mb-1">{obs.observation}</div>
+                              <div className="text-muted-foreground mb-1">Phrase: <span className="italic">"{obs.example_phrase}"</span></div>
+                              <div className="text-[10px] text-blue-600/80 mb-2">CRIA will: {obs.what_cria_will_do}</div>
+                              {obs.suggested_additions.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  <span className="text-[10px] text-muted-foreground self-center">Widen by adding:</span>
+                                  {obs.suggested_additions.map((add, j) => (
+                                    <SuggestionChip
+                                      key={`framing-${i}-${j}`}
+                                      id={`framing-${i}-${j}`}
+                                      label={add.length > 40 ? add.slice(0, 40) + "…" : add}
+                                      text={add}
+                                      mode="append"
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Scope signal ── */}
+                    <div className={cn(
+                      "rounded-lg border p-3 text-[11px]",
+                      analysis.scope_signal.assessment === "well_scoped" ? "border-green-500/30 bg-green-500/5" :
+                      analysis.scope_signal.assessment === "sovereign_territory" ? "border-purple-500/30 bg-purple-500/5" :
+                      "border-amber-500/30 bg-amber-500/5"
+                    )}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        {analysis.scope_signal.assessment === "well_scoped" ? <CheckCheck className="w-3.5 h-3.5 text-green-600" /> : <AlertCircle className="w-3.5 h-3.5 text-amber-500" />}
+                        <span className="font-semibold">
+                          {analysis.scope_signal.assessment === "well_scoped" ? "Well scoped" :
+                           analysis.scope_signal.assessment === "likely_absence" ? "Evidence may be sparse" :
+                           analysis.scope_signal.assessment === "too_broad" ? "Consider narrowing" :
+                           "Sovereign territory — partnership recommended"}
+                        </span>
+                      </div>
+                      <div className="text-muted-foreground mb-2">{analysis.scope_signal.explanation}</div>
+                      {analysis.scope_signal.suggested_narrowings.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-1.5">
+                          <span className="text-[10px] text-muted-foreground self-center">Narrower focus:</span>
+                          {analysis.scope_signal.suggested_narrowings.map((n, i) => (
+                            <SuggestionChip
+                              key={`narrow-${i}`}
+                              id={`narrow-${i}`}
+                              label={n.length > 45 ? n.slice(0, 45) + "…" : n}
+                              text={n}
+                              mode="replace_all"
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {analysis.scope_signal.suggested_broadening && (
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="text-[10px] text-muted-foreground self-center">Broader framing:</span>
+                          <SuggestionChip
+                            id="broaden"
+                            label={analysis.scope_signal.suggested_broadening.slice(0, 45) + "…"}
+                            text={analysis.scope_signal.suggested_broadening}
+                            mode="replace_all"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── Suggested complete variants ── */}
+                    {analysis.suggested_question_variants.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Wand2 className="w-3.5 h-3.5 text-violet-500" />
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Synthesised Variants — Use as Starting Point</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {analysis.suggested_question_variants.map((v, i) => (
+                            <div key={i} className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3">
+                              <div className="text-[11px] text-foreground mb-2 leading-relaxed italic">"{v}"</div>
+                              <SuggestionChip
+                                id={`variant-${i}`}
+                                label="Use this variant"
+                                text={v}
+                                mode="replace_all"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Profile suggestion ── */}
+                    {analysis.profile_suggestion && analysis.profile_suggestion !== profile && (
+                      <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-[11px]">
+                        <div className="font-semibold mb-1">Profile suggestion: <span className="text-primary">{analysis.profile_suggestion}</span></div>
+                        <div className="text-muted-foreground">{analysis.profile_reasoning}</div>
+                        <button
+                          onClick={() => setProfile(analysis!.profile_suggestion)}
+                          className="mt-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium hover:bg-primary/20 transition-colors"
+                        >
+                          Apply suggested profile
+                        </button>
+                      </div>
+                    )}
+
+                    {/* ── Observer note suggestion ── */}
+                    {analysis.observer_note_suggestion && !observerNote.trim() && (
+                      <div className="rounded-lg border border-border/40 bg-background/50 p-3 text-[11px]">
+                        <div className="font-semibold mb-1">Observer note suggestion</div>
+                        <div className="text-muted-foreground italic mb-1">"{analysis.observer_note_suggestion.suggested_note}"</div>
+                        <div className="text-[10px] text-muted-foreground mb-2">{analysis.observer_note_suggestion.reasoning}</div>
+                        <button
+                          onClick={() => setObserverNote(analysis!.observer_note_suggestion!.suggested_note)}
+                          className="px-3 py-1 rounded-full bg-muted/60 border border-border/50 text-[10px] font-medium hover:bg-muted transition-colors"
+                        >
+                          Use this suggestion
+                        </button>
+                      </div>
+                    )}
+
+                    {/* ── Refined question builder ── */}
+                    <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Wand2 className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-semibold text-primary">Your Refined Question</span>
+                        {appliedSuggestions.size > 0 && (
+                          <span className="text-[10px] text-primary/70">
+                            ({appliedSuggestions.size} suggestion{appliedSuggestions.size !== 1 ? "s" : ""} applied)
+                          </span>
+                        )}
+                      </div>
+                      <textarea
+                        value={refinedQuestion}
+                        onChange={e => setRefinedQuestion(e.target.value)}
+                        rows={3}
+                        className="w-full bg-background/70 border border-primary/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
+                        placeholder="Your refined question will appear here as you apply suggestions above…"
+                      />
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          onClick={() => {
+                            if (refinedQuestion.trim()) {
+                              setQuery(refinedQuestion.trim());
+                              setAnalysisExpanded(false);
+                            }
+                          }}
+                          disabled={!refinedQuestion.trim() || refinedQuestion.trim() === query}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <CheckCheck className="w-3.5 h-3.5" />
+                          Use this question
+                        </button>
+                        <button
+                          onClick={() => { setRefinedQuestion(analysis!.original_question); setAppliedSuggestions(new Set()); }}
+                          className="px-3 py-1.5 rounded-lg border border-border/50 text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+                        >
+                          Reset to original
+                        </button>
+                        {refinedQuestion.trim() && refinedQuestion.trim() !== analysis.original_question && (
+                          <span className="text-[10px] text-muted-foreground ml-auto">
+                            {refinedQuestion.length} chars
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 text-[10px] text-muted-foreground italic">
+                        {analysis.analysis_note}
                       </div>
                     </div>
-                  )}
-
-                  {/* Framing observations */}
-                  {analysis.framing_observations.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Lightbulb className="w-3.5 h-3.5 text-blue-500" />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Implicit Framings</span>
-                      </div>
-                      <div className="space-y-2">
-                        {analysis.framing_observations.map((obs, i) => (
-                          <div key={i} className="rounded-lg border border-border/40 p-3 bg-background/50 text-[11px]">
-                            <div className="font-medium mb-1">{obs.observation}</div>
-                            <div className="text-muted-foreground mb-1">Phrase: <span className="italic">"{obs.example_phrase}"</span></div>
-                            <div className="text-[10px] text-blue-600/80 mb-1.5">CRIA will: {obs.what_cria_will_do}</div>
-                            {obs.options.map((opt, j) => (
-                              <div key={j} className="text-[10px] text-muted-foreground">• {opt}</div>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Scope signal */}
-                  <div className={cn(
-                    "rounded-lg border p-3 text-[11px]",
-                    analysis.scope_signal.assessment === "well_scoped" ? "border-green-500/30 bg-green-500/5" :
-                    analysis.scope_signal.assessment === "sovereign_territory" ? "border-purple-500/30 bg-purple-500/5" :
-                    "border-amber-500/30 bg-amber-500/5"
-                  )}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      {analysis.scope_signal.assessment === "well_scoped" ? <CheckCheck className="w-3.5 h-3.5 text-green-600" /> : <AlertCircle className="w-3.5 h-3.5 text-amber-500" />}
-                      <span className="font-semibold">
-                        {analysis.scope_signal.assessment === "well_scoped" ? "Well scoped" :
-                         analysis.scope_signal.assessment === "likely_absence" ? "Evidence may be sparse" :
-                         analysis.scope_signal.assessment === "too_broad" ? "Consider narrowing" :
-                         "Sovereign territory — partnership recommended"}
-                      </span>
-                    </div>
-                    <div className="text-muted-foreground">{analysis.scope_signal.explanation}</div>
-                    <div className="mt-1 italic text-[10px]">{analysis.scope_signal.suggestion}</div>
-                  </div>
-
-                  {/* Profile suggestion */}
-                  {analysis.profile_suggestion && analysis.profile_suggestion !== profile && (
-                    <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-[11px]">
-                      <div className="font-semibold mb-1">Profile suggestion: <span className="text-primary">{analysis.profile_suggestion}</span></div>
-                      <div className="text-muted-foreground">{analysis.profile_reasoning}</div>
-                      <button
-                        onClick={() => setProfile(analysis.profile_suggestion)}
-                        className="mt-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium hover:bg-primary/20 transition-colors"
-                      >
-                        Apply suggested profile
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Observer note suggestion */}
-                  {analysis.observer_note_suggestion && !observerNote.trim() && (
-                    <div className="rounded-lg border border-border/40 bg-background/50 p-3 text-[11px]">
-                      <div className="font-semibold mb-1">Observer note suggestion</div>
-                      <div className="text-muted-foreground italic mb-1">"{analysis.observer_note_suggestion.suggested_note}"</div>
-                      <div className="text-[10px] text-muted-foreground mb-2">{analysis.observer_note_suggestion.reasoning}</div>
-                      <button
-                        onClick={() => setObserverNote(analysis!.observer_note_suggestion!.suggested_note)}
-                        className="px-3 py-1 rounded-full bg-muted/60 border border-border/50 text-[10px] font-medium hover:bg-muted transition-colors"
-                      >
-                        Use this suggestion
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Disclaimer */}
-                  <div className="text-[10px] text-muted-foreground italic border-t border-border/30 pt-3">
-                    {analysis.analysis_note}
-                  </div>
-                </>)}
+                  </>);
+                })()}
               </div>
             )}
           </div>
         )}
 
-        {/* Warm-up / error banners */}
+{/* Warm-up / error banners */}
         {warmingUp ? (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6">
             <div className="flex items-start gap-3">
