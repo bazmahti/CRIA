@@ -989,7 +989,7 @@ export default function UnifiedResearch() {
                 alignment_forum: "Alignment Forum GraphQL API — cutting-edge AI safety research",
                 democracy_governance: "V-Dem · Freedom House · International IDEA · Carnegie · openDemocracy",
                 neurodiversity_community: "ASAN · PARC · AASPIRE · Autism RISE Network — community-controlled research",
-                neurofeedback: "NeuroRegulation Journal (OA) · ISNR · Biofeedback research",
+                neurofeedback_legacy: "NeuroRegulation Journal (OA) · ISNR · Biofeedback research",
                 clinical_medical: "PubMed · Cochrane · CINAHL · PsycINFO",
                 our_world_in_data: "Our World in Data — data-driven synthesis on global issues",
                 australian_institutional: "AustLII · ARDC · NIAA · AHRC · ABS",
