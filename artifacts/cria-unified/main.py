@@ -93,12 +93,16 @@ from openai import AsyncOpenAI
 # ============================================================
 
 BASE_PATH = os.environ.get("BASE_PATH", "/cria-unified")
-MODEL_NAME = os.environ.get("CRIA_MODEL_NAME", "gpt-5-mini")
+MODEL_NAME = os.environ.get("CRIA_MODEL_NAME", "gpt-5.1")
 _chain_env = os.environ.get("CRIA_MODEL_CHAIN", "")
 MODEL_CHAIN: list[str] = (
     [m.strip() for m in _chain_env.split(",") if m.strip()]
     if _chain_env
-    else ([MODEL_NAME] + (["gpt-5-nano"] if MODEL_NAME != "gpt-5-nano" else []))
+    else (
+        [MODEL_NAME]
+        + (["gpt-5-mini"] if MODEL_NAME not in ("gpt-5-mini", "gpt-5-nano") else [])
+        + (["gpt-5-nano"] if MODEL_NAME != "gpt-5-nano" else [])
+    )
 )
 _job_models_ctx: contextvars.ContextVar[set] = contextvars.ContextVar("job_models_used", default=set())
 MAX_QUERY_LENGTH = 8000

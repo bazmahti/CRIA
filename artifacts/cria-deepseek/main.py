@@ -18,12 +18,16 @@ from openai import AsyncOpenAI
 
 BASE_PATH = "/cria-v2"
 
-_DEFAULT_MODEL = os.environ.get("CRIA_MODEL_NAME", "gpt-5-mini")
+_DEFAULT_MODEL = os.environ.get("CRIA_MODEL_NAME", "gpt-5.1")
 _chain_env = os.environ.get("CRIA_MODEL_CHAIN", "")
 MODEL_CHAIN: list[str] = (
     [m.strip() for m in _chain_env.split(",") if m.strip()]
     if _chain_env
-    else ([_DEFAULT_MODEL] + (["gpt-5-nano"] if _DEFAULT_MODEL != "gpt-5-nano" else []))
+    else (
+        [_DEFAULT_MODEL]
+        + (["gpt-5-mini"] if _DEFAULT_MODEL not in ("gpt-5-mini", "gpt-5-nano") else [])
+        + (["gpt-5-nano"] if _DEFAULT_MODEL != "gpt-5-nano" else [])
+    )
 )
 
 _openai_client: Optional[AsyncOpenAI] = None
@@ -467,7 +471,7 @@ Produce a rigorous synthesis:
 
 Aim for a synthesis a doctoral committee would find credible."""
 
-        response = await call_llm(prompt, model="gpt-5-mini")
+        response = await call_llm(prompt, model=_DEFAULT_MODEL)
         return Finding(
             content=response,
             source_channel=self.name,
