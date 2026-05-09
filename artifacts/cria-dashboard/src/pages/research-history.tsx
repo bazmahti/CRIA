@@ -194,6 +194,60 @@ function VoicePanel({ voiceKey, voiceData }: { voiceKey: string; voiceData: { te
 }
 
 // ── JobDetail ─────────────────────────────────────────────────────────────────
+// ── Error Boundary ───────────────────────────────────────────────────────────
+// Without this, ANY render error in JobDetail unmounts the entire React app
+// (React 18 behaviour) — producing a completely blank screen.
+class JobDetailErrorBoundary extends React.Component<
+  { onBack: () => void; children: React.ReactNode },
+  { hasError: boolean; errorMessage: string }
+> {
+  constructor(props: { onBack: () => void; children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, errorMessage: "" };
+  }
+  static getDerivedStateFromError(error: unknown) {
+    return {
+      hasError: true,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    };
+  }
+  componentDidCatch(error: unknown, info: unknown) {
+    console.error("[CRIA History] JobDetail render error:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 max-w-3xl space-y-4">
+          <button
+            onClick={this.props.onBack}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Research History
+          </button>
+          <div className="border border-red-500/30 bg-red-500/5 rounded-xl p-6">
+            <p className="text-sm font-medium text-red-400 mb-2">
+              Unable to display this research job
+            </p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Research results are always available immediately after a run on the{" "}
+              <a href="/unified" className="text-primary underline">
+                Unified Research page
+              </a>
+              , where you can also download all output files.
+            </p>
+            {this.state.errorMessage && (
+              <p className="text-[10px] font-mono text-muted-foreground/60">
+                {this.state.errorMessage}
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function JobDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const { data: job, isLoading, isError } = useGetResearchJob(id);
 
@@ -271,7 +325,7 @@ function JobDetail({ id, onBack }: { id: string; onBack: () => void }) {
           {job.questionText || <span className="text-muted-foreground italic">No question text</span>}
         </h1>
         <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground font-mono">
-          <span>Started {formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}</span>
+          <span>Started {(() => { try { return formatDistanceToNow(new Date(job.createdAt), { addSuffix: true }); } catch { return "unknown time"; } })()}</span>
           {job.completedAt && <span>Completed {format(new Date(job.completedAt), "MMM d, yyyy HH:mm")}</span>}
         </div>
       </div>
@@ -371,7 +425,7 @@ function JobRow({ job, onSelect }: { job: JobItem; onSelect: () => void }) {
         </p>
       </div>
       <div className="flex items-center gap-3 flex-shrink-0 text-[10px] text-muted-foreground font-mono">
-        <span className="hidden sm:block">{formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}</span>
+        <span className="hidden sm:block">{(() => { try { return formatDistanceToNow(new Date(job.createdAt), { addSuffix: true }); } catch { return "unknown time"; } })()}</span>
         <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
       </div>
     </button>
@@ -430,7 +484,11 @@ export default function ResearchHistoryPage() {
   const { data: jobs, isLoading } = useListResearchJobs();
 
   if (selected) {
-    return <JobDetail id={selected} onBack={() => setSelected(null)} />;
+    return (
+      <JobDetailErrorBoundary onBack={() => setSelected(null)}>
+        <JobDetail id={selected} onBack={() => setSelected(null)} />
+      </JobDetailErrorBoundary>
+    );
   }
 
   const allJobs: JobItem[] = jobs ?? [];

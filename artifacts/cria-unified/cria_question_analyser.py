@@ -427,6 +427,48 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
     if isinstance(variants, list):
         variants = [v for v in variants if v and len(v) > 20][:3]
 
+    # ── Post-processing: ensure refinement fields are populated ─────────────
+    # If the LLM returned empty arrays for the new fields (common with non-Claude
+    # models), generate minimal useful alternatives from the existing content.
+
+    # Ensure every vocab cluster has at least one suggested expansion
+    for vc in vocab_clusters:
+        if not vc.suggested_expansions and vc.disciplinary_terms:
+            # Build one expansion from the first discipline's terms
+            first_disc = next(iter(vc.disciplinary_terms))
+            first_terms = vc.disciplinary_terms[first_disc][:2]
+            if first_terms:
+                vc.suggested_expansions = [
+                    f"...or what {first_disc} calls {' or '.join(first_terms)}"
+                ]
+
+    # Ensure ambiguity flags have clarifications
+    for af in ambiguity_flags:
+        if not af.clarification_a and af.reading_a:
+            # Use reading_a summary as clarification
+            af.clarification_a = af.excerpt  # minimal: keep as-is (Reading A)
+        if not af.clarification_both and af.reading_a and af.reading_b:
+            af.clarification_both = f"{af.excerpt} (understood as both: {af.reading_a[:40]}... and {af.reading_b[:40]}...)"
+
+    # Ensure framing observations have suggested additions
+    for fo in framing_obs:
+        if not fo.suggested_additions and fo.options and len(fo.options) > 1:
+            # Extract option B text as a suggested addition
+            opt_b = fo.options[-1]
+            if "Option B:" in opt_b:
+                addition = opt_b.split("Option B:")[-1].strip()
+                if addition:
+                    fo.suggested_additions = [f"...{addition[:80]}"]
+
+    # If no variants were generated, synthesise one from readiness explanation
+    if not variants and data.get("readiness_explanation"):
+        readiness = data.get("readiness_explanation", "")
+        if len(question) > 30:
+            # Offer a more specific version of the question
+            variants = [
+                f"{question.rstrip('?')} — with particular attention to empirical evidence and dissenting perspectives?",
+            ]
+
     return QuestionAnalysis(
         original_question=question,
         vocabulary_clusters=vocab_clusters,
