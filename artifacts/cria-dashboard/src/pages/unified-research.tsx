@@ -56,6 +56,9 @@ interface QuestionAnalysis {
   cria_readiness: "ready" | "refine_recommended" | "refine_strongly_recommended";
   readiness_explanation: string;
   suggested_question_variants: string[];
+  iteration_recommendation: number;
+  iteration_reasoning: string;
+  estimated_cost_range: string;
   analysis_note: string;
 }
 
@@ -1215,6 +1218,49 @@ export default function UnifiedResearch() {
                     <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2 italic">
                       {analysis.readiness_explanation}
                     </div>
+
+                    {/* Iteration recommendation */}
+                    {analysis.iteration_recommendation && (
+                      <div className={cn(
+                        "flex items-start gap-3 rounded-lg border px-3 py-2.5",
+                        analysis.iteration_recommendation === 1
+                          ? "border-green-500/30 bg-green-500/5"
+                          : analysis.iteration_recommendation === 3
+                          ? "border-amber-500/30 bg-amber-500/5"
+                          : "border-border/40 bg-background/50"
+                      )}>
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className={cn(
+                            "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold",
+                            analysis.iteration_recommendation === 1 ? "bg-green-500/20 text-green-500" :
+                            analysis.iteration_recommendation === 3 ? "bg-amber-500/20 text-amber-600" :
+                            "bg-primary/15 text-primary"
+                          )}>
+                            {analysis.iteration_recommendation}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Recommended iterations
+                            </span>
+                            {analysis.estimated_cost_range && (
+                              <span className={cn(
+                                "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+                                analysis.iteration_recommendation === 1 ? "bg-green-500/15 text-green-600" :
+                                analysis.iteration_recommendation === 3 ? "bg-amber-500/15 text-amber-700" :
+                                "bg-primary/10 text-primary"
+                              )}>
+                                {analysis.estimated_cost_range}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground leading-relaxed">
+                            {analysis.iteration_reasoning}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* ── Vocabulary clusters ── */}
                     {analysis.vocabulary_clusters.length > 0 && (
