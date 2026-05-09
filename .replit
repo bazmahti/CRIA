@@ -55,3 +55,8 @@ externalPort = 3000
 [nix]
 channel = "stable-25_05"
 packages = ["libxcrypt", "xcodebuild", "zlib"]
+
+[userenv]
+
+[userenv.shared]
+CORS_ALLOWED_ORIGINS = "https://convergent-research-hub.replit.app,https://d54542fa-70d1-4299-aef4-6f64dc49ea62-00-2otvmxu2q6fvv.spock.replit.dev"
