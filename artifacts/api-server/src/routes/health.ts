@@ -11,6 +11,10 @@ router.get("/healthz", (_req, res) => {
 });
 
 router.get("/debug/python", async (_req, res) => {
+  if (process.env.NODE_ENV !== "development") {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
   const status = await getPythonServiceStatus();
 
   // Attach the last 100 lines from each Python service log if available
