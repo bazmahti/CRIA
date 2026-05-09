@@ -87,6 +87,12 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import uvicorn
 from openai import AsyncOpenAI
+try:
+    from anthropic import AsyncAnthropic as _AsyncAnthropic
+    _ANTHROPIC_SDK_AVAILABLE = True
+except ImportError:
+    _ANTHROPIC_SDK_AVAILABLE = False
+    _AsyncAnthropic = None  # type: ignore
 
 # ── New CRIA/Ultraria modules ─────────────────────────────────────────────────
 try:
@@ -146,6 +152,53 @@ except ImportError:
     _ADVOCACY_AVAILABLE = False
     async def search_advocacy_connectors(q, profile, **kw): return []
     def connector_registry_summary(): return {}
+
+# ── New CRIA/Ultraria modules ─────────────────────────────────────────────────
+try:
+    from cria_channel_config import (
+        get_channel_spec, channel_model, channel_temperature,
+        channel_max_tokens, channel_disposition, log_config_summary,
+        CLAUDE_MODEL as _CFG_CLAUDE, ANALYTICAL_MODEL as _CFG_ANALYTICAL,
+    )
+    _CHANNEL_CONFIG_AVAILABLE = True
+except ImportError:
+    _CHANNEL_CONFIG_AVAILABLE = False
+    def channel_model(name): return ""
+    def channel_temperature(name): return 0.5
+    def channel_max_tokens(name): return 4000
+    def channel_disposition(name): return ""
+    def log_config_summary(log): pass
+
+try:
+    from cria_web_search import WebSearchConnector
+    _WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    _WEB_SEARCH_AVAILABLE = False
+
+try:
+    from cria_connector_ledger import (
+        ensure_ledger_schema, log_connector_use, log_partnership_recommendation,
+        RecalibrationAgent, get_connector_performance_matrix,
+    )
+    _LEDGER_AVAILABLE = True
+except ImportError:
+    _LEDGER_AVAILABLE = False
+    async def ensure_ledger_schema(pool): pass
+    async def log_connector_use(*a, **kw): pass
+    async def log_partnership_recommendation(*a, **kw): pass
+
+try:
+    from cria_output_writer import write_all_outputs
+    _OUTPUT_WRITER_AVAILABLE = True
+except ImportError:
+    _OUTPUT_WRITER_AVAILABLE = False
+    async def write_all_outputs(result, job_id, question): return {}
+
+try:
+    from ultraria_phase1 import UltraRiaOrchestrator, get_lane_status, active_lane_count
+    _ULTRARIA_AVAILABLE = True
+except ImportError:
+    _ULTRARIA_AVAILABLE = False
 
 # ============================================================
 # CONFIGURATION
@@ -819,7 +872,7 @@ ADVOCACY_CONNECTOR_SPECS: List[ConnectorSpec] = [
     ConnectorSpec("IRENA", "https://irena.org",
                   PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="International Renewable Energy Agency — energy transition statistics and analysi"),
+                  notes="International Renewable Energy Agency — energy transition statistics and analysis"),
 
     ConnectorSpec("REN21", "https://ren21.net",
                   PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
@@ -1031,22 +1084,92 @@ ADVOCACY_CONNECTOR_SPECS: List[ConnectorSpec] = [
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
                   notes="Research on participatory and deliberative democracy"),
 
-    ConnectorSpec("Alliance of Democracies Foundation", "https://fordemocracy.net",
+    ConnectorSpec("PARC", "https://participatoryresearch.org",
                   PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Democracy metrics, authoritarian backsliding research"),
+                  notes="Participatory Action Research Consortium"),
 
-    ConnectorSpec("National Democratic Institute", "https://ndi.org",
+    ConnectorSpec("CIVICUS", "https://civicus.org",
                   PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Democracy support and election observation reports"),
+                  notes="Global civil society alliance — civic space monitoring"),
 
-    ConnectorSpec("Autistic Self Advocacy Network", "https://autisticadvocacy.org",
-                  PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
+    ConnectorSpec("World Resources Institute", "https://wri.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Community-controlled autism research priorities and policy"),
+                  notes="Environmental and development research across food, forests, water, energy"),
 
-    ConnectorSpec("PARC", "https://participatoryautismresearch.wordpress.com",
+    ConnectorSpec("Oxfam Research", "https://oxfam.org/research",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Poverty, inequality, and humanitarian research"),
+
+    ConnectorSpec("ActionAid Research", "https://actionaid.org/research",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Gender justice, land rights, food sovereignty research"),
+
+    ConnectorSpec("Global Witness", "https://globalwitness.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Corporate and government accountability investigations"),
+
+    ConnectorSpec("Corporate Europe Observatory", "https://corporateeurope.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Lobbying, corporate power, and EU policy research"),
+
+    ConnectorSpec("InfluenceMap", "https://influencemap.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Corporate climate lobbying and policy influence data"),
+
+    ConnectorSpec("Transnational Institute", "https://tni.org",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Progressive research on global justice, democracy, alternatives"),
+
+    ConnectorSpec("PARC (Policy Alternatives Research Centre)", "https://policyalternatives.ca",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Canadian progressive policy research — labour, environment, social policy"),
+
+    ConnectorSpec("Rosa Luxemburg Stiftung", "https://rosalux.de/en",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Left political education and research — global justice, social ecology"),
+
+    ConnectorSpec("Friedrich Ebert Stiftung", "https://fes.de/en",
+                  PositionPrivileged.ADVOCACY, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Social democratic research on labour, democracy, development"),
+
+    ConnectorSpec("Ada Lovelace Institute", "https://adalovelaceinstitute.org",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="AI and data governance, rights-based technology research"),
+
+    ConnectorSpec("AlgorithmWatch", "https://algorithmwatch.org",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Algorithmic decision-making accountability research"),
+
+    ConnectorSpec("AI Now Institute", "https://ainowinstitute.org",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Social implications of AI — labour, power, governance"),
+
+    ConnectorSpec("Data & Society", "https://datasociety.net",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Critical research on data-centric systems and society"),
+
+    ConnectorSpec("Responsible AI UK", "https://rai.ac.uk",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="UK responsible AI research hub — cross-disciplinary"),
+
+    ConnectorSpec("PARC (Participatory Autism Research Collective)", "https://participatoryautismresearch.com",
                   PositionPrivileged.COMMUNITY_CURATED, DissonanceRole.COUNTER,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
                   notes="Participatory Autism Research Collective — community-led research"),
@@ -1121,60 +1244,45 @@ ADVOCACY_CONNECTOR_SPECS: List[ConnectorSpec] = [
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
                   notes="Nate Hagens research on energy, finance, and civilisational overshoot"),
 
-    ConnectorSpec("Center for Ecoliteracy", "https://ecoliteracy.org",
-                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
-                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Ecological systems thinking and education"),
-
-    ConnectorSpec("Center for Humans and Nature", "https://humansandnature.org",
-                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
-                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Philosophy of nature, ecological citizenship, cultural change"),
-
-    ConnectorSpec("Wellbeing Economy Alliance", "https://wellbeingeconomy.org",
-                  PositionPrivileged.THEORETICAL_TRADITION, DissonanceRole.COUNTER,
-                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Post-GDP economics, flourishing metrics, policy transformation"),
-
-    ConnectorSpec("GBIF", "https://api.gbif.org/v1",
+    ConnectorSpec("GBIF", "https://gbif.org",
                   PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Global Biodiversity Information Facility — 2.5B occurrence records, Tier 1 API"),
+                  notes="Global Biodiversity Information Facility — occurrence data API"),
 
-    ConnectorSpec("Biodiversity Heritage Library", "https://www.biodiversitylibrary.org/api3",
+    ConnectorSpec("Biodiversity Heritage Library", "https://biodiversitylibrary.org",
                   PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="60M pages historical ecology literature, Tier 1 API"),
+                  notes="Digitised natural history literature"),
 
-    ConnectorSpec("Alignment Forum API", "https://www.alignmentforum.org/graphql",
+    ConnectorSpec("Alignment Forum API", "https://alignmentforum.org/graphql",
                   PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="AI alignment research — real-time GraphQL API"),
+                  notes="GraphQL API for AI alignment research posts"),
 
-    ConnectorSpec("IUCN Red List API", "https://apiv3.iucnredlist.org/api/v3",
+    ConnectorSpec("IUCN Red List API", "https://apiv3.iucnredlist.org",
                   PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Species threat assessments — free key: IUCN_API_KEY"),
+                  notes="Species threat status data — requires IUCN_API_KEY"),
 
     ConnectorSpec("Our World in Data", "https://ourworldindata.org",
-                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.BRIDGE,
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Data-driven global synthesis on climate, health, inequality"),
+                  notes="Open data on global development, health, environment"),
 
     ConnectorSpec("PsyArXiv", "https://psyarxiv.com",
                   PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Psychology and neuroscience preprints — Open Science Framework"),
+                  notes="Psychology and cognitive science preprints"),
 
-    ConnectorSpec("SSRN", "https://www.ssrn.com",
+    ConnectorSpec("SSRN", "https://ssrn.com",
                   PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Social science preprints — economics, law, political science"),
+                  notes="Social science research network preprints"),
 
     ConnectorSpec("Journal of Scientific Exploration", "https://journalofscientificexploration.org",
-                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  PositionPrivileged.GREY_PRACTITIONER, DissonanceRole.COUNTER,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
-                  notes="Peer-reviewed anomalous phenomena and frontier science"),
+                  notes="Peer-reviewed anomalous phenomena research"),
 
     ConnectorSpec("Frontiers in Human Neuroscience", "https://www.frontiersin.org/journals/human-neuroscience",
                   PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
@@ -1185,9 +1293,10 @@ ADVOCACY_CONNECTOR_SPECS: List[ConnectorSpec] = [
                   PositionPrivileged.GREY_PRACTITIONER, DissonanceRole.COUNTER,
                   [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
                   notes="Parapsychology research archive"),
-
 ]
 
+
+ALL_CONNECTORS = COGNITIVE_CONNECTORS + EPISTEMIC_CONNECTORS + ADVOCACY_CONNECTOR_SPECS
 
 
 def active_connectors() -> List[ConnectorSpec]:
@@ -1400,6 +1509,7 @@ class ArxivAPI:
 # ============================================================
 
 _openai_client: Optional[AsyncOpenAI] = None
+_anthropic_client = None
 _llm_semaphore: Optional[asyncio.Semaphore] = None
 
 
@@ -1412,6 +1522,16 @@ def get_llm_client() -> AsyncOpenAI:
             timeout=httpx.Timeout(timeout=120.0, connect=10.0),
         )
     return _openai_client
+
+
+def get_anthropic_client():
+    global _anthropic_client
+    if _anthropic_client is None and _ANTHROPIC_SDK_AVAILABLE:
+        _anthropic_client = _AsyncAnthropic(
+            api_key=os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY", "replit"),
+            base_url=os.environ.get("AI_INTEGRATIONS_ANTHROPIC_BASE_URL", "https://api.anthropic.com"),
+        )
+    return _anthropic_client
 
 
 def get_llm_semaphore() -> asyncio.Semaphore:
@@ -1497,15 +1617,27 @@ async def call_llm(
     for model in _model_chain:
         last_err = ""
         hard_fail = False
+        _is_claude = model.startswith("claude-")
+        _anthropic = get_anthropic_client() if _is_claude else None
         for attempt in range(retries + 1):
             async with sem:
                 try:
-                    resp = await client.chat.completions.create(
-                        model=model,
-                        max_completion_tokens=max_tokens,
-                        messages=messages,
-                    )
-                    text = resp.choices[0].message.content or ""
+                    if _is_claude and _anthropic is not None:
+                        # Route Claude models through Anthropic SDK
+                        resp_a = await _anthropic.messages.create(
+                            model=model,
+                            max_tokens=max_tokens,
+                            system=system,
+                            messages=[{"role": "user", "content": prompt}],
+                        )
+                        text = resp_a.content[0].text if resp_a.content else ""
+                    else:
+                        resp = await client.chat.completions.create(
+                            model=model,
+                            max_completion_tokens=max_tokens,
+                            messages=messages,
+                        )
+                        text = resp.choices[0].message.content or ""
                     if text:
                         try:
                             _job_models_ctx.get().add(model)
@@ -3993,6 +4125,123 @@ async def connector_performance(request: Request):
 @app.get(f"{BASE_PATH}/outputs")
 @limiter.limit("30/minute")
 async def list_outputs(request: Request, q: str = ""):
+    if not _OUTPUT_WRITER_AVAILABLE:
+        return {"available": False, "files": []}
+    from cria_output_writer import OUTPUT_DIR, slugify, get_output_files_list
+    if q:
+        files = get_output_files_list(slugify(q))
+    else:
+        files = [
+            {"filename": p.name, "path": str(p), "size_kb": round(p.stat().st_size / 1024, 1)}
+            for p in sorted(OUTPUT_DIR.glob("*.md"), key=lambda f: f.stat().st_mtime, reverse=True)[:50]
+        ]
+    return {"available": True, "count": len(files), "files": files}
+
+
+# ── Ultraria endpoint ─────────────────────────────────────────────────────────
+
+class UltraRiaRequest(BaseModel):
+    query: str = Field(..., min_length=10, max_length=4000)
+    cria_job_id: str = Field("", description="Optional CRIA job ID to use as context")
+    observer_note: str = Field("", max_length=500)
+
+
+@app.post(f"{BASE_PATH}/ultraria", dependencies=[Depends(verify_api_key)])
+@limiter.limit("2/minute")
+async def ultraria_endpoint(
+    request: Request,
+    body: UltraRiaRequest,
+    background_tasks: BackgroundTasks,
+):
+    if not _ULTRARIA_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Ultraria module not available")
+    active = active_lane_count()
+    if active < 2:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Ultraria requires at least 2 active lanes. Currently active: {active}. "
+                   "Configure ULTRARIA_* API keys in Replit Secrets.",
+        )
+
+    # Optionally load CRIA result as context
+    cria_result = None
+    if body.cria_job_id and _db_pool:
+        job = await db_get_job(body.cria_job_id)
+        if job and job.get("result"):
+            cria_result = job["result"]
+
+    job_id = str(uuid.uuid4())
+    await db_create_job(job_id, body.query, "ultraria",
+                        getattr(request.state, "request_id", ""))
+
+    async def _run_ultraria():
+        await db_start_job(job_id)
+        try:
+            orch = UltraRiaOrchestrator()
+            result = await orch.run(
+                body.query, cria_result=cria_result, call_llm_fn=call_llm
+            )
+            result_dict = result.to_dict()
+            result_dict["markdown"] = result.to_markdown()
+            # Write markdown output
+            if _OUTPUT_WRITER_AVAILABLE:
+                from cria_output_writer import OUTPUT_DIR, slugify, ts
+                from pathlib import Path
+                slug = slugify(body.query)
+                path = OUTPUT_DIR / f"ULTRARIA-{slug}-{ts()}.md"
+                path.write_text(result.to_markdown(), encoding="utf-8")
+                result_dict["output_file"] = str(path)
+            await db_complete_job(job_id, result_dict)
+            log.info("Ultraria job %s complete — %d lanes completed",
+                     job_id, result.completed_lanes)
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"
+            log.error("Ultraria job %s failed: %s", job_id, err, exc_info=True)
+            await db_fail_job(job_id, err)
+
+    background_tasks.add_task(_run_ultraria)
+    return {
+        "jobId": job_id,
+        "status": "queued",
+        "active_lanes": active,
+        "lane_status": get_lane_status() if _ULTRARIA_AVAILABLE else {},
+    }
+
+
+@app.get(f"{BASE_PATH}/ultraria/lanes")
+async def ultraria_lane_status():
+    if not _ULTRARIA_AVAILABLE:
+        return {"available": False}
+    return {
+        "available": True,
+        "active_count": active_lane_count(),
+        "lanes": get_lane_status(),
+    }
+
+
+# ── Recalibration endpoint ────────────────────────────────────────────────────
+
+@app.post(f"{BASE_PATH}/connectors/recalibrate", dependencies=[Depends(verify_api_key)])
+async def trigger_recalibration():
+    if not _LEDGER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Connector ledger not available")
+    agent = RecalibrationAgent()
+    report = await agent.generate_report(_db_pool)
+    return report or {"status": "no_data"}
+
+
+@app.get(f"{BASE_PATH}/connectors/performance")
+async def connector_performance():
+    if not _LEDGER_AVAILABLE or not _db_pool:
+        return {"available": False, "matrix": []}
+    matrix = await get_connector_performance_matrix(_db_pool)
+    return {"available": True, "entries": len(matrix), "matrix": matrix[:50]}
+
+
+# ── Output files endpoint ─────────────────────────────────────────────────────
+
+@app.get(f"{BASE_PATH}/outputs")
+async def list_outputs(q: str = ""):
     if not _OUTPUT_WRITER_AVAILABLE:
         return {"available": False, "files": []}
     from cria_output_writer import OUTPUT_DIR, slugify, get_output_files_list

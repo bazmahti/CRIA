@@ -4,8 +4,6 @@ pnpm install --frozen-lockfile
 pnpm --filter db push --force
 
 # ── Install the tracked post-commit hook ────────────────────────────────────
-# Keep .git/hooks/post-commit in sync with scripts/hooks/post-commit so that
-# every commit fires the GitHub sync automatically.
 HOOK_SRC="$(git rev-parse --show-toplevel)/scripts/hooks/post-commit"
 HOOK_DST="$(git rev-parse --show-toplevel)/.git/hooks/post-commit"
 if [ -f "$HOOK_SRC" ]; then
@@ -16,6 +14,8 @@ fi
 
 # ── Sync to GitHub ──────────────────────────────────────────────────────────
 # Runs after every task-agent merge so GitHub stays current.
+# NOTE: GitHub sync is explicitly non-fatal — a push failure must not cause
+# post-merge setup to exit non-zero, which would block the merge.
 if [ -z "$GITHUB_TOKEN" ]; then
   echo "GITHUB_TOKEN not set — skipping GitHub sync"
 else
@@ -23,27 +23,26 @@ else
   COMMIT_SHORT="$(git rev-parse --short HEAD)"
   echo "Pushing to GitHub ($COMMIT_SHORT)..."
 
-  PUSH_OUTPUT="$(git push "$GITHUB_URL" main 2>&1)"
+  # Use set +e around the push so a failure doesn't trigger set -e exit.
+  set +e
+  PUSH_OUTPUT="$(git push "$GITHUB_URL" HEAD:main 2>&1)"
   PUSH_EXIT="$?"
+  set -e
 
   if [ "$PUSH_EXIT" -eq 0 ]; then
     echo "GitHub sync OK — $COMMIT_SHORT"
   else
-    echo "" >&2
-    echo "╔══════════════════════════════════════════════════════════════╗" >&2
-    echo "║  GITHUB SYNC FAILED (post-merge)                            ║" >&2
-    echo "║  This merge was NOT pushed to GitHub. Possible causes:      ║" >&2
-    echo "║    • GITHUB_TOKEN expired or revoked                        ║" >&2
-    echo "║    • Remote diverged (try: bash scripts/sync-github.sh      ║" >&2
-    echo "║      --force)                                               ║" >&2
-    echo "║    • GitHub is temporarily unreachable                      ║" >&2
-    echo "╚══════════════════════════════════════════════════════════════╝" >&2
-    echo "" >&2
-    echo "[github-sync] commit    : $(git rev-parse HEAD)" >&2
-    echo "[github-sync] exit code : $PUSH_EXIT" >&2
-    echo "[github-sync] details   :" >&2
-    echo "$PUSH_OUTPUT" | sed 's/^/[github-sync]   /' >&2
-    echo "" >&2
-    # Non-fatal: do not let a sync failure block the post-merge setup.
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║  GITHUB SYNC FAILED (post-merge)                            ║"
+    echo "║  This merge was NOT pushed to GitHub. Possible causes:      ║"
+    echo "║    • GITHUB_TOKEN expired or revoked                        ║"
+    echo "║    • Remote diverged — run: bash scripts/sync-github.sh     ║"
+    echo "║    • GitHub is temporarily unreachable                      ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo "[github-sync] commit    : $(git rev-parse HEAD)"
+    echo "[github-sync] exit code : $PUSH_EXIT"
+    echo "[github-sync] details   : $PUSH_OUTPUT"
+    # Deliberately NOT exiting non-zero — sync failure is informational only.
   fi
 fi
