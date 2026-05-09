@@ -461,7 +461,7 @@ router.post("/experiments/:id/run", async (req, res): Promise<void> => {
           const pollResp = await fetch(pollUrl, { signal: AbortSignal.timeout(15_000) });
           if (pollResp.ok) {
             const raw = await pollResp.json() as { status: string; engine?: { status: string; result?: Record<string, unknown>; error?: string } };
-            const engine = raw.engine ?? raw;
+            const engine = (raw.engine ?? raw) as { status: string; result?: Record<string, unknown>; error?: string };
             pollData = { status: engine.status, result: engine.result as Record<string, unknown>, error: engine.error };
             if (pollData.status === "complete" || pollData.status === "failed") break;
           }
@@ -496,11 +496,7 @@ ${papers["convergent"].text}`);
       if (voices?.["academic"]?.text) sections.push(`## Academic Voice
 
 ${voices["academic"].text}`);
-      const findingsMd = sections.join("
-
----
-
-");
+      const findingsMd = sections.join("\n\n---\n\n");
 
       // Extract real citations from retrieved papers
       const cogPipeline = result.cognitive_pipeline as { findings?: Array<{ evidence?: string[] }> } | undefined;

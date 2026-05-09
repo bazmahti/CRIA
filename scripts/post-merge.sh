@@ -13,36 +13,22 @@ if [ -f "$HOOK_SRC" ]; then
 fi
 
 # ── Sync to GitHub ──────────────────────────────────────────────────────────
-# Runs after every task-agent merge so GitHub stays current.
-# NOTE: GitHub sync is explicitly non-fatal — a push failure must not cause
-# post-merge setup to exit non-zero, which would block the merge.
+# Uses the GitHub API to push changed files so diverged histories never block.
+# This is non-fatal — a sync failure must not cause post-merge to exit non-zero.
 if [ -z "$GITHUB_TOKEN" ]; then
   echo "GITHUB_TOKEN not set — skipping GitHub sync"
+elif ! command -v python3 &>/dev/null; then
+  echo "python3 not found — skipping GitHub sync"
 else
-  GITHUB_URL="https://bazmahti:${GITHUB_TOKEN}@github.com/bazmahti/CRIA.git"
   COMMIT_SHORT="$(git rev-parse --short HEAD)"
-  echo "Pushing to GitHub ($COMMIT_SHORT)..."
+  echo "Syncing to GitHub via API ($COMMIT_SHORT)..."
 
-  # Use set +e around the push so a failure doesn't trigger set -e exit.
   set +e
-  PUSH_OUTPUT="$(git push "$GITHUB_URL" HEAD:main 2>&1)"
-  PUSH_EXIT="$?"
+  python3 /home/runner/workspace/scripts/github_sync.py
+  SYNC_EXIT="$?"
   set -e
 
-  if [ "$PUSH_EXIT" -eq 0 ]; then
-    echo "GitHub sync OK — $COMMIT_SHORT"
-  else
-    echo ""
-    echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║  GITHUB SYNC FAILED (post-merge)                            ║"
-    echo "║  This merge was NOT pushed to GitHub. Possible causes:      ║"
-    echo "║    • GITHUB_TOKEN expired or revoked                        ║"
-    echo "║    • Remote diverged — run: bash scripts/sync-github.sh     ║"
-    echo "║    • GitHub is temporarily unreachable                      ║"
-    echo "╚══════════════════════════════════════════════════════════════╝"
-    echo "[github-sync] commit    : $(git rev-parse HEAD)"
-    echo "[github-sync] exit code : $PUSH_EXIT"
-    echo "[github-sync] details   : $PUSH_OUTPUT"
-    # Deliberately NOT exiting non-zero — sync failure is informational only.
+  if [ "$SYNC_EXIT" -ne 0 ]; then
+    echo "GitHub sync encountered an error (non-fatal — merge succeeded)"
   fi
 fi

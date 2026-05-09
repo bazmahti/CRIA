@@ -972,7 +972,7 @@ export default function UnifiedResearch() {
               </div>
             </div>
 
-            {result["fallback_used"] && (
+            {Boolean(result["fallback_used"]) && (
               <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-5 text-sm text-amber-400">
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                 <div>
