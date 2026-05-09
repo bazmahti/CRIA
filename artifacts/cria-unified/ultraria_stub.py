@@ -67,18 +67,21 @@ LANES = [
 # ── Per-lane backend config ───────────────────────────────────────────────────
 LANE_BACKEND: Dict[int, Dict[str, Any]] = {
     1: {
-        "env_var": "ANTHROPIC_API_KEY",
+        "env_var": "AI_INTEGRATIONS_ANTHROPIC_API_KEY",
+        "env_var_fallback": "ANTHROPIC_API_KEY",
         "type": "anthropic",
         "model": "claude-opus-4-5",
     },
     2: {
-        "env_var": "DEEPSEEK_API_KEY",
+        "env_var": "ULTRARIA_DEEPSEEK_KEY",
+        "env_var_fallback": "DEEPSEEK_API_KEY",
         "type": "openai_compat",
         "model": "deepseek-chat",
         "base_url": "https://api.deepseek.com",
     },
     3: {
-        "env_var": "GEMINI_API_KEY",
+        "env_var": "ULTRARIA_GEMINI_KEY",
+        "env_var_fallback": "GEMINI_API_KEY",
         "type": "openai_compat",
         "model": "gemini-2.0-flash",
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -314,12 +317,20 @@ STUB_OUTPUTS: Dict[int, str] = {
 async def _call_anthropic(api_key: str, system: str, user_msg: str,
                           model: str = "claude-opus-4-5",
                           max_tokens: int = 2048) -> str:
-    """Direct httpx call to Anthropic Messages API — no SDK dependency."""
+    """Anthropic Messages API — uses Replit proxy when available, direct otherwise."""
+    proxy_base = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_BASE_URL", "").rstrip("/")
+    proxy_key  = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY", "").strip()
+    if proxy_base and proxy_key:
+        endpoint = f"{proxy_base}/messages"
+        key_used  = proxy_key
+    else:
+        endpoint = "https://api.anthropic.com/v1/messages"
+        key_used  = api_key
     async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0)) as client:
         r = await client.post(
-            "https://api.anthropic.com/v1/messages",
+            endpoint,
             headers={
-                "x-api-key": api_key,
+                "x-api-key": key_used,
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             },
@@ -405,6 +416,14 @@ async def _generate_tension_question(lane_a_id: int, output_a: str,
     )
 
 
+# ── Helper: resolve lane API key (primary env_var, then fallback) ─────────────
+def _lane_key(cfg: Dict) -> str:
+    key = os.environ.get(cfg.get("env_var", ""), "").strip()
+    if not key:
+        key = os.environ.get(cfg.get("env_var_fallback", ""), "").strip()
+    return key
+
+
 # ── Single lane execution ──────────────────────────────────────────────────────
 async def _run_lane(lane: Dict, question: str, mode: str,
                     lane_index: int, prev_outputs: List[Dict]) -> Dict:
@@ -413,7 +432,7 @@ async def _run_lane(lane: Dict, question: str, mode: str,
     In Fibonacci spiral mode, generates tension question from two preceding outputs.
     """
     cfg = LANE_BACKEND.get(lane["id"], {})
-    api_key = os.environ.get(cfg.get("env_var", ""), "").strip()
+    api_key = _lane_key(cfg)
     is_stub = not bool(api_key)
 
     # Determine the question this lane will answer
@@ -695,8 +714,8 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
-    configured = [l for l in LANES if os.environ.get(LANE_BACKEND[l["id"]]["env_var"], "").strip()]
-    stub = [l for l in LANES if not os.environ.get(LANE_BACKEND[l["id"]]["env_var"], "").strip()]
+    configured = [l for l in LANES if _lane_key(LANE_BACKEND[l["id"]])]
+    stub = [l for l in LANES if not _lane_key(LANE_BACKEND[l["id"]])]
     meta_live = bool(os.environ.get(META_BACKEND["env_var"], "").strip())
     log.info("╔══════════════════════════════════════════════════════════╗")
     log.info("║  ULTRARIA SERVICE — Phase 2                             ║")
@@ -714,8 +733,8 @@ async def startup():
 @app.get("/ultraria/health", response_model=UltraHealthResponse)
 @app.get("/health", response_model=UltraHealthResponse)
 async def health():
-    live = [l for l in LANES if os.environ.get(LANE_BACKEND[l["id"]]["env_var"], "").strip()]
-    stub = [l for l in LANES if not os.environ.get(LANE_BACKEND[l["id"]]["env_var"], "").strip()]
+    live = [l for l in LANES if _lane_key(LANE_BACKEND[l["id"]])]
+    stub = [l for l in LANES if not _lane_key(LANE_BACKEND[l["id"]])]
     meta_live = bool(os.environ.get(META_BACKEND["env_var"], "").strip())
     phase = "2-partial" if live else "1-stub"
     if len(live) == len(LANES) and meta_live:
@@ -737,13 +756,14 @@ async def list_lanes():
     return {"lanes": LANES, "count": len(LANES)}
 
 
+@app.get("/ultraria/lanes/status")
 @app.get("/api/ultraria/lanes/status")
 async def lanes_status():
     """Returns per-lane live/stub status without exposing key values."""
     status = []
     for lane in LANES:
         cfg = LANE_BACKEND.get(lane["id"], {})
-        has_key = bool(os.environ.get(cfg.get("env_var", ""), "").strip())
+        has_key = bool(_lane_key(cfg))
         status.append({
             "lane_id":   lane["id"],
             "label":     lane["label"],
@@ -770,6 +790,7 @@ async def lanes_status():
     }
 
 
+@app.post("/ultraria/run")
 @app.post("/api/ultraria/run")
 async def run_experiment(request: UltraRunRequest,
                          background_tasks: BackgroundTasks):
@@ -785,6 +806,7 @@ async def run_experiment(request: UltraRunRequest,
     return {"jobId": job_id, "status": "running"}
 
 
+@app.get("/ultraria/run/{job_id}")
 @app.get("/api/ultraria/run/{job_id}")
 async def poll_experiment(job_id: str):
     job = _jobs.get(job_id)
