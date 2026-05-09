@@ -3621,6 +3621,47 @@ def make_epi_layer3() -> Layer3MetaCognitive:
 # THREE-VOICE RENDERING — WITH EVIDENCE FIREWALL ON ACADEMIC
 # ============================================================
 
+# ── LinkedIn post profiles and hashtag fallback ──────────────────────────────
+
+_LINKEDIN_PROFILES = {
+    "environmental_polycrisis", "food_sovereignty", "ocaa_daily_editorial",
+    "new_economy", "democracy_governance", "post_ai_flourishing",
+    "civilisational_academic", "ai_alignment", "neurodiversity_health",
+    "therapeutic_clinical", "clinical_biomedical", "mental_health",
+    "contemplative_neuroscience", "psychedelic_research", "integrative_medicine",
+    "neurofeedback_health", "public_health", "health_equity", "indigenous_health",
+    "nutrition_gut_brain", "longevity_ageing",
+}
+
+_PROFILE_HASHTAGS: dict = {
+    "environmental_polycrisis": ["ClimateAction","Biodiversity","PlanetaryBoundaries","Sustainability","ClimateCrisis"],
+    "food_sovereignty": ["FoodSovereignty","RegenerativeAgriculture","FoodSystems","AgroEcology","FoodJustice"],
+    "ocaa_daily_editorial": ["Sustainability","FoodSystems","ClimateAction","RegenerativeAg","EcoJustice"],
+    "new_economy": ["NewEconomy","DoughnutEconomics","PostGrowth","WellbeingEconomy","EconomicJustice"],
+    "democracy_governance": ["Democracy","CivilSociety","Governance","CitizenEngagement","PoliticalChange"],
+    "post_ai_flourishing": ["AIEthics","HumanFlourishing","FutureOfWork","ArtificialIntelligence","Consciousness"],
+    "civilisational_academic": ["Civilisation","SystemsChange","ComplexSystems","FutureStudies","GlobalChallenges"],
+    "ai_alignment": ["AISafety","AIAlignment","AIGovernance","ResponsibleAI","ArtificialIntelligence"],
+    "neurodiversity_health": ["Neurodiversity","MentalHealth","AutismResearch","Neuroscience","InclusiveHealth"],
+    "therapeutic_clinical": ["MentalHealth","Therapy","ClinicalResearch","Wellbeing","HealthcareInnovation"],
+    "clinical_biomedical": ["MedicalResearch","ClinicalTrials","BiomedicalScience","HealthScience","EvidenceBasedMedicine"],
+    "mental_health": ["MentalHealth","Psychology","Wellbeing","MentalHealthAwareness","PsychologicalHealth"],
+    "contemplative_neuroscience": ["Meditation","Neuroscience","Mindfulness","ContemplativeScience","Consciousness"],
+    "psychedelic_research": ["PsychedelicResearch","MentalHealthTreatment","Psilocybin","Consciousness","Neuroplasticity"],
+    "integrative_medicine": ["IntegrativeMedicine","FunctionalMedicine","HolisticHealth","ComplementaryMedicine","Wellbeing"],
+    "neurofeedback_health": ["Neurofeedback","Biofeedback","BrainHealth","Neuroplasticity","CognitiveEnhancement"],
+    "public_health": ["PublicHealth","GlobalHealth","Epidemiology","HealthEquity","PreventiveMedicine"],
+    "health_equity": ["HealthEquity","SocialDeterminants","HealthJustice","SystemicChange","PublicHealth"],
+    "indigenous_health": ["IndigenousHealth","CommunityHealth","IndigenousRights","HealthEquity","CulturalSafety"],
+    "nutrition_gut_brain": ["Nutrition","GutHealth","GutBrainAxis","FoodAsMedicine","Microbiome"],
+    "longevity_ageing": ["Longevity","HealthyAgeing","Healthspan","AntiAgeing","LongevityResearch"],
+}
+
+def _generate_fallback_hashtags(profile: str) -> list:
+    base = _PROFILE_HASHTAGS.get(profile, ["Research","Evidence","Knowledge","SystemsChange"])
+    return base[:6]
+
+
 class ThreeVoiceRenderer:
     async def render_all(self, cog: List[Finding], epi: List[Finding],
                           conv: List[Finding], epi_academic: Dict,
@@ -3773,7 +3814,111 @@ class ThreeVoiceRenderer:
             "Editorial voice. Contemporary journalistic. Maintain rigour; drop apparatus. "
             "NO methodology section, NO AI/pipeline references of any kind."
         ), max_tokens=4000)
-        return {"text": text, "audience": "Trade publications, quality magazines"}
+
+        # LinkedIn post — generated for non-academic research streams
+        linkedin_post = None
+        profile = getattr(artefact, "profile", "") or ""
+        if profile in _LINKEDIN_PROFILES:
+            linkedin_post = await self._render_linkedin(
+                text, artefact, cog, epi, conv
+            )
+
+        return {
+            "text": text,
+            "audience": "Trade publications, quality magazines",
+            "linkedin_post": linkedin_post,
+        }
+
+    async def _render_linkedin(self, editorial_text: str, artefact: "ResearchArtefact",
+                                cog, epi, conv) -> Dict[str, str]:
+        """
+        Generate a LinkedIn post (≤3000 chars) from the editorial output.
+        Optimised hashtags, hook opening, evidence-grounded, non-promotional.
+        """
+        # Extract key finding from convergent pipeline for grounding
+        conv_summary = " ".join(
+            f.content[:150] for f in conv[:2] if f.content
+        )
+        prompt = (
+            f"Write a LinkedIn post based on this research finding.\n\n"
+            f"Research question: {artefact.research_question}\n\n"
+            f"Editorial summary: {editorial_text[:1500]}\n\n"
+            f"Convergent finding: {conv_summary[:400]}\n\n"
+            f"LINKEDIN POST REQUIREMENTS:\n"
+            f"- Maximum 3000 characters total (including hashtags)\n"
+            f"- Open with a single striking sentence that stops the scroll — "
+            f"a specific finding, a surprising fact, or a provocative question. "
+            f"NOT 'I\'m excited to share...' or 'New research shows...'.\n"
+            f"- 3-4 short paragraphs. Each paragraph 2-3 sentences maximum.\n"
+            f"- One concrete takeaway the reader can use or think about.\n"
+            f"- Closing question or provocation that invites genuine engagement.\n"
+            f"- 5-8 hashtags at the end, optimised for LinkedIn reach in this topic area. "
+            f"Mix of: 1-2 broad reach tags, 2-3 topic-specific tags, 1-2 community tags.\n"
+            f"- Tone: authoritative but not academic. Urgent but not alarmist. "
+            f"Evidence-grounded but human. Think researcher sharing a real finding, "
+            f"not marketer promoting content.\n"
+            f"- NO emojis unless they genuinely add meaning (not decoration).\n"
+            f"- NO: 'game-changing', 'revolutionary', 'I\'m thrilled', "
+            f"'disrupting', 'paradigm shift'.\n\n"
+            f"Return JSON with exactly these keys:\n"
+            f"{{\n"
+            f'  "post": "the full post text including hashtags",\n'
+            f'  "char_count": <integer>,\n'
+            f'  "hook": "the opening sentence only",\n'
+            f'  "hashtags": ["tag1", "tag2", ...]\n'
+            f"}}"
+        )
+
+        raw = await call_llm(
+            prompt,
+            system_prompt=(
+                "You write LinkedIn posts that earn engagement through substance, "
+                "not performance. You know that the best LinkedIn posts read like "
+                "a colleague sharing something genuinely interesting — specific, "
+                "grounded, and with a point of view. You write clean, direct prose. "
+                "Return only valid JSON."
+            ),
+            max_tokens=1500,
+            channel_name="Voice_Editorial",
+        )
+
+        try:
+            clean = raw.strip()
+            if clean.startswith("```"):
+                clean = clean.split("```")[1]
+                if clean.startswith("json"):
+                    clean = clean[4:]
+            data = json.loads(clean.strip())
+
+            # Enforce 3000 char limit
+            post = data.get("post", "")
+            if len(post) > 3000:
+                post = post[:2970] + "..."
+                data["post"] = post
+                data["char_count"] = len(post)
+
+            return {
+                "post": data.get("post", ""),
+                "char_count": data.get("char_count", len(data.get("post", ""))),
+                "hook": data.get("hook", ""),
+                "hashtags": data.get("hashtags", []),
+                "platform": "LinkedIn",
+                "char_limit": 3000,
+            }
+        except (json.JSONDecodeError, KeyError) as e:
+            log.warning("LinkedIn post JSON parse failed: %s", e)
+            # Graceful fallback — truncate editorial to 2800 chars + hashtags
+            truncated = editorial_text[:2750].rsplit(".", 1)[0] + "."
+            hashtags = _generate_fallback_hashtags(artefact.profile)
+            post = truncated + "\n\n" + " ".join(f"#{h}" for h in hashtags)
+            return {
+                "post": post[:3000],
+                "char_count": len(post[:3000]),
+                "hook": "",
+                "hashtags": hashtags,
+                "platform": "LinkedIn",
+                "char_limit": 3000,
+            }
 
     async def _render_practitioner(self, cog, epi, conv, artefact):
         cog_t = "\n".join(f"- {f.content[:200]}" for f in cog[:5])
