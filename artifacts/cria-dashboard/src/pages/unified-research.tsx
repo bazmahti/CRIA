@@ -479,6 +479,7 @@ export default function UnifiedResearch() {
   const [voice, setVoice] = useState("all");
   const [profile, setProfile] = useState("general_scholarship");
   const [showConnectorGroups, setShowConnectorGroups] = useState(false);
+  const [activeStream, setActiveStream] = useState<string>("general");
   const [savedToHistory, setSavedToHistory] = useState(false);
 
   const [job, setJob] = useState<UnifiedJobState | null>(null);
@@ -754,41 +755,113 @@ export default function UnifiedResearch() {
                   onChange={(e) => { setProfile(e.target.value); setShowConnectorGroups(true); }}
                   className="w-full bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-xs focus:outline-none"
                 >
-                  <optgroup label="General">
-                    <option value="general_scholarship">General Scholarship</option>
-                    <option value="partnership_sensitive">Partnership-Sensitive</option>
-                  </optgroup>
-                  <optgroup label="Civilisational and systems">
-                    <option value="civilisational_academic">Civilisational-Academic</option>
-                    <option value="post_ai_flourishing">Post-AI Flourishing</option>
-                    <option value="new_economy">New Economy / Post-Growth</option>
-                    <option value="democracy_governance">Democracy and Governance</option>
-                  </optgroup>
-                  <optgroup label="Environmental and ecological">
-                    <option value="environmental_polycrisis">Environmental Polycrisis</option>
-                    <option value="food_sovereignty">Food Sovereignty and Agriculture</option>
-                    <option value="ocaa_daily_editorial">OCAA Daily Editorial</option>
-                  </optgroup>
-                  <optgroup label="Technology and mind">
-                    <option value="ai_alignment">AI Alignment and Safety</option>
-                    <option value="neurodiversity_health">Neurodiversity and Health</option>
-                    <option value="therapeutic_clinical">Therapeutic-Clinical</option>
-                  </optgroup>
-                  <optgroup label="Health and medicine">
-                    <option value="clinical_biomedical">Clinical and Biomedical</option>
-                    <option value="mental_health">Mental Health and Psychology</option>
-                    <option value="contemplative_neuroscience">Contemplative Neuroscience</option>
-                    <option value="psychedelic_research">Psychedelic and Expanded-States Research</option>
-                    <option value="integrative_medicine">Integrative and Functional Medicine</option>
-                    <option value="neurofeedback_health">Neurofeedback and Biofeedback</option>
-                    <option value="public_health">Public Health and Epidemiology</option>
-                    <option value="health_equity">Health Equity and Social Determinants</option>
-                    <option value="indigenous_health">Indigenous and Community-Controlled Health</option>
-                    <option value="nutrition_gut_brain">Nutrition and Gut-Brain Axis</option>
-                    <option value="longevity_ageing">Longevity and Ageing</option>
-                  </optgroup>
+                  <option value="general_scholarship">General Scholarship</option>
+                  <option value="partnership_sensitive">Partnership-Sensitive</option>
                 </select>
               </div>
+            </div>
+
+            {/* ── Research Stream Selector ─────────────────────────────────────── */}
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+                Research Stream
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                {([
+                  { key: "general", label: "General Scholarship", icon: "🎓", profiles: ["general_scholarship","partnership_sensitive"] },
+                  { key: "civilisational", label: "Civilisational & Systems", icon: "🌐", profiles: ["civilisational_academic","post_ai_flourishing","new_economy","democracy_governance"] },
+                  { key: "environmental", label: "Environmental & Ecological", icon: "🌱", profiles: ["environmental_polycrisis","food_sovereignty","ocaa_daily_editorial"] },
+                  { key: "technology", label: "Technology & Mind", icon: "🧠", profiles: ["ai_alignment","neurodiversity_health","therapeutic_clinical"] },
+                  { key: "health", label: "Health & Medicine", icon: "⚕️", profiles: ["clinical_biomedical","mental_health","contemplative_neuroscience","psychedelic_research","integrative_medicine","neurofeedback_health","public_health","health_equity","indigenous_health","nutrition_gut_brain","longevity_ageing"] },
+                  { key: "activist", label: "Activist & Issue Research", icon: "✊", profiles: ["environmental_polycrisis","food_sovereignty","new_economy","democracy_governance","ai_alignment","neurodiversity_health"] },
+                ] as { key: string; label: string; icon: string; profiles: string[] }[]).map(({ key, label, icon, profiles }) => {
+                  const isActive = profiles.includes(profile);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        setProfile(profiles[0]);
+                        setShowConnectorGroups(true);
+                        setActiveStream(key);
+                      }}
+                      className={cn(
+                        "flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl border text-center transition-all",
+                        isActive
+                          ? "border-primary/60 bg-primary/10 text-primary"
+                          : "border-border/40 bg-background/40 text-muted-foreground hover:border-border hover:bg-background/70"
+                      )}
+                    >
+                      <span className="text-lg">{icon}</span>
+                      <span className="text-[10px] font-medium leading-tight">{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Sub-profile selector — shown when a stream is active */}
+              {activeStream && activeStream !== "general" && (() => {
+                const streamProfiles: Record<string, { value: string; label: string }[]> = {
+                  civilisational: [
+                    { value: "civilisational_academic", label: "Civilisational-Academic" },
+                    { value: "post_ai_flourishing", label: "Post-AI Flourishing" },
+                    { value: "new_economy", label: "New Economy / Post-Growth" },
+                    { value: "democracy_governance", label: "Democracy and Governance" },
+                  ],
+                  environmental: [
+                    { value: "environmental_polycrisis", label: "Environmental Polycrisis" },
+                    { value: "food_sovereignty", label: "Food Sovereignty and Agriculture" },
+                    { value: "ocaa_daily_editorial", label: "OCAA Daily Editorial" },
+                  ],
+                  technology: [
+                    { value: "ai_alignment", label: "AI Alignment and Safety" },
+                    { value: "neurodiversity_health", label: "Neurodiversity and Health" },
+                    { value: "therapeutic_clinical", label: "Therapeutic-Clinical" },
+                  ],
+                  health: [
+                    { value: "clinical_biomedical", label: "Clinical and Biomedical" },
+                    { value: "mental_health", label: "Mental Health and Psychology" },
+                    { value: "contemplative_neuroscience", label: "Contemplative Neuroscience" },
+                    { value: "psychedelic_research", label: "Psychedelic and Expanded-States" },
+                    { value: "integrative_medicine", label: "Integrative and Functional Medicine" },
+                    { value: "neurofeedback_health", label: "Neurofeedback and Biofeedback" },
+                    { value: "public_health", label: "Public Health and Epidemiology" },
+                    { value: "health_equity", label: "Health Equity / Social Determinants" },
+                    { value: "indigenous_health", label: "Indigenous and Community-Controlled" },
+                    { value: "nutrition_gut_brain", label: "Nutrition and Gut-Brain Axis" },
+                    { value: "longevity_ageing", label: "Longevity and Ageing" },
+                  ],
+                  activist: [
+                    { value: "environmental_polycrisis", label: "Environmental Polycrisis" },
+                    { value: "food_sovereignty", label: "Food Sovereignty" },
+                    { value: "new_economy", label: "New Economy / Post-Growth" },
+                    { value: "democracy_governance", label: "Democracy and Governance" },
+                    { value: "ai_alignment", label: "AI Alignment and Safety" },
+                    { value: "neurodiversity_health", label: "Neurodiversity and Health" },
+                  ],
+                };
+                const subProfiles = streamProfiles[activeStream] ?? [];
+                if (!subProfiles.length) return null;
+                return (
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {subProfiles.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => { setProfile(value); setShowConnectorGroups(true); }}
+                        className={cn(
+                          "px-3 py-1 rounded-full text-[11px] border transition-all",
+                          profile === value
+                            ? "border-primary bg-primary/15 text-primary font-medium"
+                            : "border-border/50 bg-background/50 text-muted-foreground hover:border-border hover:text-foreground"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Connector group cascade display */}
