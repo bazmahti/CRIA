@@ -87,18 +87,87 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import uvicorn
 from openai import AsyncOpenAI
+try:
+    from anthropic import AsyncAnthropic as _AsyncAnthropic
+    _ANTHROPIC_SDK_AVAILABLE = True
+except ImportError:
+    _ANTHROPIC_SDK_AVAILABLE = False
+    _AsyncAnthropic = None  # type: ignore
+
+# ── New CRIA/Ultraria modules ─────────────────────────────────────────────────
+try:
+    from cria_channel_config import (
+        get_channel_spec, channel_model, channel_temperature,
+        channel_max_tokens, channel_disposition, log_config_summary,
+        CLAUDE_MODEL as _CFG_CLAUDE, ANALYTICAL_MODEL as _CFG_ANALYTICAL,
+    )
+    _CHANNEL_CONFIG_AVAILABLE = True
+except ImportError:
+    _CHANNEL_CONFIG_AVAILABLE = False
+    def channel_model(name): return ""
+    def channel_temperature(name): return 0.5
+    def channel_max_tokens(name): return 4000
+    def channel_disposition(name): return ""
+    def log_config_summary(log): pass
+
+try:
+    from cria_web_search import WebSearchConnector
+    _WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    _WEB_SEARCH_AVAILABLE = False
+
+try:
+    from cria_connector_ledger import (
+        ensure_ledger_schema, log_connector_use, log_partnership_recommendation,
+        RecalibrationAgent, get_connector_performance_matrix,
+    )
+    _LEDGER_AVAILABLE = True
+except ImportError:
+    _LEDGER_AVAILABLE = False
+    async def ensure_ledger_schema(pool): pass
+    async def log_connector_use(*a, **kw): pass
+    async def log_partnership_recommendation(*a, **kw): pass
+
+try:
+    from cria_output_writer import write_all_outputs
+    _OUTPUT_WRITER_AVAILABLE = True
+except ImportError:
+    _OUTPUT_WRITER_AVAILABLE = False
+    async def write_all_outputs(result, job_id, question): return {}
+
+try:
+    from ultraria_phase1 import UltraRiaOrchestrator, get_lane_status, active_lane_count
+    _ULTRARIA_AVAILABLE = True
+except ImportError:
+    _ULTRARIA_AVAILABLE = False
+
+try:
+    from cria_advocacy_connectors import (
+        search_advocacy_connectors, connector_registry_summary,
+        get_connector_by_name, ALL_ADVOCACY_CONNECTORS,
+        STRUCTURED_API_CONNECTORS, gbif, bhl, alignment_forum,
+    )
+    _ADVOCACY_AVAILABLE = True
+except ImportError:
+    _ADVOCACY_AVAILABLE = False
+    async def search_advocacy_connectors(q, profile, **kw): return []
+    def connector_registry_summary(): return {}
 
 # ============================================================
 # CONFIGURATION
 # ============================================================
 
 BASE_PATH = os.environ.get("BASE_PATH", "/cria-unified")
-MODEL_NAME = os.environ.get("CRIA_MODEL_NAME", "gpt-5-mini")
+MODEL_NAME = os.environ.get("CRIA_MODEL_NAME", "gpt-5.1")
 _chain_env = os.environ.get("CRIA_MODEL_CHAIN", "")
 MODEL_CHAIN: list[str] = (
     [m.strip() for m in _chain_env.split(",") if m.strip()]
     if _chain_env
-    else ([MODEL_NAME] + (["gpt-5-nano"] if MODEL_NAME != "gpt-5-nano" else []))
+    else (
+        [MODEL_NAME]
+        + (["gpt-5-mini"] if MODEL_NAME not in ("gpt-5-mini", "gpt-5-nano") else [])
+        + (["gpt-5-nano"] if MODEL_NAME != "gpt-5-nano" else [])
+    )
 )
 _job_models_ctx: contextvars.ContextVar[set] = contextvars.ContextVar("job_models_used", default=set())
 MAX_QUERY_LENGTH = 8000
@@ -238,6 +307,9 @@ async def _init_db_pool() -> asyncpg.Pool:
         await _migrate(conn)
         await conn.execute(_SCHEMA_SQL)
     log.info("DB pool ready")
+    if _LEDGER_AVAILABLE:
+        await ensure_ledger_schema(pool)
+    log_config_summary(log)
     return pool
 
 
@@ -927,6 +999,7 @@ class ArxivAPI:
 # ============================================================
 
 _openai_client: Optional[AsyncOpenAI] = None
+_anthropic_client = None
 _llm_semaphore: Optional[asyncio.Semaphore] = None
 
 
@@ -939,6 +1012,16 @@ def get_llm_client() -> AsyncOpenAI:
             timeout=httpx.Timeout(timeout=120.0, connect=10.0),
         )
     return _openai_client
+
+
+def get_anthropic_client():
+    global _anthropic_client
+    if _anthropic_client is None and _ANTHROPIC_SDK_AVAILABLE:
+        _anthropic_client = _AsyncAnthropic(
+            api_key=os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY", "replit"),
+            base_url=os.environ.get("AI_INTEGRATIONS_ANTHROPIC_BASE_URL", "https://api.anthropic.com"),
+        )
+    return _anthropic_client
 
 
 def get_llm_semaphore() -> asyncio.Semaphore:
@@ -974,10 +1057,22 @@ async def call_llm(
     retries: int = 2,
     enforce_evidence_firewall: bool = False,
     retrieved_papers: Optional[List[Paper]] = None,
+    channel_name: str = "",        # NEW: route to channel-specific model
+    override_model: str = "",      # NEW: explicit model override
 ) -> str:
-    """Call the LLM with optional evidence firewall enforcement."""
+    """Call the LLM with optional evidence firewall enforcement and channel routing."""
     client = get_llm_client()
     sem = get_llm_semaphore()
+    # Channel-aware model selection
+    if override_model:
+        _channel_model = override_model
+    elif channel_name and _CHANNEL_CONFIG_AVAILABLE:
+        _channel_model = channel_model(channel_name) or MODEL_CHAIN[0]
+    else:
+        _channel_model = MODEL_CHAIN[0]
+    # Channel-aware max_tokens if not caller-specified
+    if channel_name and _CHANNEL_CONFIG_AVAILABLE and max_tokens == 4000:
+        max_tokens = channel_max_tokens(channel_name)
 
     default_system = (
         "You are a rigorous research analyst. Be specific and evidence-based. "
@@ -1007,18 +1102,32 @@ async def call_llm(
         s = str(exc)
         return "UNSUPPORTED_MODEL" in s or '"code": 400' in s or "status_code=400" in s or "Error code: 400" in s
 
-    for model in MODEL_CHAIN:
+    # Use channel-specific model if configured, else fall through MODEL_CHAIN
+    _model_chain = ([_channel_model] + [m for m in MODEL_CHAIN if m != _channel_model]) if _channel_model else MODEL_CHAIN
+    for model in _model_chain:
         last_err = ""
         hard_fail = False
+        _is_claude = model.startswith("claude-")
+        _anthropic = get_anthropic_client() if _is_claude else None
         for attempt in range(retries + 1):
             async with sem:
                 try:
-                    resp = await client.chat.completions.create(
-                        model=model,
-                        max_completion_tokens=max_tokens,
-                        messages=messages,
-                    )
-                    text = resp.choices[0].message.content or ""
+                    if _is_claude and _anthropic is not None:
+                        # Route Claude models through Anthropic SDK
+                        resp_a = await _anthropic.messages.create(
+                            model=model,
+                            max_tokens=max_tokens,
+                            system=system,
+                            messages=[{"role": "user", "content": prompt}],
+                        )
+                        text = resp_a.content[0].text if resp_a.content else ""
+                    else:
+                        resp = await client.chat.completions.create(
+                            model=model,
+                            max_completion_tokens=max_tokens,
+                            messages=messages,
+                        )
+                        text = resp.choices[0].message.content or ""
                     if text:
                         try:
                             _job_models_ctx.get().add(model)
@@ -1119,10 +1228,12 @@ Rules:
         raw = await call_llm(
             prompt,
             system_prompt=(
-                "You are a research design expert. Produce precise, actionable "
+                "You are a research design expert with deep knowledge of academic literature. "
+                "Identify landmark papers and key researchers. Produce precise, actionable "
                 "search design. Return only valid JSON with no markdown fences."
             ),
             max_tokens=2000,
+            channel_name="Stage0",   # routes to Claude for deep academic knowledge
         )
 
         try:
@@ -1458,13 +1569,18 @@ class CogC2_Evidence(BaseChannel):
 
     def __init__(self, semantic_key: Optional[str] = None, email: Optional[str] = None):
         super().__init__(2, "Evidence Acquisition",
-                         "Searches academic databases using Stage 0 routing",
+                         "Searches web (foundational) + academic databases using Stage 0 routing",
                          Pipeline.COGNITIVE)
         self.semantic = SemanticScholarAPI(semantic_key)
         self.openalex = OpenAlexAPI(email)
         self.pubmed = PubMedAPI()
         self.arxiv = ArxivAPI()
         self.crossref = CrossrefAPI()
+        # Web search — the foundational strand. Runs first, finds landmark papers.
+        self._web_connector = None
+        if _WEB_SEARCH_AVAILABLE:
+            from cria_web_search import WebSearchConnector
+            self._web_connector = WebSearchConnector()
         self._api_map = {
             "Semantic Scholar": self.semantic,
             "OpenAlex": self.openalex,
@@ -1485,7 +1601,55 @@ class CogC2_Evidence(BaseChannel):
 
     async def research(self, artefact: ResearchArtefact, context: Dict[str, Any]) -> Finding:
         design: Optional[ResearchDesignRecord] = context.get("design_record")
+        profile = getattr(artefact, "profile", "general_scholarship") or "general_scholarship"
 
+        # ── FOUNDATIONAL WEB SEARCH (runs first, before academic DBs) ──────
+        # Uses Stage 0 landmark paper identification + broad web search.
+        # Finds what academic DBs miss: recent preprints, grey literature,
+        # advocacy sources, and landmark papers by author name.
+        web_papers: List[Paper] = []
+        if self._web_connector and design:
+            try:
+                stage0_queries = list(design.search_strings.values())[:3]
+                raw_web = await self._web_connector.search_with_landmarks(
+                    artefact.research_question,
+                    stage0_queries,
+                    call_llm_fn=lambda p, **kw: call_llm(p, channel_name="Stage0", **kw),
+                    count_per_query=6,
+                )
+                for wp in raw_web:
+                    web_papers.append(Paper(
+                        title=wp.title,
+                        authors=wp.authors if hasattr(wp, "authors") else [],
+                        year=wp.year,
+                        abstract=wp.snippet if hasattr(wp, "snippet") else "",
+                        source=f"Web ({wp.source})",
+                        doi=wp.doi,
+                        cited_by=0,
+                        is_stub=False,
+                    ))
+                log.info("Web search foundation: %d papers", len(web_papers))
+            except Exception as e:
+                log.warning("Web search foundation failed: %s", e)
+
+        # ── ADVOCACY CONNECTORS (profile-specific) ──────────────────────────
+        advocacy_papers: List[Paper] = []
+        if _ADVOCACY_AVAILABLE and profile not in ("general_scholarship", ""):
+            try:
+                raw_adv = await search_advocacy_connectors(
+                    artefact.research_question, profile, limit_per_connector=4, max_connectors=4,
+                )
+                for p in raw_adv:
+                    advocacy_papers.append(Paper(
+                        title=p.title, authors=p.authors, year=p.year,
+                        abstract=p.abstract, source=p.source,
+                        doi=p.doi, cited_by=p.cited_by, is_stub=False,
+                    ))
+                log.info("Advocacy search: %d papers for profile=%s", len(advocacy_papers), profile)
+            except Exception as e:
+                log.warning("Advocacy search failed: %s", e)
+
+        # ── ACADEMIC DATABASE SEARCH ─────────────────────────────────────────
         # Determine which connectors and queries to use
         if design and design.search_strings:
             # Stage 0 routing: use designed queries for selected connectors
@@ -1513,6 +1677,9 @@ class CogC2_Evidence(BaseChannel):
         raw_results = await asyncio.gather(*search_tasks, return_exceptions=True)
 
         all_papers: List[Paper] = []
+        # Web and advocacy results go FIRST (foundational layer)
+        all_papers.extend(web_papers)
+        all_papers.extend(advocacy_papers)
         for r in raw_results:
             if isinstance(r, list):
                 all_papers.extend(r)
@@ -3213,14 +3380,25 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
         result["fallback_used"] = bool(used_list and any(m != MODEL_CHAIN[0] for m in used_list))
         result["primary_model"] = MODEL_CHAIN[0]
         await db_complete_job(job_id, result)
+        # Write ALL outputs to .md files (meta-layer, pipeline papers, etc.)
+        output_files = {}
+        if _OUTPUT_WRITER_AVAILABLE:
+            try:
+                output_files = await write_all_outputs(
+                    result, job_id, artefact.research_question
+                )
+                result["output_files"] = output_files
+            except Exception as oe:
+                log.warning("Output writer error: %s", oe)
         log.info(
-            "Job %s complete — %.1fs — cog:%d epi:%d conv:%d new_experiments:%d",
+            "Job %s complete — %.1fs — cog:%d epi:%d conv:%d new_experiments:%d files:%d",
             job_id,
             result.get("duration_seconds", 0),
             len(result.get("cognitive_pipeline", {}).get("findings", [])),
             len(result.get("epistemic_pipeline", {}).get("findings", [])),
             len(result.get("convergent_pipeline", {}).get("findings", [])),
             len(result.get("new_experiments", [])),
+            len(output_files),
         )
     except (KeyboardInterrupt, SystemExit):
         raise
@@ -3305,7 +3483,7 @@ async def list_experiments(request: Request, status: Optional[str] = None):
 
 @app.get(f"{BASE_PATH}/connectors")
 async def list_connectors():
-    return {
+    base = {
         "total": len(ALL_CONNECTORS),
         "active": len(active_connectors()),
         "inactive": len(inactive_connectors()),
@@ -3324,6 +3502,130 @@ async def list_connectors():
             for c in ALL_CONNECTORS
         ],
     }
+    if _ADVOCACY_AVAILABLE:
+        base["advocacy_registry"] = connector_registry_summary()
+        base["advocacy_total"] = connector_registry_summary().get("total", 0)
+    return base
+
+
+# ── Ultraria endpoint ─────────────────────────────────────────────────────────
+
+class UltraRiaRequest(BaseModel):
+    query: str = Field(..., min_length=10, max_length=4000)
+    cria_job_id: str = Field("", description="Optional CRIA job ID to use as context")
+    observer_note: str = Field("", max_length=500)
+
+
+@app.post(f"{BASE_PATH}/ultraria", dependencies=[Depends(verify_api_key)])
+@limiter.limit("2/minute")
+async def ultraria_endpoint(
+    request: Request,
+    body: UltraRiaRequest,
+    background_tasks: BackgroundTasks,
+):
+    if not _ULTRARIA_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Ultraria module not available")
+    active = active_lane_count()
+    if active < 2:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Ultraria requires at least 2 active lanes. Currently active: {active}. "
+                   "Configure ULTRARIA_* API keys in Replit Secrets.",
+        )
+
+    # Optionally load CRIA result as context
+    cria_result = None
+    if body.cria_job_id and _db_pool:
+        job = await db_get_job(body.cria_job_id)
+        if job and job.get("result"):
+            cria_result = job["result"]
+
+    job_id = str(uuid.uuid4())
+    await db_create_job(job_id, body.query, "ultraria",
+                        getattr(request.state, "request_id", ""))
+
+    async def _run_ultraria():
+        await db_start_job(job_id)
+        try:
+            orch = UltraRiaOrchestrator()
+            result = await orch.run(
+                body.query, cria_result=cria_result, call_llm_fn=call_llm
+            )
+            result_dict = result.to_dict()
+            result_dict["markdown"] = result.to_markdown()
+            # Write markdown output
+            if _OUTPUT_WRITER_AVAILABLE:
+                from cria_output_writer import OUTPUT_DIR, slugify, ts
+                from pathlib import Path
+                slug = slugify(body.query)
+                path = OUTPUT_DIR / f"ULTRARIA-{slug}-{ts()}.md"
+                path.write_text(result.to_markdown(), encoding="utf-8")
+                result_dict["output_file"] = str(path)
+            await db_complete_job(job_id, result_dict)
+            log.info("Ultraria job %s complete — %d lanes completed",
+                     job_id, result.completed_lanes)
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"
+            log.error("Ultraria job %s failed: %s", job_id, err, exc_info=True)
+            await db_fail_job(job_id, err)
+
+    background_tasks.add_task(_run_ultraria)
+    return {
+        "jobId": job_id,
+        "status": "queued",
+        "active_lanes": active,
+        "lane_status": get_lane_status() if _ULTRARIA_AVAILABLE else {},
+    }
+
+
+@app.get(f"{BASE_PATH}/ultraria/lanes")
+@limiter.limit("20/minute")
+async def ultraria_lane_status(request: Request):
+    if not _ULTRARIA_AVAILABLE:
+        return {"available": False}
+    return {
+        "available": True,
+        "active_count": active_lane_count(),
+        "lanes": get_lane_status(),
+    }
+
+
+# ── Recalibration endpoint ────────────────────────────────────────────────────
+
+@app.post(f"{BASE_PATH}/connectors/recalibrate", dependencies=[Depends(verify_api_key)])
+async def trigger_recalibration():
+    if not _LEDGER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Connector ledger not available")
+    agent = RecalibrationAgent()
+    report = await agent.generate_report(_db_pool)
+    return report or {"status": "no_data"}
+
+
+@app.get(f"{BASE_PATH}/connectors/performance")
+@limiter.limit("20/minute")
+async def connector_performance(request: Request):
+    if not _LEDGER_AVAILABLE or not _db_pool:
+        return {"available": False, "matrix": []}
+    matrix = await get_connector_performance_matrix(_db_pool)
+    return {"available": True, "entries": len(matrix), "matrix": matrix[:50]}
+
+
+# ── Output files endpoint ─────────────────────────────────────────────────────
+
+@app.get(f"{BASE_PATH}/outputs")
+@limiter.limit("30/minute")
+async def list_outputs(request: Request, q: str = ""):
+    if not _OUTPUT_WRITER_AVAILABLE:
+        return {"available": False, "files": []}
+    from cria_output_writer import OUTPUT_DIR, slugify, get_output_files_list
+    if q:
+        files = get_output_files_list(slugify(q))
+    else:
+        files = [
+            {"filename": p.name, "path": str(p), "size_kb": round(p.stat().st_size / 1024, 1)}
+            for p in sorted(OUTPUT_DIR.glob("*.md"), key=lambda f: f.stat().st_mtime, reverse=True)[:50]
+        ]
+    return {"available": True, "count": len(files), "files": files}
 
 
 @app.get(f"{BASE_PATH}/health")

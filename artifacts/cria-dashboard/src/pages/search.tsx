@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useSearchFindings } from "@workspace/api-client-react";
+import { useSearchFindings, getSearchFindingsQueryKey } from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +37,7 @@ export default function SearchPage() {
 
   const { data, isLoading, isFetching } = useSearchFindings(
     { q, limit: 30 },
-    { query: { enabled: q.trim().length >= 2 } }
+    { query: { queryKey: getSearchFindingsQueryKey({ q, limit: 30 }), enabled: q.trim().length >= 2 } }
   );
 
   return (

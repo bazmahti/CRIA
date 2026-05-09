@@ -6,7 +6,8 @@ import { SearchFindingsQueryParams, SearchFindingsResponse } from "@workspace/ap
 
 const router: IRouter = Router();
 
-router.get("/search", async (req, res) => {
+router.get("/search", async (req, res, next) => {
+  try {
   const params = SearchFindingsQueryParams.safeParse(req.query);
   if (!params.success) {
     res.status(400).json({ error: "Invalid query params" });
@@ -60,7 +61,8 @@ router.get("/search", async (req, res) => {
       or(
         ilike(researchJobsTable.questionText, term),
         ilike(researchJobsTable.errorText, term),
-        sql`${researchJobsTable.resultJson}::text ILIKE ${term}`,
+        // NOTE: resultJson JSONB cast removed — too slow on large result sets.
+        // Question text search covers the primary use case.
       )
     )
     .orderBy(desc(researchJobsTable.createdAt))
@@ -133,6 +135,7 @@ router.get("/search", async (req, res) => {
     results: results.slice(0, limit),
   });
   res.json(response);
+  } catch (err) { next(err); }
 });
 
 export default router;

@@ -40,7 +40,7 @@ export default function FindingsPage() {
                     <span className="text-xs font-medium text-green-300">{f.theme}</span>
                     <span className="text-[10px] text-green-400/60">{f.strength}</span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">{f.experiments.length} experiment{f.experiments.length !== 1 ? "s" : ""}</p>
+                  <p className="text-[10px] text-muted-foreground">{f.experiments?.length ?? 0} experiment{(f.experiments?.length ?? 0) !== 1 ? "s" : ""}</p>
                 </div>
               ))}
             </CardContent>
@@ -63,7 +63,7 @@ export default function FindingsPage() {
                     <span className="text-xs font-medium text-yellow-300">{f.theme}</span>
                     <span className="text-[10px] text-yellow-400/60">{f.tension} tension</span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">{f.experiments.length} experiment{f.experiments.length !== 1 ? "s" : ""}</p>
+                  <p className="text-[10px] text-muted-foreground">{f.experiments?.length ?? 0} experiment{(f.experiments?.length ?? 0) !== 1 ? "s" : ""}</p>
                 </div>
               ))}
             </CardContent>
