@@ -786,7 +786,7 @@ This should be:
 
 State it boldly and explain why it only becomes visible at this integrative level."""
 
-        response = await call_llm(prompt, model="gpt-5-mini")
+        response = await call_llm(prompt, model=_DEFAULT_MODEL)
         finding = Finding(
             content=f"[META-LAYER EMERGENT INSIGHT]\n\n{response}",
             source_channel="Meta-Layer",
@@ -1080,21 +1080,21 @@ Write a coherent, scholarly synthesis that:
 
 Write at doctoral seminar quality. Be substantive and specific."""
 
-        return await call_llm(prompt, model="gpt-5-mini")
+        return await call_llm(prompt, model=_DEFAULT_MODEL)
 
     async def _generate_paper(self, query: str, synthesis: str) -> Dict[str, str]:
         abstract, findings_bullets, conclusion = await asyncio.gather(
             call_llm(
                 f'Write a structured 200-word research abstract for: "{query}"\n\nBased on this synthesis:\n{synthesis[:600]}\n\nInclude: background, methods (multi-database search + multi-agent analysis), key findings, and implications.',
-                model="gpt-5-mini"
+                model=_DEFAULT_MODEL
             ),
             call_llm(
                 f'From this research synthesis on "{query}", extract 4-6 specific, falsifiable key findings as numbered bullet points. Each should include a confidence qualifier (e.g., "strong evidence", "limited evidence", "contested").\n\nSynthesis:\n{synthesis[:800]}',
-                model="gpt-5-mini"
+                model=_DEFAULT_MODEL
             ),
             call_llm(
                 f'Write a research conclusion for "{query}" covering: (1) what we now know with confidence, (2) key limitations of this analysis, (3) most important next research steps, (4) practical recommendations.\n\nSynthesis:\n{synthesis[:600]}',
-                model="gpt-5-mini"
+                model=_DEFAULT_MODEL
             )
         )
 

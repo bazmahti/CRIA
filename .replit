@@ -55,3 +55,8 @@ externalPort = 3000
 [nix]
 channel = "stable-25_05"
 packages = ["libxcrypt", "xcodebuild", "zlib"]
+
+[userenv]
+
+[userenv.shared]
+CRIA_MODEL_NAME = "gpt-5.1"
