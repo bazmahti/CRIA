@@ -138,6 +138,9 @@ class QuestionAnalysis:
     suggested_question_variants: List[str] = field(default_factory=list)
     # 2-3 complete alternative question formulations synthesising the improvements
     # These are starting points, not prescriptions — researcher modifies freely
+    iteration_recommendation: int = 2          # 1, 2, or 3
+    iteration_reasoning: str = ""              # plain-language explanation
+    estimated_cost_range: str = ""             # e.g. "AUD $1.50–2.50"
     analysis_note: str = (
         "This analysis is for your information only. Each suggestion below can be "
         "applied or ignored independently. Use the refinement builder at the bottom "
@@ -195,6 +198,9 @@ class QuestionAnalysis:
             "cria_readiness": self.cria_readiness,
             "readiness_explanation": self.readiness_explanation,
             "suggested_question_variants": self.suggested_question_variants,
+            "iteration_recommendation": self.iteration_recommendation,
+            "iteration_reasoning": self.iteration_reasoning,
+            "estimated_cost_range": self.estimated_cost_range,
             "analysis_note": self.analysis_note,
         }
 
@@ -287,7 +293,10 @@ Return ONLY valid JSON with this exact structure:
     "complete alternative question incorporating the most important improvements",
     "second complete alternative with a different framing emphasis",
     "third variant if there is a meaningfully different third approach — else omit"
-  ]
+  ],
+  "iteration_recommendation": 1,
+  "iteration_reasoning": "plain-language explanation of why this iteration count — mention cost implications honestly",
+  "estimated_cost_range": "AUD $X.XX–X.XX per run at this iteration count"
 }}
 
 Rules:
@@ -314,6 +323,23 @@ Rules:
 - cria_readiness: "ready" = proceed as is. "refine_recommended" = would benefit from
   clarification but will produce useful output either way.
   "refine_strongly_recommended" = the question as stated will likely produce poor results.
+- iteration_recommendation: recommend 1, 2, or 3 iterations based on this logic:
+    1 = well-scoped question, good existing literature, single-domain, exploratory.
+      Cost: approximately AUD $0.80–1.50. Use for: first-pass research, topic surveys,
+      questions with obvious literature.
+    2 = multi-domain question, some sparse areas, substantive research needed.
+      Cost: approximately AUD $1.50–2.50. Use for: most research questions.
+      This is the recommended default.
+    3 = frame-extinction or absence-mapping question, cross-tradition synthesis,
+      sovereign-territory questions, publication-grade research, questions where
+      the important findings are in what is NOT in the literature.
+      Cost: approximately AUD $3.00–5.00. Only recommend when the question
+      genuinely requires it — be honest about the cost.
+  iteration_reasoning: 1-2 sentences in plain language explaining why this count,
+    mentioning cost explicitly. E.g. "This is a multi-domain question crossing
+    economics and Indigenous philosophy — 2 iterations will retrieve the core
+    literature without unnecessary cost (est. AUD $1.50–2.50)."
+  estimated_cost_range: format as "AUD $X.XX–X.XX" for the recommended iteration count.
 
 Return ONLY valid JSON. No preamble, no markdown fences."""
 
@@ -324,23 +350,17 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
         "answer. You never rewrite questions — you illuminate them."
     )
 
-    # Use Anthropic API directly if key is available — avoids OpenAI proxy 400 on Claude names
-    if _ANTHROPIC_KEY:
-        try:
-            raw = await _call_anthropic_direct(_system, prompt, max_tokens=3000)
-            log.info("QuestionAnalyser: used Anthropic direct API (%s)", _ANTHROPIC_MODEL)
-        except Exception as e:
-            log.warning("Anthropic direct call failed (%s) — falling back to call_llm_fn: %s",
-                        _ANTHROPIC_MODEL, e)
-            raw = await call_llm_fn(prompt, system_prompt=_system, max_tokens=3000)
-    else:
-        log.info("QuestionAnalyser: ANTHROPIC_API_KEY not set — using call_llm_fn fallback")
-        raw = await call_llm_fn(
-            prompt,
-            system_prompt=_system,
-            max_tokens=3000,
-            channel_name="Stage0",
-        )
+    # Route through the Replit AI proxy (same path as all other CRIA channels).
+    # The CLAUDE_MODEL secret is already set correctly (claude-sonnet-4-5-20250929)
+    # and the proxy accepts it. This avoids any ANTHROPIC_API_KEY issues entirely.
+    # The channel_name="Stage0" routes to Claude via cria_channel_config.py.
+    raw = await call_llm_fn(
+        prompt,
+        system_prompt=_system,
+        max_tokens=3000,
+        channel_name="Stage0",
+    )
+    log.info("QuestionAnalyser: used proxy path (channel=Stage0, model=%s)", _ANTHROPIC_MODEL)
 
     try:
         # Strip any markdown fences
@@ -469,6 +489,39 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
                 f"{question.rstrip('?')} — with particular attention to empirical evidence and dissenting perspectives?",
             ]
 
+    # Iteration recommendation with fallback logic
+    raw_iter = data.get("iteration_recommendation", 2)
+    try:
+        iter_rec = int(raw_iter)
+        iter_rec = max(1, min(3, iter_rec))  # clamp 1–3
+    except (TypeError, ValueError):
+        iter_rec = 2
+
+    # Fallback reasoning if LLM didn't provide it
+    iter_reasoning = data.get("iteration_reasoning", "")
+    if not iter_reasoning:
+        cost_map = {1: "AUD $0.80–1.50", 2: "AUD $1.50–2.50", 3: "AUD $3.00–5.00"}
+        scope_assessment = scope.assessment
+        if scope_assessment == "too_broad":
+            iter_rec = 1
+            iter_reasoning = "Question is too broad — narrow it first, then run 1 iteration to test the reformulation. Running more iterations on an unfocused question wastes credits."
+        elif scope_assessment == "likely_absence":
+            iter_rec = 3
+            iter_reasoning = "This question is likely to return sparse evidence — 3 iterations needed to exhaust retrieval strategies and properly document the confirmed absence (est. AUD $3.00–5.00)."
+        elif scope_assessment == "sovereign_territory":
+            iter_rec = 2
+            iter_reasoning = "Sovereign-territory questions require partnership, not iteration. 2 iterations retrieves available academic literature while documenting the sovereignty gap (est. AUD $1.50–2.50)."
+        elif len(vocab_clusters) >= 3 and len(ambiguity_flags) >= 2:
+            iter_rec = 2
+            iter_reasoning = "Multi-domain question with significant vocabulary variation. 2 iterations will retrieve the core literature across disciplines without unnecessary cost (est. AUD $1.50–2.50)."
+        else:
+            iter_reasoning = f"Standard question with clear scope. {iter_rec} iteration{'s' if iter_rec > 1 else ''} recommended (est. {cost_map.get(iter_rec, 'AUD $1.50–2.50')})."
+
+    cost_range = data.get("estimated_cost_range", "")
+    if not cost_range:
+        cost_map = {1: "AUD $0.80–1.50", 2: "AUD $1.50–2.50", 3: "AUD $3.00–5.00"}
+        cost_range = cost_map.get(iter_rec, "AUD $1.50–2.50")
+
     return QuestionAnalysis(
         original_question=question,
         vocabulary_clusters=vocab_clusters,
@@ -481,4 +534,7 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
         cria_readiness=data.get("cria_readiness", "ready"),
         readiness_explanation=data.get("readiness_explanation", ""),
         suggested_question_variants=variants,
+        iteration_recommendation=iter_rec,
+        iteration_reasoning=iter_reasoning,
+        estimated_cost_range=cost_range,
     )
