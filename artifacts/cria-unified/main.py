@@ -148,6 +148,13 @@ except ImportError:
     _ANALYSER_AVAILABLE = False
 
 try:
+    from cria_extended_apis import EXTENDED_API_MAP, get_extended_api_status
+    _EXTENDED_APIS_AVAILABLE = True
+except ImportError:
+    _EXTENDED_APIS_AVAILABLE = False
+    EXTENDED_API_MAP = {}
+
+try:
     from cria_health_connectors import (
         search_health_connectors, health_registry_summary,
         ALL_HEALTH_CONNECTORS, STRUCTURED_HEALTH_APIS,
@@ -1745,7 +1752,43 @@ HEALTH_CONNECTOR_SPECS: List[ConnectorSpec] = [
                   notes="UK clinical guidelines and evidence search"),
 ]
 
-ALL_CONNECTORS = COGNITIVE_CONNECTORS + EPISTEMIC_CONNECTORS + ADVOCACY_CONNECTOR_SPECS + HEALTH_CONNECTOR_SPECS
+
+EXTENDED_API_SPECS: List[ConnectorSpec] = [
+    ConnectorSpec("CORE", "https://api.core.ac.uk/v3",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="200M+ open access papers, institutional repos — working papers, theses"),
+    ConnectorSpec("PhilPapers", "https://philpapers.org",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Philosophy, ethics, social theory, consciousness studies"),
+    ConnectorSpec("BASE (Bielefeld)", "https://api.base-search.net",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="350M+ docs, non-Anglophone literature, 10000+ content providers"),
+    ConnectorSpec("SSRN", "https://ssrn.com",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Economics, law, political science preprints — working paper corpus"),
+    ConnectorSpec("Semantic Scholar (enhanced)", "https://api.semanticscholar.org/graph/v1",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE],
+                  notes="Author-specific queries and citation graph — retrieves full publication lists"),
+    ConnectorSpec("PubChem", "https://pubchem.ncbi.nlm.nih.gov",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE],
+                  notes="Biochemistry, neuropharmacology, psychedelic research compounds"),
+    ConnectorSpec("Dimensions", "https://app.dimensions.ai",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Policy docs, govt reports, grey literature — free key: DIMENSIONS_API_KEY"),
+    ConnectorSpec("NASA ADS", "https://api.adsabs.harvard.edu/v1",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.BRIDGE,
+                  [Pipeline.COGNITIVE],
+                  notes="Complexity science, physics of information, quantum cognition — free key: NASA_ADS_API_KEY"),
+]
+
+ALL_CONNECTORS = COGNITIVE_CONNECTORS + EPISTEMIC_CONNECTORS + ADVOCACY_CONNECTOR_SPECS + HEALTH_CONNECTOR_SPECS + EXTENDED_API_SPECS
 
 
 def active_connectors() -> List[ConnectorSpec]:
@@ -2548,11 +2591,70 @@ class CogC2_Evidence(BaseChannel):
             "Crossref": self.crossref,
         }
 
+        # ── Wire advocacy and health connectors into the search map ──────────
+        # These are TargetedWebConnectors from cria_advocacy_connectors.py and
+        # cria_health_connectors.py. Build a unified name→connector lookup so
+        # when Stage 0 selects "INET" or "Stockholm Resilience Centre" the
+        # search actually executes rather than silently returning empty.
+        if _ADVOCACY_AVAILABLE:
+            try:
+                from cria_advocacy_connectors import ALL_ADVOCACY_CONNECTORS
+                from cria_health_connectors import ALL_HEALTH_CONNECTORS
+                all_targeted = ALL_ADVOCACY_CONNECTORS + ALL_HEALTH_CONNECTORS
+                for conn in all_targeted:
+                    name = getattr(conn, "source_name", None)
+                    if name and name not in self._api_map:
+                        self._api_map[name] = conn
+                log.info("CogC2: wired %d advocacy/health connectors into _api_map",
+                         len(all_targeted))
+            except Exception as e:
+                log.warning("CogC2: failed to wire advocacy connectors: %s", e)
+
+        # Wire structured extended API connectors (CORE, PhilPapers, BASE, SSRN etc.)
+        if _EXTENDED_APIS_AVAILABLE:
+            try:
+                for name, connector in EXTENDED_API_MAP.items():
+                    if name not in self._api_map:
+                        self._api_map[name] = connector
+                status = get_extended_api_status()
+                active = [k for k, v in status.items()
+                         if isinstance(v, bool) and v and k != "missing_keys"]
+                missing = status.get("missing_keys", [])
+                log.info("CogC2: wired %d extended API connectors. Active: %s",
+                         len(EXTENDED_API_MAP), ", ".join(active))
+                if missing:
+                    log.info("CogC2: extended APIs needing keys: %s", ", ".join(missing))
+            except Exception as e:
+                log.warning("CogC2: failed to wire extended APIs: %s", e)
+
     async def _search_connector(self, connector_name: str, query: str) -> List[Paper]:
         api = self._api_map.get(connector_name)
         if api is None:
+            log.debug("CogC2: no implementation for connector '%s' — skipping", connector_name)
             return []
         try:
+            # TargetedWebConnector returns Paper-compatible objects (not main.py Paper)
+            # Convert them to main.py Paper objects
+            if hasattr(api, "source_name"):  # is a TargetedWebConnector
+                raw_results = await api.search(query, limit=8)
+                converted = []
+                for r in raw_results:
+                    try:
+                        converted.append(Paper(
+                            title=getattr(r, "title", ""),
+                            authors=getattr(r, "authors", []),
+                            year=getattr(r, "year", ""),
+                            abstract=getattr(r, "abstract", "")[:500],
+                            source=getattr(r, "source", connector_name),
+                            doi=getattr(r, "doi", ""),
+                            cited_by=getattr(r, "cited_by", 0),
+                            is_stub=False,
+                        ))
+                    except Exception:
+                        pass
+                log.info("CogC2: %s returned %d results via web connector",
+                         connector_name, len(converted))
+                return converted
             return await api.search(query, limit=6) if hasattr(api, 'search') else []
         except Exception as e:
             log.warning("Connector %s failed: %s", connector_name, e)

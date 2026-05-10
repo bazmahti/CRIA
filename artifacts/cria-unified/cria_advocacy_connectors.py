@@ -439,6 +439,30 @@ NEW_ECONOMY_CONNECTORS = [
                          "Pluriverse", "Post-development alternatives and cosmovisions"),
 ]
 
+# ── Economics research repositories (wired directly into CogC2) ──────────────
+# These are the databases that hold the MMT/post-Keynesian working paper corpus.
+# RepEc is the primary repository for heterodox economics — Wray, Mitchell,
+# Mosler, Watts, and Juniper's Newcastle working papers all live here.
+
+ECONOMICS_RESEARCH_CONNECTORS = [
+    TargetedWebConnector("repec.org",
+                         "RepEc", "Research Papers in Economics — primary heterodox economics repository"),
+    TargetedWebConnector("ideas.repec.org",
+                         "IDEAS/RepEc", "MMT and post-Keynesian working papers — Wray, Mitchell, Mosler, Watts"),
+    TargetedWebConnector("ineteconomics.org/research",
+                         "INET Research", "Institute for New Economic Thinking — heterodox economics research"),
+    TargetedWebConnector("levy.org/publications",
+                         "Levy Economics Institute", "Post-Keynesian research — Minsky, Wray, Kelton working papers"),
+    TargetedWebConnector("billmitchell.org",
+                         "Bill Mitchell MMT", "Modern Monetary Theory — Mitchell's research and publications"),
+    TargetedWebConnector("heteconomist.com",
+                         "Het Economist", "Heterodox economics research and commentary"),
+    TargetedWebConnector("progressive.economy.eu",
+                         "Progressive Economy Forum", "European heterodox and post-Keynesian economics"),
+    TargetedWebConnector("newcastle.edu.au/research/centre/cers",
+                         "Newcastle CERS", "Centre for Economics and Resource Studies — Juniper, Watts publications"),
+]
+
 
 # ── AI Alignment and Safety ──────────────────────────────────────────────────
 
@@ -558,6 +582,7 @@ ALL_ADVOCACY_CONNECTORS = (
     + DEMOCRACY_CONNECTORS
     + NEURODIVERSITY_CONNECTORS
     + CIVILISATIONAL_CONNECTORS
+    + ECONOMICS_RESEARCH_CONNECTORS
 )
 
 
@@ -593,13 +618,14 @@ def get_connectors_for_profile(profile: str) -> List:
             + CIVILISATIONAL_CONNECTORS[:4]
         ),
         "food_sovereignty": FOOD_SOVEREIGNTY_CONNECTORS + ENVIRONMENTAL_CONNECTORS[13:17],
-        "new_economy": NEW_ECONOMY_CONNECTORS + [owid],
+        "new_economy": NEW_ECONOMY_CONNECTORS + ECONOMICS_RESEARCH_CONNECTORS + [owid],
         "ai_alignment": AI_ALIGNMENT_CONNECTORS + [alignment_forum],
         "neurodiversity_health": NEURODIVERSITY_CONNECTORS,
         "democracy_governance": DEMOCRACY_CONNECTORS,
         "civilisational_academic": (
             CIVILISATIONAL_CONNECTORS
             + NEW_ECONOMY_CONNECTORS[:4]
+            + ECONOMICS_RESEARCH_CONNECTORS[:4]
             + ENVIRONMENTAL_CONNECTORS[:4]
         ),
         "post_ai_flourishing": (
