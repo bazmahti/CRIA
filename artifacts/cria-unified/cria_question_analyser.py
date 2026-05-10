@@ -350,23 +350,17 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
         "answer. You never rewrite questions — you illuminate them."
     )
 
-    # Use Anthropic API directly if key is available — avoids OpenAI proxy 400 on Claude names
-    if _ANTHROPIC_KEY:
-        try:
-            raw = await _call_anthropic_direct(_system, prompt, max_tokens=3000)
-            log.info("QuestionAnalyser: used Anthropic direct API (%s)", _ANTHROPIC_MODEL)
-        except Exception as e:
-            log.warning("Anthropic direct call failed (%s) — falling back to call_llm_fn: %s",
-                        _ANTHROPIC_MODEL, e)
-            raw = await call_llm_fn(prompt, system_prompt=_system, max_tokens=3000)
-    else:
-        log.info("QuestionAnalyser: ANTHROPIC_API_KEY not set — using call_llm_fn fallback")
-        raw = await call_llm_fn(
-            prompt,
-            system_prompt=_system,
-            max_tokens=3000,
-            channel_name="Stage0",
-        )
+    # Route through the Replit AI proxy (same path as all other CRIA channels).
+    # The CLAUDE_MODEL secret is already set correctly (claude-sonnet-4-5-20250929)
+    # and the proxy accepts it. This avoids any ANTHROPIC_API_KEY issues entirely.
+    # The channel_name="Stage0" routes to Claude via cria_channel_config.py.
+    raw = await call_llm_fn(
+        prompt,
+        system_prompt=_system,
+        max_tokens=3000,
+        channel_name="Stage0",
+    )
+    log.info("QuestionAnalyser: used proxy path (channel=Stage0, model=%s)", _ANTHROPIC_MODEL)
 
     try:
         # Strip any markdown fences
