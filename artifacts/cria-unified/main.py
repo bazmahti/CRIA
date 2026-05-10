@@ -148,6 +148,13 @@ except ImportError:
     _ANALYSER_AVAILABLE = False
 
 try:
+    from cria_extended_apis import EXTENDED_API_MAP, get_extended_api_status
+    _EXTENDED_APIS_AVAILABLE = True
+except ImportError:
+    _EXTENDED_APIS_AVAILABLE = False
+    EXTENDED_API_MAP = {}
+
+try:
     from cria_health_connectors import (
         search_health_connectors, health_registry_summary,
         ALL_HEALTH_CONNECTORS, STRUCTURED_HEALTH_APIS,
@@ -1745,7 +1752,43 @@ HEALTH_CONNECTOR_SPECS: List[ConnectorSpec] = [
                   notes="UK clinical guidelines and evidence search"),
 ]
 
-ALL_CONNECTORS = COGNITIVE_CONNECTORS + EPISTEMIC_CONNECTORS + ADVOCACY_CONNECTOR_SPECS + HEALTH_CONNECTOR_SPECS
+
+EXTENDED_API_SPECS: List[ConnectorSpec] = [
+    ConnectorSpec("CORE", "https://api.core.ac.uk/v3",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="200M+ open access papers, institutional repos — working papers, theses"),
+    ConnectorSpec("PhilPapers", "https://philpapers.org",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.COUNTER,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Philosophy, ethics, social theory, consciousness studies"),
+    ConnectorSpec("BASE (Bielefeld)", "https://api.base-search.net",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="350M+ docs, non-Anglophone literature, 10000+ content providers"),
+    ConnectorSpec("SSRN", "https://ssrn.com",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Economics, law, political science preprints — working paper corpus"),
+    ConnectorSpec("Semantic Scholar (enhanced)", "https://api.semanticscholar.org/graph/v1",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE],
+                  notes="Author-specific queries and citation graph — retrieves full publication lists"),
+    ConnectorSpec("PubChem", "https://pubchem.ncbi.nlm.nih.gov",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE],
+                  notes="Biochemistry, neuropharmacology, psychedelic research compounds"),
+    ConnectorSpec("Dimensions", "https://app.dimensions.ai",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.MAIN,
+                  [Pipeline.COGNITIVE, Pipeline.EPISTEMIC],
+                  notes="Policy docs, govt reports, grey literature — free key: DIMENSIONS_API_KEY"),
+    ConnectorSpec("NASA ADS", "https://api.adsabs.harvard.edu/v1",
+                  PositionPrivileged.CREDENTIALED_RESEARCH, DissonanceRole.BRIDGE,
+                  [Pipeline.COGNITIVE],
+                  notes="Complexity science, physics of information, quantum cognition — free key: NASA_ADS_API_KEY"),
+]
+
+ALL_CONNECTORS = COGNITIVE_CONNECTORS + EPISTEMIC_CONNECTORS + ADVOCACY_CONNECTOR_SPECS + HEALTH_CONNECTOR_SPECS + EXTENDED_API_SPECS
 
 
 def active_connectors() -> List[ConnectorSpec]:
@@ -2566,6 +2609,23 @@ class CogC2_Evidence(BaseChannel):
                          len(all_targeted))
             except Exception as e:
                 log.warning("CogC2: failed to wire advocacy connectors: %s", e)
+
+        # Wire structured extended API connectors (CORE, PhilPapers, BASE, SSRN etc.)
+        if _EXTENDED_APIS_AVAILABLE:
+            try:
+                for name, connector in EXTENDED_API_MAP.items():
+                    if name not in self._api_map:
+                        self._api_map[name] = connector
+                status = get_extended_api_status()
+                active = [k for k, v in status.items()
+                         if isinstance(v, bool) and v and k != "missing_keys"]
+                missing = status.get("missing_keys", [])
+                log.info("CogC2: wired %d extended API connectors. Active: %s",
+                         len(EXTENDED_API_MAP), ", ".join(active))
+                if missing:
+                    log.info("CogC2: extended APIs needing keys: %s", ", ".join(missing))
+            except Exception as e:
+                log.warning("CogC2: failed to wire extended APIs: %s", e)
 
     async def _search_connector(self, connector_name: str, query: str) -> List[Paper]:
         api = self._api_map.get(connector_name)
