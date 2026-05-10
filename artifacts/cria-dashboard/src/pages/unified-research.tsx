@@ -778,12 +778,21 @@ export default function UnifiedResearch() {
                 <label className="block text-[10px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Iterations</label>
                 <select
                   value={iterations}
-                  onChange={(e) => setIterations(Number(e.target.value))}
+                  onChange={(e) => {
+                    setIterations(Number(e.target.value));
+                  }}
                   className="w-full bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-xs focus:outline-none"
                 >
-                  <option value={1}>1 (~3–5 min)</option>
-                  <option value={2}>2 (~6–10 min)</option>
+                  <option value={1}>1 — Exploratory · ~3–5 min · AUD $0.80–1.50</option>
+                  <option value={2}>2 — Standard · ~6–10 min · AUD $1.50–2.50</option>
+                  <option value={3}>3 — Publication-grade · ~12–18 min · AUD $3–5</option>
                 </select>
+                {/* Iteration set automatically by analyser — override above if needed */}
+                {analysis?.iteration_recommendation && (
+                  <div className="mt-1 text-[10px] text-muted-foreground">
+                    Set by analyser · adjust above if needed
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-[10px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Dissonance Budget</label>
@@ -1090,6 +1099,10 @@ export default function UnifiedResearch() {
                     setAnalysis(data);
                     setConfirmedQuery(query);
                     setRefinedQuestion(query);
+                    // Auto-apply iteration recommendation
+                    if (data.iteration_recommendation && [1, 2, 3].includes(data.iteration_recommendation)) {
+                      setIterations(data.iteration_recommendation);
+                    }
                   } catch (e) {
                     setAnalysisError(e instanceof Error ? e.message : String(e));
                   } finally {
