@@ -562,6 +562,209 @@ class IUCNConnectorV2:
                 return []
 
 
+
+
+# ── RepEc / IDEAS Dedicated API Client ───────────────────────────────────────
+# The Research Papers in Economics repository.
+# Two endpoints:
+#   1. IDEAS full-text search API (no key required)
+#   2. Author-specific queries by RepEc short-ID (e.g. "pwr6" for Wray)
+# This is the primary repository for MMT and post-Keynesian working papers.
+# Wray, Mitchell, Mosler, Watts, Kelton, and Juniper all have author profiles.
+
+class RePEcConnector:
+    IDEAS_SEARCH = "https://ideas.repec.org/cgi-bin/htsearch"
+    REPEC_API = "https://api.repec.org/call.pl"
+    SOURCE = "IDEAS/RepEc"
+
+    # Known author short-IDs for MMT/post-Keynesian economists
+    # These enable direct author-publication queries
+    KNOWN_AUTHORS = {
+        "wray": "pwr6",
+        "l. randall wray": "pwr6",
+        "randall wray": "pwr6",
+        "mitchell": "pmi148",
+        "bill mitchell": "pmi148",
+        "william mitchell": "pmi148",
+        "mosler": "pmo370",
+        "warren mosler": "pmo370",
+        "kelton": "pke19",
+        "stephanie kelton": "pke19",
+        "watts": "pwa434",
+        "martin watts": "pwa434",
+        "juniper": "pju1",
+        "james juniper": "pju1",
+    }
+
+    def _find_author_id(self, query: str) -> str | None:
+        q_lower = query.lower().strip()
+        for name, author_id in self.KNOWN_AUTHORS.items():
+            if name in q_lower:
+                return author_id
+        return None
+
+    async def get_author_papers(self, author_id: str, limit: int = 8) -> List[Paper]:
+        """Retrieve papers by RepEc author short-ID."""
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            try:
+                resp = await client.get(
+                    self.REPEC_API,
+                    params={
+                        "code": f"jel:author:{author_id}",
+                        "fmt": "json",
+                    },
+                    headers={"User-Agent": "CRIA-Research/2.0"},
+                )
+                results = []
+                data = resp.json() if resp.status_code == 200 else {}
+                for item in data.get("result", [])[:limit]:
+                    title = _clean(item.get("title", ""))
+                    abstract = _clean(item.get("abstract", "") or "")
+                    authors = item.get("author-name", [])
+                    if isinstance(authors, str):
+                        authors = [authors]
+                    year = str(item.get("year", ""))[:4]
+                    doi = _clean(item.get("doi", "") or "", 200)
+                    handle = item.get("handle", "")
+                    url = f"https://ideas.repec.org/{handle}" if handle else ""
+                    if title:
+                        results.append(Paper(
+                            title=title, authors=authors, year=year,
+                            abstract=abstract, source=self.SOURCE,
+                            doi=doi or url,
+                        ))
+                log.info("RePEc author %s: %d papers", author_id, len(results))
+                return results
+            except Exception as e:
+                log.warning("RePEc author query error: %s", e)
+                return []
+
+    async def search_ideas(self, query: str, limit: int = 8) -> List[Paper]:
+        """Search IDEAS full-text index."""
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            try:
+                resp = await client.get(
+                    self.IDEAS_SEARCH,
+                    params={
+                        "q": query,
+                        "ul": "ideas.repec.org",
+                        "format": "brief",
+                        "config": "htdig",
+                        "restrict": "",
+                        "exclude": "",
+                    },
+                    headers={"User-Agent": "CRIA-Research/2.0"},
+                )
+                # Parse HTML response — IDEAS doesn't have a JSON API
+                text = resp.text
+                import re as _re
+                # Extract paper titles and links
+                titles = _re.findall(
+                    r'<a href="(/[a-z]/[^"]+)"[^>]*>([^<]+)</a>', text
+                )
+                results = []
+                for handle, title in titles[:limit]:
+                    clean_title = title.strip()
+                    if clean_title and len(clean_title) > 10:
+                        results.append(Paper(
+                            title=clean_title, authors=[], year="",
+                            abstract="",
+                            source=self.SOURCE,
+                            doi=f"https://ideas.repec.org{handle}",
+                        ))
+                log.info("IDEAS search: %d results for '%s'", len(results), query[:50])
+                return results
+            except Exception as e:
+                log.warning("IDEAS search error: %s", e)
+                return []
+
+    async def search(self, query: str, limit: int = 8) -> List[Paper]:
+        """Route to author query if author name detected, else IDEAS search."""
+        author_id = self._find_author_id(query)
+        if author_id:
+            log.info("RePEc: routing to author query for ID '%s'", author_id)
+            results = await self.get_author_papers(author_id, limit)
+            if results:
+                return results
+        return await self.search_ideas(query, limit)
+
+
+# ── IUCN Red List (updated to new API endpoint) ──────────────────────────────
+# Previous version used deprecated apiv3.iucnredlist.org.
+# New API: api.iucnredlist.org (documented at api.iucnredlist.org/api-docs)
+# Key registration: api.iucnredlist.org/users/sign_up
+# Secret name updated to match rOpenSci rredlist convention: IUCN_REDLIST_KEY
+
+class IUCNConnectorV3:
+    BASE = "https://api.iucnredlist.org/api/v4"
+    SOURCE = "IUCN Red List"
+
+    def __init__(self):
+        # Accept both naming conventions for the secret
+        self._key = (
+            os.environ.get("IUCN_REDLIST_KEY", "") or
+            os.environ.get("IUCN_API_KEY", "")
+        )
+
+    def available(self) -> bool:
+        return bool(self._key)
+
+    async def search(self, query: str, limit: int = 6) -> List[Paper]:
+        if not self.available():
+            return []
+        headers = {
+            "Authorization": self._key,
+            "Accept": "application/json",
+        }
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            try:
+                resp = await client.get(
+                    f"{self.BASE}/taxa/search",
+                    params={"query": query[:50], "page": 1},
+                    headers=headers,
+                )
+                results = []
+                data = resp.json() if resp.status_code == 200 else {}
+                for item in data.get("taxa", [])[:limit]:
+                    name = item.get("scientific_name", "")
+                    status = item.get("red_list_category", {}).get("code", "")
+                    desc = item.get("red_list_category", {}).get("name", "")
+                    taxon_id = item.get("taxon_id", "")
+                    if name:
+                        results.append(Paper(
+                            title=f"{name} — IUCN Red List {status}",
+                            authors=["IUCN SSC"],
+                            year=str(item.get("latest_assessment", {}).get("year_published", "")),
+                            abstract=f"Species: {name}. Category: {desc} ({status}).",
+                            source=self.SOURCE,
+                            doi=f"https://www.iucnredlist.org/species/{taxon_id}",
+                        ))
+                log.info("IUCN v4: %d results for '%s'", len(results), query[:30])
+                return results
+            except Exception as e:
+                log.warning("IUCN v4 error: %s — trying v3 fallback", e)
+                # Fallback to v3 endpoint
+                try:
+                    keyword = query.split()[0]
+                    resp2 = await client.get(
+                        f"https://apiv3.iucnredlist.org/api/v3/species/{keyword}",
+                        params={"token": self._key},
+                    )
+                    results = []
+                    for item in resp2.json().get("result", [])[:limit]:
+                        name = item.get("scientific_name", "")
+                        if name:
+                            results.append(Paper(
+                                title=f"{name} — IUCN Red List",
+                                authors=["IUCN SSC"],
+                                year=str(item.get("published_year", "")),
+                                abstract=f"Conservation status: {item.get('category', '')}",
+                                source=self.SOURCE,
+                            ))
+                    return results
+                except Exception:
+                    return []
+
 # ── Instantiate all connectors ────────────────────────────────────────────────
 
 core_connector = COREConnector()
@@ -573,6 +776,8 @@ dimensions_connector = DimensionsConnector()
 nasa_ads_connector = NASAADSConnector()
 pubchem_connector = PubChemConnector()
 iucn_v2_connector = IUCNConnectorV2()
+repec_connector = RePEcConnector()
+iucn_v3_connector = IUCNConnectorV3()
 
 
 # ── Registry 2 extension map ─────────────────────────────────────────────────
@@ -594,8 +799,16 @@ EXTENDED_API_MAP = {
     # Tier 2 — free key registration
     "Dimensions": dimensions_connector,
     "NASA ADS": nasa_ads_connector,
-    "IUCN Red List": iucn_v2_connector,
-    "IUCN": iucn_v2_connector,
+    "IUCN Red List": iucn_v3_connector,
+    "IUCN": iucn_v3_connector,
+    "IUCN v3 (legacy)": iucn_v2_connector,
+
+    # RepEc dedicated API — author queries + IDEAS search
+    "IDEAS/RepEc": repec_connector,
+    "RePEc": repec_connector,
+    "RepEc": repec_connector,
+    "IDEAS": repec_connector,
+    "Research Papers in Economics": repec_connector,
 }
 
 
@@ -608,14 +821,15 @@ def get_extended_api_status() -> dict:
         "SSRN": True,
         "Semantic Scholar (enhanced)": True,
         "PubChem": True,
+        "IDEAS/RepEc": True,
         "Dimensions": dimensions_connector.available(),
         "NASA ADS": nasa_ads_connector.available(),
-        "IUCN Red List": iucn_v2_connector.available(),
+        "IUCN Red List (v4)": iucn_v3_connector.available(),
         "missing_keys": [
             name for name, conn in [
                 ("DIMENSIONS_API_KEY", dimensions_connector),
                 ("NASA_ADS_API_KEY", nasa_ads_connector),
-                ("IUCN_API_KEY", iucn_v2_connector),
+                ("IUCN_REDLIST_KEY or IUCN_API_KEY", iucn_v3_connector),
             ] if not conn.available()
         ]
     }
