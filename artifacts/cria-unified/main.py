@@ -2548,11 +2548,53 @@ class CogC2_Evidence(BaseChannel):
             "Crossref": self.crossref,
         }
 
+        # ── Wire advocacy and health connectors into the search map ──────────
+        # These are TargetedWebConnectors from cria_advocacy_connectors.py and
+        # cria_health_connectors.py. Build a unified name→connector lookup so
+        # when Stage 0 selects "INET" or "Stockholm Resilience Centre" the
+        # search actually executes rather than silently returning empty.
+        if _ADVOCACY_AVAILABLE:
+            try:
+                from cria_advocacy_connectors import ALL_ADVOCACY_CONNECTORS
+                from cria_health_connectors import ALL_HEALTH_CONNECTORS
+                all_targeted = ALL_ADVOCACY_CONNECTORS + ALL_HEALTH_CONNECTORS
+                for conn in all_targeted:
+                    name = getattr(conn, "source_name", None)
+                    if name and name not in self._api_map:
+                        self._api_map[name] = conn
+                log.info("CogC2: wired %d advocacy/health connectors into _api_map",
+                         len(all_targeted))
+            except Exception as e:
+                log.warning("CogC2: failed to wire advocacy connectors: %s", e)
+
     async def _search_connector(self, connector_name: str, query: str) -> List[Paper]:
         api = self._api_map.get(connector_name)
         if api is None:
+            log.debug("CogC2: no implementation for connector '%s' — skipping", connector_name)
             return []
         try:
+            # TargetedWebConnector returns Paper-compatible objects (not main.py Paper)
+            # Convert them to main.py Paper objects
+            if hasattr(api, "source_name"):  # is a TargetedWebConnector
+                raw_results = await api.search(query, limit=8)
+                converted = []
+                for r in raw_results:
+                    try:
+                        converted.append(Paper(
+                            title=getattr(r, "title", ""),
+                            authors=getattr(r, "authors", []),
+                            year=getattr(r, "year", ""),
+                            abstract=getattr(r, "abstract", "")[:500],
+                            source=getattr(r, "source", connector_name),
+                            doi=getattr(r, "doi", ""),
+                            cited_by=getattr(r, "cited_by", 0),
+                            is_stub=False,
+                        ))
+                    except Exception:
+                        pass
+                log.info("CogC2: %s returned %d results via web connector",
+                         connector_name, len(converted))
+                return converted
             return await api.search(query, limit=6) if hasattr(api, 'search') else []
         except Exception as e:
             log.warning("Connector %s failed: %s", connector_name, e)
