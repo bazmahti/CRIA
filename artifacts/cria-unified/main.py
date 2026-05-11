@@ -707,7 +707,9 @@ class ResearchArtefact:
     voices: List[str] = field(default_factory=lambda: ["academic", "editorial", "practitioner"])
     dissonance_budget: float = 0.20
     profile: str = "general_scholarship"
-    max_iterations: int = 2
+    max_iterations: int = 2            # legacy — kept for backward compat
+    cognitive_iterations: int = 2      # Cognitive pipeline: breadth work, 1–5
+    epistemic_iterations: int = 2      # Epistemic pipeline: depth work, 1–3
     job_id: str = ""
 
 
@@ -4405,17 +4407,48 @@ class UnifiedOrchestrator:
             except Exception as e:
                 log.warning("Landmark pre-verification error: %s", e)
 
-        # ── Iterative Channel Execution ─────────────────────────────────────
-        for iteration in range(self.max_iterations):
+        # ── Independent Iterative Channel Execution ────────────────────────
+        # Cognitive (breadth) and Epistemic (depth) pipelines run independent
+        # iteration budgets. Cognitive benefits from more passes on wide domains;
+        # Epistemic reaches diminishing returns faster but needs higher intensity.
+        cog_iter = getattr(artefact, "cognitive_iterations", artefact.max_iterations)
+        epi_iter = getattr(artefact, "epistemic_iterations",
+                           min(artefact.max_iterations, 2))  # default: never exceed 2 for epi
+
+        log.info("Pipeline budgets — Cognitive: %d iterations, Epistemic: %d iterations",
+                 cog_iter, epi_iter)
+
+        # Run Cognitive iterations
+        cog_findings_all: List[Finding] = []
+        for iteration in range(cog_iter):
             context["iteration"] = iteration + 1
+            context["pipeline_mode"] = "cognitive"
             cog_tasks = [ch.research(artefact, context) for ch in self.cog_channels]
+            raw_cog = await asyncio.gather(*cog_tasks, return_exceptions=True)
+            new_cog = [r for r in raw_cog if isinstance(r, Finding)]
+            cog_findings_all.extend(new_cog)
+            # Update context with all findings so far (cog channels see prior cog work)
+            context["previous_findings"] = cog_findings_all
+            log.info("Cognitive iteration %d/%d: %d findings", iteration + 1, cog_iter, len(new_cog))
+
+        # Run Epistemic iterations with full Cognitive context available
+        context["pipeline_mode"] = "epistemic"
+        context["cognitive_complete"] = True
+        epi_findings_all: List[Finding] = []
+        for iteration in range(epi_iter):
+            context["iteration"] = iteration + 1
             epi_tasks = [ch.research(artefact, context) for ch in self.epi_channels]
-            raw = await asyncio.gather(*cog_tasks, *epi_tasks, return_exceptions=True)
-            context["previous_findings"] = [r for r in raw if isinstance(r, Finding)]
+            raw_epi = await asyncio.gather(*epi_tasks, return_exceptions=True)
+            new_epi = [r for r in raw_epi if isinstance(r, Finding)]
+            epi_findings_all.extend(new_epi)
+            context["previous_findings"] = cog_findings_all + epi_findings_all
+            log.info("Epistemic iteration %d/%d: %d findings", iteration + 1, epi_iter, len(new_epi))
+
+        context["previous_findings"] = cog_findings_all + epi_findings_all
 
         all_findings = context["previous_findings"]
-        cog_findings = [f for f in all_findings if f.pipeline == Pipeline.COGNITIVE]
-        epi_findings = [f for f in all_findings if f.pipeline == Pipeline.EPISTEMIC]
+        cog_findings = cog_findings_all
+        epi_findings = epi_findings_all
 
         # ── Connector Review if Retrieval Failed ────────────────────────────
         confirmed_absences: List[ConfirmedAbsenceRecord] = []
@@ -4558,6 +4591,8 @@ class UnifiedOrchestrator:
             "observer_note": artefact.observer_note,
             "profile": artefact.profile,
             "iterations": self.max_iterations,
+            "cognitive_iterations": cog_iter,
+            "epistemic_iterations": epi_iter,
             "duration_seconds": duration,
             # Research design
             "research_design_record": {
@@ -4708,7 +4743,9 @@ class ResearchRequest(BaseModel):
     dissonance_budget: float = Field(0.20, ge=0.0, le=1.0)
     voice: str = Field("all", pattern="^(all|academic|editorial|practitioner)$")
     profile: str = Field("general_scholarship", max_length=100)
-    max_iterations: int = Field(2, ge=1, le=5)
+    max_iterations: int = Field(2, ge=1, le=5)  # legacy
+    cognitive_iterations: int = Field(2, ge=1, le=5)   # Cognitive: breadth, 1–5
+    epistemic_iterations: int = Field(2, ge=1, le=3)   # Epistemic: depth, 1–3
 
     @field_validator("query")
     @classmethod
@@ -4836,6 +4873,8 @@ async def research_endpoint(
         voices=voices,
         profile=body.profile,
         max_iterations=body.max_iterations,
+        cognitive_iterations=getattr(body, "cognitive_iterations", body.max_iterations),
+        epistemic_iterations=getattr(body, "epistemic_iterations", min(body.max_iterations, 2)),
         job_id=job_id,
     )
     request_id = getattr(request.state, "request_id", "")

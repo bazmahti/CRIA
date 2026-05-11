@@ -56,9 +56,12 @@ interface QuestionAnalysis {
   cria_readiness: "ready" | "refine_recommended" | "refine_strongly_recommended";
   readiness_explanation: string;
   suggested_question_variants: string[];
+  cognitive_iterations: number;
+  epistemic_iterations: number;
   iteration_recommendation: number;
   iteration_reasoning: string;
-  estimated_cost_range: string;
+  estimated_cost_aud: string;
+  budget_trade_off: string;
   analysis_note: string;
 }
 
@@ -529,6 +532,7 @@ export default function UnifiedResearch() {
   const [profile, setProfile] = useState("general_scholarship");
   const [showConnectorGroups, setShowConnectorGroups] = useState(false);
   const [activeStream, setActiveStream] = useState<string>("general");
+  const [epistemicIterations, setEpistemicIterations] = useState<number>(2);
   const [analysis, setAnalysis] = useState<QuestionAnalysis | null>(null);
   const [analysing, setAnalysing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -797,24 +801,50 @@ export default function UnifiedResearch() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
-                <label className="block text-[10px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Iterations</label>
-                <select
-                  value={iterations}
-                  onChange={(e) => {
-                    setIterations(Number(e.target.value));
-                  }}
-                  className="w-full bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-xs focus:outline-none"
-                >
-                  <option value={1}>1 — Exploratory · ~3–5 min · AUD $0.80–1.50</option>
-                  <option value={2}>2 — Standard · ~6–10 min · AUD $1.50–2.50</option>
-                  <option value={3}>3 — Publication-grade · ~12–18 min · AUD $3–5</option>
-                </select>
-                {/* Iteration set automatically by analyser — override above if needed */}
-                {analysis?.iteration_recommendation && (
-                  <div className="mt-1 text-[10px] text-muted-foreground">
-                    Set by analyser · adjust above if needed
+                {/* Split iteration controls */}
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                        Cognitive Iterations
+                      </label>
+                      <span className="text-[9px] text-emerald-600 font-medium">breadth · 1–5</span>
+                    </div>
+                    <select
+                      value={iterations}
+                      onChange={(e) => setIterations(Number(e.target.value))}
+                      className="w-full bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-xs focus:outline-none"
+                    >
+                      <option value={1}>1 — Single domain · ~2 min · ~AUD $0.45</option>
+                      <option value={2}>2 — Standard · ~4 min · ~AUD $0.85</option>
+                      <option value={3}>3 — Wide domain · ~6 min · ~AUD $1.25</option>
+                      <option value={4}>4 — Civilisational scope · ~8 min · ~AUD $1.65</option>
+                      <option value={5}>5 — Maximum scope · ~10 min · ~AUD $2.05</option>
+                    </select>
                   </div>
-                )}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                        Epistemic Iterations
+                      </label>
+                      <span className="text-[9px] text-violet-600 font-medium">depth · 1–3</span>
+                    </div>
+                    <select
+                      value={epistemicIterations}
+                      onChange={(e) => setEpistemicIterations(Number(e.target.value))}
+                      className="w-full bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-xs focus:outline-none"
+                    >
+                      <option value={1}>1 — Single framing · ~2.5 min · ~AUD $0.70</option>
+                      <option value={2}>2 — Standard · ~5 min · ~AUD $1.40</option>
+                      <option value={3}>3 — Frame collision · ~7.5 min · ~AUD $2.10</option>
+                    </select>
+                  </div>
+                  {analysis?.iteration_reasoning && (
+                    <div className="text-[10px] text-muted-foreground bg-muted/30 rounded-lg px-2.5 py-1.5">
+                      Set by analyser · adjust above if needed
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="block text-[10px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Dissonance Budget</label>
@@ -1114,16 +1144,20 @@ export default function UnifiedResearch() {
                     const resp = await fetch(`${BASE}/cria-unified/analyse`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ query, observer_note: observerNote, profile }),
+                      body: JSON.stringify({ query, observer_note: observerNote, profile,
+                        cognitive_iterations: iterations, epistemic_iterations: epistemicIterations }),
                     });
                     if (!resp.ok) throw new Error(`Analysis failed: HTTP ${resp.status}`);
                     const data = await resp.json() as QuestionAnalysis;
                     setAnalysis(data);
                     setConfirmedQuery(query);
                     setRefinedQuestion(query);
-                    // Auto-apply iteration recommendation
-                    if (data.iteration_recommendation && [1, 2, 3].includes(data.iteration_recommendation)) {
-                      setIterations(data.iteration_recommendation);
+                    // Auto-apply split iteration recommendations
+                    if (data.cognitive_iterations && [1,2,3,4,5].includes(data.cognitive_iterations)) {
+                      setIterations(data.cognitive_iterations);
+                    }
+                    if (data.epistemic_iterations && [1,2,3].includes(data.epistemic_iterations)) {
+                      setEpistemicIterations(data.epistemic_iterations);
                     }
                   } catch (e) {
                     setAnalysisError(e instanceof Error ? e.message : String(e));
@@ -1254,46 +1288,39 @@ export default function UnifiedResearch() {
                       {analysis.readiness_explanation}
                     </div>
 
-                    {/* Iteration recommendation */}
-                    {analysis.iteration_recommendation && (
-                      <div className={cn(
-                        "flex items-start gap-3 rounded-lg border px-3 py-2.5",
-                        analysis.iteration_recommendation === 1
-                          ? "border-green-500/30 bg-green-500/5"
-                          : analysis.iteration_recommendation === 3
-                          ? "border-amber-500/30 bg-amber-500/5"
-                          : "border-border/40 bg-background/50"
-                      )}>
-                        <div className="flex-shrink-0 mt-0.5">
-                          <div className={cn(
-                            "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold",
-                            analysis.iteration_recommendation === 1 ? "bg-green-500/20 text-green-500" :
-                            analysis.iteration_recommendation === 3 ? "bg-amber-500/20 text-amber-600" :
-                            "bg-primary/15 text-primary"
-                          )}>
-                            {analysis.iteration_recommendation}
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              Recommended iterations
+                    {/* Split iteration recommendations */}
+                    {(analysis.cognitive_iterations || analysis.epistemic_iterations) && (
+                      <div className="rounded-lg border border-border/40 bg-background/50 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Recommended iterations
+                          </span>
+                          {analysis.estimated_cost_aud && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                              {analysis.estimated_cost_aud}
                             </span>
-                            {analysis.estimated_cost_range && (
-                              <span className={cn(
-                                "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
-                                analysis.iteration_recommendation === 1 ? "bg-green-500/15 text-green-600" :
-                                analysis.iteration_recommendation === 3 ? "bg-amber-500/15 text-amber-700" :
-                                "bg-primary/10 text-primary"
-                              )}>
-                                {analysis.estimated_cost_range}
-                              </span>
-                            )}
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-lg bg-emerald-500/8 border border-emerald-500/20 px-2.5 py-2 text-center">
+                            <div className="text-lg font-bold text-emerald-600">{analysis.cognitive_iterations}</div>
+                            <div className="text-[9px] text-emerald-600 font-medium">Cognitive</div>
+                            <div className="text-[8.5px] text-muted-foreground">breadth · retrieval</div>
                           </div>
-                          <div className="text-[11px] text-muted-foreground leading-relaxed">
-                            {analysis.iteration_reasoning}
+                          <div className="rounded-lg bg-violet-500/8 border border-violet-500/20 px-2.5 py-2 text-center">
+                            <div className="text-lg font-bold text-violet-600">{analysis.epistemic_iterations}</div>
+                            <div className="text-[9px] text-violet-600 font-medium">Epistemic</div>
+                            <div className="text-[8.5px] text-muted-foreground">depth · frame critique</div>
                           </div>
                         </div>
+                        <div className="text-[11px] text-muted-foreground leading-relaxed">
+                          {analysis.iteration_reasoning}
+                        </div>
+                        {analysis.budget_trade_off && (
+                          <div className="text-[10px] text-muted-foreground border-t border-border/30 pt-2 italic">
+                            {analysis.budget_trade_off}
+                          </div>
+                        )}
                       </div>
                     )}
 
