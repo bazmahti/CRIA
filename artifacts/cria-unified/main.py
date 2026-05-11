@@ -155,6 +155,31 @@ except ImportError:
     EXTENDED_API_MAP = {}
 
 try:
+    from cria_integrity_protocols import (
+        inject_grounding_instruction,
+        extract_confidence_audit,
+        format_confidence_audit,
+        run_doi_verification_pass,
+        format_doi_verification_report,
+        verify_stage0_landmarks,
+        format_landmark_verification_report,
+        compile_integrity_report,
+        GROUNDING_INSTRUCTION,
+    )
+    _INTEGRITY_AVAILABLE = True
+except ImportError:
+    _INTEGRITY_AVAILABLE = False
+    def inject_grounding_instruction(p, s): return p, s
+    def extract_confidence_audit(t): return {}
+    def format_confidence_audit(a, n): return ""
+    async def run_doi_verification_pass(t): return {}
+    def format_doi_verification_report(r): return ""
+    async def verify_stage0_landmarks(l): return {"confirmed": l, "unconfirmed": [], "excluded": [], "total": len(l)}
+    def format_landmark_verification_report(r): return ""
+    def compile_integrity_report(*a, **k): return ""
+    GROUNDING_INSTRUCTION = ""  
+
+try:
     from cria_health_connectors import (
         search_health_connectors, health_registry_summary,
         ALL_HEALTH_CONNECTORS, STRUCTURED_HEALTH_APIS,
@@ -2869,9 +2894,11 @@ class CogC4_Synthesis(BaseChannel):
                            confidence=1.0, evidence=[], pipeline=Pipeline.COGNITIVE,
                            is_retrieved=False, epistemic_modality=Modality.KNOWLEDGE)
         ftext = "\n".join(f"{f.source_channel}: {f.content[:200]}" for f in prev[:8])
-        prompt = (f"Synthesise findings for: '{artefact.research_question}'\n\n{ftext}\n\n"
-                  "1. Main consensus\n2. Disagreements\n3. Gaps\n4. Tentative conclusions")
-        response = await call_llm(prompt, system_prompt=self._system_prompt())
+        base_prompt = (f"Synthesise findings for: '{artefact.research_question}'\n\n{ftext}\n\n"
+                       "1. Main consensus\n2. Disagreements\n3. Gaps\n4. Tentative conclusions")
+        # Protocol 1: inject grounding instruction
+        prompt, sys = inject_grounding_instruction(base_prompt, self._system_prompt())
+        response = await call_llm(prompt, system_prompt=sys)
         return Finding(content=response, source_channel=self.name, confidence=0.70,
                        evidence=[f.source_channel for f in prev],
                        pipeline=Pipeline.COGNITIVE, is_retrieved=False)
@@ -3849,7 +3876,18 @@ class ThreeVoiceRenderer:
         epi_t = "\n".join(f"- {f.content[:300]}" for f in epi[:6])
         conv_t = "\n".join(f"- [{f.source_channel}] {f.content[:300]}" for f in conv[:5])
 
+        # Protocol 1: grounding instruction prepended to academic synthesis
+        grounding_preamble = (
+            "EPISTEMIC INTEGRITY REQUIREMENT: Tag every substantive claim with its "
+            "grounding source. [R: AuthorYear] = from a retrieved document in this "
+            "evidence set. [T-HIGH] = training knowledge, high confidence. "
+            "[T-LOW] = training knowledge, LOW confidence — must be verified before "
+            "publication. [T-UNCERTAIN] = source unclear. "
+            "You know which operation you are performing. Tag every claim.\n\n"
+        ) if _INTEGRITY_AVAILABLE else ""
+
         prompt = (
+            grounding_preamble +
             f"Render in ACADEMIC voice for peer-reviewed publication.\n\n"
             f"Question: {artefact.research_question}\n"
             f"Observer: {artefact.observer_note}\n\n"
@@ -3890,11 +3928,44 @@ class ThreeVoiceRenderer:
             enforce_evidence_firewall=True,
             retrieved_papers=unique_retrieved,
         )
+
+        # Protocol 1: confidence audit on grounding tags
+        confidence_audit = {}
+        confidence_audit_text = ""
+        if _INTEGRITY_AVAILABLE:
+            try:
+                confidence_audit = extract_confidence_audit(text)
+                confidence_audit_text = format_confidence_audit(
+                    confidence_audit, "Academic Synthesis")
+                log.info("Confidence audit: %d [R], %d [T-LOW], %d [T-UNCERTAIN]",
+                    confidence_audit.get("retrieved_claims", 0),
+                    confidence_audit.get("training_low_confidence", 0),
+                    confidence_audit.get("uncertain_source", 0))
+            except Exception as e:
+                log.warning("Confidence audit error: %s", e)
+
+        # Protocol 2: DOI verification pass
+        doi_report = {}
+        doi_report_text = ""
+        if _INTEGRITY_AVAILABLE:
+            try:
+                doi_report = await run_doi_verification_pass(text)
+                doi_report_text = format_doi_verification_report(doi_report)
+                if doi_report.get("phantom", 0) > 0:
+                    log.warning("⚠ DOI verification: %d PHANTOM citation(s) in academic output",
+                                doi_report["phantom"])
+            except Exception as e:
+                log.warning("DOI verification error: %s", e)
+
         return {
             "text": text,
             "audience": "Peer-reviewed scholarly community",
             "retrieval_adequate": True,
             "retrieved_paper_count": len(unique_retrieved),
+            "confidence_audit": confidence_audit,
+            "confidence_audit_text": confidence_audit_text,
+            "doi_verification": doi_report,
+            "doi_verification_text": doi_report_text,
         }
 
     async def _render_editorial(self, cog, epi, conv, artefact):
@@ -4259,6 +4330,33 @@ class UnifiedOrchestrator:
         design_record = await self.stage0.design(artefact, active_connectors())
         context["design_record"] = design_record
         log.info("Stage 0 complete: connectors=%s", design_record.selected_connectors)
+
+        # Protocol 3: Landmark paper pre-verification
+        # Verify Stage 0's named landmark papers against Semantic Scholar BEFORE
+        # they are used in search strings. Excludes unverified papers.
+        landmark_verification = {}
+        if _INTEGRITY_AVAILABLE:
+            try:
+                landmark_papers = getattr(design_record, "landmark_papers", [])
+                if landmark_papers:
+                    log.info("Protocol 3: verifying %d landmark papers", len(landmark_papers))
+                    landmark_verification = await verify_stage0_landmarks(landmark_papers)
+                    excluded = landmark_verification.get("excluded", [])
+                    if excluded:
+                        log.warning(
+                            "Protocol 3: %d landmark papers excluded from search strings: %s",
+                            len(excluded),
+                            [p["name"] for p in excluded[:3]],
+                        )
+                        # Update design record to only use confirmed landmarks
+                        confirmed_names = [
+                            p["name"] for p in landmark_verification.get("confirmed", [])
+                        ]
+                        if hasattr(design_record, "landmark_papers"):
+                            design_record.landmark_papers = confirmed_names
+                context["landmark_verification"] = landmark_verification
+            except Exception as e:
+                log.warning("Landmark pre-verification error: %s", e)
 
         # ── Iterative Channel Execution ─────────────────────────────────────
         for iteration in range(self.max_iterations):
