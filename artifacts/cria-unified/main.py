@@ -155,6 +155,29 @@ except ImportError:
     EXTENDED_API_MAP = {}
 
 try:
+    from cria_integrity_protocols import (
+        inject_grounding_instruction,
+        run_verification_retrieval_agent,
+        run_doi_verification,
+        verify_stage0_landmarks,
+        build_evidence_quality_section,
+        build_analytical_inference_register,
+        build_integrity_summary_block,
+        GROUNDING_INSTRUCTION,
+    )
+    _INTEGRITY_AVAILABLE = True
+except ImportError:
+    _INTEGRITY_AVAILABLE = False
+    def inject_grounding_instruction(p, s): return p, s
+    async def run_verification_retrieval_agent(t, fn=None): return []
+    async def run_doi_verification(t): return []
+    async def verify_stage0_landmarks(l): return []
+    def build_evidence_quality_section(*a, **k): return ""
+    def build_analytical_inference_register(c): return ""
+    def build_integrity_summary_block(*a, **k): return "{}"
+    GROUNDING_INSTRUCTION = ""  
+
+try:
     from cria_health_connectors import (
         search_health_connectors, health_registry_summary,
         ALL_HEALTH_CONNECTORS, STRUCTURED_HEALTH_APIS,
@@ -2869,9 +2892,11 @@ class CogC4_Synthesis(BaseChannel):
                            confidence=1.0, evidence=[], pipeline=Pipeline.COGNITIVE,
                            is_retrieved=False, epistemic_modality=Modality.KNOWLEDGE)
         ftext = "\n".join(f"{f.source_channel}: {f.content[:200]}" for f in prev[:8])
-        prompt = (f"Synthesise findings for: '{artefact.research_question}'\n\n{ftext}\n\n"
-                  "1. Main consensus\n2. Disagreements\n3. Gaps\n4. Tentative conclusions")
-        response = await call_llm(prompt, system_prompt=self._system_prompt())
+        base_prompt = (f"Synthesise findings for: '{artefact.research_question}'\n\n{ftext}\n\n"
+                       "1. Main consensus\n2. Disagreements\n3. Gaps\n4. Tentative conclusions")
+        # Protocol 1: inject grounding instruction
+        prompt, sys = inject_grounding_instruction(base_prompt, self._system_prompt())
+        response = await call_llm(prompt, system_prompt=sys)
         return Finding(content=response, source_channel=self.name, confidence=0.70,
                        evidence=[f.source_channel for f in prev],
                        pipeline=Pipeline.COGNITIVE, is_retrieved=False)
@@ -3849,7 +3874,18 @@ class ThreeVoiceRenderer:
         epi_t = "\n".join(f"- {f.content[:300]}" for f in epi[:6])
         conv_t = "\n".join(f"- [{f.source_channel}] {f.content[:300]}" for f in conv[:5])
 
+        # Protocol 1: grounding instruction prepended to academic synthesis
+        grounding_preamble = (
+            "EPISTEMIC INTEGRITY REQUIREMENT: Tag every substantive claim with its "
+            "grounding source. [R: AuthorYear] = from a retrieved document in this "
+            "evidence set. [T-HIGH] = training knowledge, high confidence. "
+            "[T-LOW] = training knowledge, LOW confidence — must be verified before "
+            "publication. [T-UNCERTAIN] = source unclear. "
+            "You know which operation you are performing. Tag every claim.\n\n"
+        ) if _INTEGRITY_AVAILABLE else ""
+
         prompt = (
+            grounding_preamble +
             f"Render in ACADEMIC voice for peer-reviewed publication.\n\n"
             f"Question: {artefact.research_question}\n"
             f"Observer: {artefact.observer_note}\n\n"
@@ -3890,11 +3926,93 @@ class ThreeVoiceRenderer:
             enforce_evidence_firewall=True,
             retrieved_papers=unique_retrieved,
         )
+
+        # ── Epistemic Integrity Protocols ────────────────────────────────
+        # Runs after Academic synthesis. Embeds quality assessment and
+        # Analytical Inference Register directly into the document.
+        doi_results = []
+        claim_verifications = []
+        landmark_results = context.get("landmark_results", [])
+        integrity_summary = "{}"
+
+        if _INTEGRITY_AVAILABLE:
+            try:
+                # Protocol 2: DOI verification
+                doi_results = await run_doi_verification(text)
+                phantom = sum(1 for r in doi_results if r.status == "phantom")
+                if phantom > 0:
+                    log.warning("⚠ %d PHANTOM citation(s) in academic output", phantom)
+
+                # Protocol 1b: verify T-LOW/T-UNCERTAIN claims via retrieval
+                claim_verifications = await run_verification_retrieval_agent(
+                    text, call_llm_fn=call_llm
+                )
+                log.info("Integrity: %d DOIs checked, %d claims verified",
+                         len(doi_results), len(claim_verifications))
+
+                # Build plain-language summary for dashboard
+                integrity_summary = build_integrity_summary_block(
+                    doi_results, claim_verifications, landmark_results
+                )
+
+                # Build Evidence Quality Assessment section (embedded in document)
+                quality_section = build_evidence_quality_section(
+                    doi_results, claim_verifications, landmark_results,
+                    retrieved_paper_count=len(unique_retrieved),
+                )
+
+                # Build Analytical Inference Register (embedded before References)
+                inference_register = build_analytical_inference_register(claim_verifications)
+
+                # Embed both into the document at the right structural positions
+                # Insert Evidence Quality Assessment after Methodology, before Findings
+                if "## Findings" in text and quality_section:
+                    text = text.replace(
+                        "## Findings",
+                        quality_section + "\n\n## Findings",
+                        1,
+                    )
+                elif "## 4." in text and quality_section:
+                    text = text.replace(
+                        "## 4.",
+                        quality_section + "\n\n## 4.",
+                        1,
+                    )
+
+                # Insert Analytical Inference Register before References
+                if inference_register:
+                    if "## References" in text:
+                        text = text.replace(
+                            "## References",
+                            inference_register + "\n\n## References",
+                            1,
+                        )
+                    elif "## 8." in text:
+                        text = text.replace(
+                            "## 8.",
+                            inference_register + "\n\n## 8.",
+                            1,
+                        )
+                    else:
+                        text = text + "\n\n" + inference_register
+
+                # Strip inline grounding tags from readable text
+                text = re.sub(r"\[R\+T:[^\]]+\]", "", text)
+                text = re.sub(r"\[R:[^\]]+\]", "", text)
+                text = re.sub(r"\[T-HIGH\]", "", text)
+                text = re.sub(r"\[T-LOW\]", "†", text)  # Convert to dagger
+                text = re.sub(r"\[T-UNCERTAIN\]", "†", text)
+                text = re.sub(r"  +", " ", text)  # Clean double spaces
+
+            except Exception as e:
+                log.warning("Integrity protocol error: %s", e, exc_info=True)
+
         return {
             "text": text,
             "audience": "Peer-reviewed scholarly community",
             "retrieval_adequate": True,
             "retrieved_paper_count": len(unique_retrieved),
+            "integrity_summary": integrity_summary,
         }
 
     async def _render_editorial(self, cog, epi, conv, artefact):
@@ -4259,6 +4377,33 @@ class UnifiedOrchestrator:
         design_record = await self.stage0.design(artefact, active_connectors())
         context["design_record"] = design_record
         log.info("Stage 0 complete: connectors=%s", design_record.selected_connectors)
+
+        # Protocol 3: Landmark paper pre-verification
+        # Verify Stage 0's named landmark papers against Semantic Scholar BEFORE
+        # they are used in search strings. Excludes unverified papers.
+        landmark_verification = {}
+        if _INTEGRITY_AVAILABLE:
+            try:
+                landmark_papers = getattr(design_record, "landmark_papers", [])
+                if landmark_papers:
+                    log.info("Protocol 3: verifying %d landmark papers", len(landmark_papers))
+                    landmark_verification = await verify_stage0_landmarks(landmark_papers)
+                    excluded = landmark_verification.get("excluded", [])
+                    if excluded:
+                        log.warning(
+                            "Protocol 3: %d landmark papers excluded from search strings: %s",
+                            len(excluded),
+                            [p["name"] for p in excluded[:3]],
+                        )
+                        # Update design record to only use confirmed landmarks
+                        confirmed_names = [
+                            p["name"] for p in landmark_verification.get("confirmed", [])
+                        ]
+                        if hasattr(design_record, "landmark_papers"):
+                            design_record.landmark_papers = confirmed_names
+                context["landmark_verification"] = landmark_verification
+            except Exception as e:
+                log.warning("Landmark pre-verification error: %s", e)
 
         # ── Iterative Channel Execution ─────────────────────────────────────
         for iteration in range(self.max_iterations):

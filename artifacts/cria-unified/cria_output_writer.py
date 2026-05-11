@@ -356,6 +356,25 @@ async def write_all_outputs(
             files[f"voice_{voice_name}"] = filepath
             log.info("Written %s voice: %s", voice_name, filepath)
 
+    # Integrity report — written if Protocol 1/2 ran
+    academic_data = voices.get("academic", {})
+    if isinstance(academic_data, dict):
+        doi_text = academic_data.get("doi_verification_text", "")
+        audit_text = academic_data.get("confidence_audit_text", "")
+        landmark_text = result.get("landmark_verification_text", "")
+        if doi_text or audit_text or landmark_text:
+            integrity_content = "# CRIA Integrity Report\n\n"
+            if landmark_text:
+                integrity_content += landmark_text + "\n\n"
+            if doi_text:
+                integrity_content += doi_text + "\n\n"
+            if audit_text:
+                integrity_content += "# Confidence Audit — Grounding Tags\n\n"
+                integrity_content += audit_text + "\n"
+            filepath = write(f"CRIA-integrity-{slug}", integrity_content)
+            files["integrity_report"] = filepath
+            log.info("Written integrity report: %s", filepath)
+
     # LinkedIn post — written if present in editorial output
     editorial_data = voices.get("editorial", {})
     if isinstance(editorial_data, dict):
