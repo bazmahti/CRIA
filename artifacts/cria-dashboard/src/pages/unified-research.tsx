@@ -679,6 +679,28 @@ export default function UnifiedResearch() {
   }, [stopPolling]);
 
   const result = job?.engine?.result ?? null;
+  // Parse integrity summary for badge
+  const integritySummary = (() => {
+    try {
+      const voices = (result?.["voices"] ?? {}) as Record<string, Record<string, unknown>>;
+      const raw = voices?.["academic"]?.["integrity_summary"] as string | undefined;
+      if (raw) return JSON.parse(raw) as {
+        status: string; colour: string;
+        citations_verified: number; citations_phantom: number;
+        citations_total: number; claims_flagged: number; claims_unverified: number;
+      };
+    } catch { /* */ }
+    return null;
+  })();
+
+  const integrityBadge = integritySummary ? (
+    <span className={cn(
+      "ml-1 w-2 h-2 rounded-full inline-block",
+      integritySummary.colour === "green" ? "bg-green-500" :
+      integritySummary.colour === "amber" ? "bg-amber-500" : "bg-red-500"
+    )} title={integritySummary.status} />
+  ) : null;
+
   const pipelineTabs: { key: PipelineTab; label: string }[] = [
     { key: "cognitive", label: "CRIA-Cognitive" },
     { key: "epistemic", label: "CRIA-Epistemic" },

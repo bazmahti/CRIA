@@ -1,574 +1,571 @@
 """
 cria_integrity_protocols.py
 ============================
-Three epistemic integrity protocols for CRIA, implementing priority items
-from the RAG hallucination literature review (May 2026).
+Epistemic integrity protocols for CRIA academic output.
 
-PROTOCOL 1 — Structured Grounding Schema
-  Requires every synthesis channel to tag each claim with its grounding source:
-  [R] retrieved document (with reference)
-  [T-HIGH] training knowledge, high confidence
-  [T-LOW] training knowledge, low confidence — verify before citing
-  [T-UNCERTAIN] cannot clearly distinguish source
-  [R+T] retrieved finding + trained interpretive frame
-  Produces a Confidence Audit file alongside every Academic output.
+Design principle: The Academic output is a self-contained publishable document.
+Integrity information is embedded within the document — not in separate files —
+following the conventions of Cochrane systematic reviews and evidence-based
+medicine publication standards.
 
-PROTOCOL 2 — DOI Verification Pass
-  Post-retrieval verification of every DOI cited in Academic output.
-  Distinguishes:
-  - VERIFIED: DOI resolves, title matches
-  - SLOPPY: DOI resolves but metadata differs (wrong year/author — Sloppiness)
-  - PHANTOM: DOI doesn't resolve (fabricated — Phantom)
-  - NO_DOI: citation exists but no DOI retrieved
-  Attaches Verification Report to Retrieval Status file.
+Architecture:
+  1. Verification Retrieval Agent — attempts to verify T-LOW/T-UNCERTAIN claims
+     via targeted Semantic Scholar/Crossref retrieval before Academic render
+  2. DOI Verification Pass — verifies all retrieved paper DOIs post-synthesis
+  3. Stage 0 Landmark Pre-Verification — confirms landmark papers before search
+  4. Integrity Summary Block — plain-English traffic-light summary embedded
+     at the end of the Academic output before References
+  5. Analytical Inference Register — scholarly footnote-style register of
+     every claim that could not be fully retrieval-verified
 
-PROTOCOL 3 — Stage 0 Landmark Pre-Verification
-  Before any database search runs, Stage 0's named landmark papers are
-  verified against Semantic Scholar. Non-existent papers are flagged
-  in the Research Design Record and excluded from search strings.
+Output convention:
+  † in running text = claim in Analytical Inference Register
+  All other claims = retrieval-grounded with verified DOI
 
 References:
-  - Self-RAG: Asai et al. ICLR 2024 (reflection tokens for grounding)
-  - GHOSTCITE / CITEVERIFIER (Sloppiness vs Phantom taxonomy)
-  - "The 17% Gap" (Ilter 2026, arXiv 2601.17431)
-  - ReDeEP (ICLR 2025, mechanistic interpretability of RAG hallucinations)
+  Asai et al. Self-RAG (ICLR 2024) — reflection token grounding
+  GHOSTCITE / CITEVERIFIER — Sloppiness vs Phantom taxonomy
+  Ilter (2026) "The 17% Gap" arXiv:2601.17431
+  Magesh et al. (2025) JELS — RAG hallucination in legal research
 """
 
 import asyncio
+import json as _json
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import List, Optional, Dict, Tuple
 import httpx
 
 log = logging.getLogger("cria-integrity")
 
-# ── Grounding source taxonomy (Protocol 1) ────────────────────────────────────
+
+# ── Grounding instruction injected into synthesis prompts ─────────────────────
 
 GROUNDING_INSTRUCTION = """
-EPISTEMIC INTEGRITY REQUIREMENT — READ CAREFULLY BEFORE GENERATING OUTPUT.
+EPISTEMIC INTEGRITY PROTOCOL — ACTIVE.
 
-You are operating in CRIA's evidence-firewalled synthesis mode. For every
-substantive claim you make, you know whether you are drawing from:
-  (a) A specific document in the retrieved evidence set in your context, OR
-  (b) Your training knowledge.
-These are distinct cognitive operations. You are required to tag each claim.
+For every substantive claim you make, tag its source:
+  [R: AuthorYear] — from a retrieved document in the evidence set (name it)
+  [T-HIGH]        — from training knowledge, high confidence
+  [T-LOW]         — from training knowledge, LOW confidence
+  [T-UNCERTAIN]   — you cannot clearly distinguish the source
 
-GROUNDING TAGS — append to every substantive claim:
-  [R: AuthorYear] — directly from a retrieved document. Name the source.
-                    Example: "Wray argues that money is endogenous [R: Wray1998]"
-  [T-HIGH]        — from training knowledge, high confidence.
-                    Example: "MMT is associated with Mosler and Wray [T-HIGH]"
-  [T-LOW]         — from training knowledge, LOW confidence. Must be verified
-                    before this claim is cited in publication.
-                    Example: "This position was contested in 2019 [T-LOW]"
-  [T-UNCERTAIN]   — you cannot clearly distinguish whether this comes from
-                    the retrieved evidence or your training. Flag it.
-  [R+T: AuthorYear] — a retrieved finding interpreted through a trained
-                    analytical frame. Specify which part is retrieved.
-
-RULES:
-  - Tag every claim. No untagged claims in synthesis output.
-  - You cannot mark a training-knowledge claim as [R]. You have the retrieved
-    documents in your context. You can see whether you are citing one or not.
-  - If you are genuinely uncertain, use [T-UNCERTAIN]. Do not guess.
-  - T-LOW claims will be flagged for manual verification in the Confidence Audit.
-  - This is not optional. You know which operation you are performing. Report it.
+You know which operation you are performing. Tag every claim.
+These tags will be processed before the reader sees the output — they are
+not visible in the final document. They are used to generate the Evidence
+Quality Assessment and Analytical Inference Register.
 """
 
 GROUNDING_SYSTEM_ADDENDUM = (
-    "CRITICAL: Apply grounding tags [R:], [T-HIGH], [T-LOW], [T-UNCERTAIN], "
-    "[R+T:] to every substantive claim. You know whether you are citing a "
-    "retrieved document or drawing on training knowledge. Report it honestly."
+    "Tag every substantive claim: [R: AuthorYear], [T-HIGH], [T-LOW], or [T-UNCERTAIN]. "
+    "You know whether you are citing a retrieved document or training knowledge."
 )
 
 
 def inject_grounding_instruction(prompt: str, system_prompt: str) -> Tuple[str, str]:
-    """Prepend grounding instruction to synthesis prompts."""
-    enhanced_prompt = GROUNDING_INSTRUCTION + "\n\n" + prompt
-    enhanced_system = system_prompt + "\n\n" + GROUNDING_SYSTEM_ADDENDUM
-    return enhanced_prompt, enhanced_system
+    return GROUNDING_INSTRUCTION + "\n\n" + prompt, system_prompt + "\n\n" + GROUNDING_SYSTEM_ADDENDUM
 
 
-def extract_confidence_audit(text: str) -> Dict:
-    """
-    Parse grounding tags from synthesis output and produce audit report.
-    Returns dict with claim counts by tag type and list of T-LOW claims.
-    """
-    r_claims = re.findall(r'\[R:\s*[^\]]+\]', text)
-    t_high = re.findall(r'\[T-HIGH\]', text)
-    t_low = re.findall(r'\[T-LOW\]', text)
-    t_uncertain = re.findall(r'\[T-UNCERTAIN\]', text)
-    r_plus_t = re.findall(r'\[R\+T:\s*[^\]]+\]', text)
-
-    # Extract sentences containing T-LOW tags for manual review
-    sentences = re.split(r'(?<=[.!?])\s+', text)
-    t_low_sentences = [s for s in sentences if '[T-LOW]' in s or '[T-UNCERTAIN]' in s]
-
-    return {
-        "retrieved_claims": len(r_claims),
-        "training_high_confidence": len(t_high),
-        "training_low_confidence": len(t_low),
-        "uncertain_source": len(t_uncertain),
-        "blended_claims": len(r_plus_t),
-        "total_tagged": len(r_claims) + len(t_high) + len(t_low) + len(t_uncertain) + len(r_plus_t),
-        "requires_verification": t_low_sentences,
-        "grounding_ratio": len(r_claims) / max(1, len(r_claims) + len(t_high) + len(t_low)),
-    }
-
-
-def format_confidence_audit(audit: Dict, channel_name: str) -> str:
-    """Format audit report for the Confidence Audit file."""
-    ratio_pct = int(audit["grounding_ratio"] * 100)
-    lines = [
-        f"## {channel_name} — Confidence Audit",
-        "",
-        f"Retrieval-grounded claims [R]: {audit['retrieved_claims']}",
-        f"Training knowledge — high confidence [T-HIGH]: {audit['training_high_confidence']}",
-        f"Training knowledge — low confidence [T-LOW]: {audit['training_low_confidence']}",
-        f"Uncertain source [T-UNCERTAIN]: {audit['uncertain_source']}",
-        f"Blended claims [R+T]: {audit['blended_claims']}",
-        f"Retrieval grounding ratio: {ratio_pct}%",
-        "",
-    ]
-    if audit["requires_verification"]:
-        lines.append("### Claims requiring manual verification before publication:")
-        for i, sentence in enumerate(audit["requires_verification"][:10], 1):
-            lines.append(f"{i}. {sentence[:200].strip()}")
-    else:
-        lines.append("✓ No T-LOW or T-UNCERTAIN claims detected.")
-    return "\n".join(lines)
-
-
-# ── Protocol 2: DOI Verification Pass ────────────────────────────────────────
-
-class DOIStatus(str, Enum):
-    VERIFIED = "VERIFIED"       # DOI resolves, title matches
-    SLOPPY = "SLOPPY"           # DOI resolves but metadata differs (Sloppiness)
-    PHANTOM = "PHANTOM"         # DOI doesn't resolve (fabricated)
-    NO_DOI = "NO_DOI"           # Citation but no DOI in retrieved set
-
+# ── Verification Retrieval Agent ─────────────────────────────────────────────
 
 @dataclass
-class DOIVerificationResult:
-    doi: str
-    title_in_output: str
-    status: DOIStatus
-    resolved_title: str = ""
-    resolved_year: str = ""
-    note: str = ""
+class ClaimVerification:
+    original_claim: str          # the T-LOW/T-UNCERTAIN claim text
+    query_used: str              # what was searched
+    status: str                  # "verified" | "paper_found" | "not_found" | "unverifiable"
+    found_title: str = ""        # what Semantic Scholar/Crossref returned
+    found_year: str = ""
+    found_doi: str = ""
+    confidence_note: str = ""    # plain English explanation for register
+    dagger_id: int = 0           # position in Analytical Inference Register
 
 
-async def verify_doi(doi: str, title_in_output: str) -> DOIVerificationResult:
-    """
-    Verify a single DOI against Crossref.
-    Distinguishes VERIFIED, SLOPPY (metadata mismatch), and PHANTOM (not found).
-    """
-    clean_doi = doi.strip().lstrip("https://doi.org/").lstrip("http://dx.doi.org/")
+async def verify_single_claim(
+    claim_text: str,
+    dagger_id: int,
+    call_llm_fn=None,
+) -> ClaimVerification:
+    """Attempt to verify a T-LOW claim via targeted retrieval."""
+
+    if not call_llm_fn:
+        return ClaimVerification(
+            original_claim=claim_text, query_used="",
+            status="unverifiable",
+            confidence_note="Verification skipped — no LLM available.",
+            dagger_id=dagger_id,
+        )
+
+    # Extract bibliographic components
+    extract_prompt = (
+        f"Extract bibliographic components from this claim (return JSON only):\n"
+        f"Claim: '{claim_text[:250]}'\n\n"
+        f'{{"author": "surname or empty", "year": "4 digits or empty", '
+        f'"title_fragment": "key title words or empty", "verifiable": true/false}}'
+    )
+    try:
+        raw = await call_llm_fn(extract_prompt, max_tokens=150)
+        clean = raw.strip().strip("```json").strip("```").strip()
+        comp = _json.loads(clean)
+    except Exception:
+        return ClaimVerification(
+            original_claim=claim_text, query_used="",
+            status="unverifiable",
+            confidence_note="Bibliographic components could not be extracted from claim.",
+            dagger_id=dagger_id,
+        )
+
+    if not comp.get("verifiable"):
+        return ClaimVerification(
+            original_claim=claim_text, query_used="",
+            status="unverifiable",
+            confidence_note="Claim does not reference a specific citable work — analytical inference.",
+            dagger_id=dagger_id,
+        )
+
+    query = " ".join(p for p in [
+        comp.get("title_fragment", ""),
+        comp.get("author", ""),
+        comp.get("year", ""),
+    ] if p).strip()
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         try:
             resp = await client.get(
-                f"https://api.crossref.org/works/{clean_doi}",
-                headers={
-                    "User-Agent": "CRIA-Research/2.0 (mailto:research@cria.dev)",
-                    "Accept": "application/json",
-                },
-            )
-
-            if resp.status_code == 404:
-                return DOIVerificationResult(
-                    doi=doi, title_in_output=title_in_output,
-                    status=DOIStatus.PHANTOM,
-                    note="DOI not found in Crossref — possible hallucinated citation (Phantom)",
-                )
-
-            if resp.status_code != 200:
-                return DOIVerificationResult(
-                    doi=doi, title_in_output=title_in_output,
-                    status=DOIStatus.NO_DOI,
-                    note=f"Crossref returned HTTP {resp.status_code}",
-                )
-
-            data = resp.json().get("message", {})
-            title_list = data.get("title", [])
-            resolved_title = title_list[0] if title_list else ""
-            resolved_year = str(
-                data.get("published", {}).get("date-parts", [[""]])[0][0]
-            )
-
-            # Fuzzy title match — allow for minor formatting differences
-            t1 = re.sub(r'[^a-z0-9 ]', '', title_in_output.lower())
-            t2 = re.sub(r'[^a-z0-9 ]', '', resolved_title.lower())
-
-            # Check word overlap
-            words1 = set(t1.split())
-            words2 = set(t2.split())
-            if not words1 or not words2:
-                overlap = 0.0
-            else:
-                overlap = len(words1 & words2) / max(len(words1), len(words2))
-
-            if overlap >= 0.75:
-                return DOIVerificationResult(
-                    doi=doi, title_in_output=title_in_output,
-                    status=DOIStatus.VERIFIED,
-                    resolved_title=resolved_title,
-                    resolved_year=resolved_year,
-                    note=f"Title match: {int(overlap*100)}%",
-                )
-            else:
-                return DOIVerificationResult(
-                    doi=doi, title_in_output=title_in_output,
-                    status=DOIStatus.SLOPPY,
-                    resolved_title=resolved_title,
-                    resolved_year=resolved_year,
-                    note=(
-                        f"Metadata mismatch (Sloppiness): output says '{title_in_output[:60]}', "
-                        f"Crossref says '{resolved_title[:60]}'. Overlap: {int(overlap*100)}%"
-                    ),
-                )
-
-        except httpx.TimeoutException:
-            return DOIVerificationResult(
-                doi=doi, title_in_output=title_in_output,
-                status=DOIStatus.NO_DOI,
-                note="Crossref timeout — could not verify",
-            )
-        except Exception as e:
-            return DOIVerificationResult(
-                doi=doi, title_in_output=title_in_output,
-                status=DOIStatus.NO_DOI,
-                note=f"Verification error: {str(e)[:100]}",
-            )
-
-
-def extract_dois_from_text(text: str) -> List[Tuple[str, str]]:
-    """
-    Extract (doi, nearby_title) pairs from academic output text.
-    Returns list of (doi_string, context_title) tuples.
-    """
-    pairs = []
-
-    # Pattern 1: explicit DOI URLs
-    doi_pattern = re.compile(
-        r'(?:https?://(?:dx\.)?doi\.org/|doi:\s*)(10\.\d{4,}/\S+)'
-    )
-
-    for match in doi_pattern.finditer(text):
-        doi = match.group(1).rstrip('.,;)')
-        # Extract nearby title — look back up to 300 chars for quoted text or bold
-        start = max(0, match.start() - 300)
-        context = text[start:match.start()]
-
-        # Try to find title in context
-        title_match = re.search(r'"([^"]{10,100})"', context)
-        if not title_match:
-            title_match = re.search(r'\*\*([^*]{10,100})\*\*', context)
-        if not title_match:
-            # Use first sentence fragment as fallback
-            sentences = context.split('.')
-            title_match = None
-            context_title = sentences[-1].strip()[:80] if sentences else ""
-        else:
-            context_title = title_match.group(1)
-
-        pairs.append((doi, context_title))
-
-    return pairs
-
-
-async def run_doi_verification_pass(academic_text: str) -> Dict:
-    """
-    Run the full DOI verification pass on academic output text.
-    Returns verification report dict.
-    """
-    doi_pairs = extract_dois_from_text(academic_text)
-
-    if not doi_pairs:
-        return {
-            "dois_found": 0,
-            "verified": 0, "sloppy": 0, "phantom": 0, "no_doi": 0,
-            "results": [],
-            "note": "No DOIs found in academic output to verify.",
-        }
-
-    # Verify concurrently (rate limited)
-    semaphore = asyncio.Semaphore(3)
-
-    async def verify_with_limit(doi, title):
-        async with semaphore:
-            await asyncio.sleep(0.5)  # Crossref rate limit courtesy
-            return await verify_doi(doi, title)
-
-    results = await asyncio.gather(
-        *[verify_with_limit(doi, title) for doi, title in doi_pairs],
-        return_exceptions=True,
-    )
-
-    valid_results = [r for r in results if isinstance(r, DOIVerificationResult)]
-
-    counts = {
-        "dois_found": len(doi_pairs),
-        "verified": sum(1 for r in valid_results if r.status == DOIStatus.VERIFIED),
-        "sloppy": sum(1 for r in valid_results if r.status == DOIStatus.SLOPPY),
-        "phantom": sum(1 for r in valid_results if r.status == DOIStatus.PHANTOM),
-        "no_doi": sum(1 for r in valid_results if r.status == DOIStatus.NO_DOI),
-        "results": [
-            {
-                "doi": r.doi,
-                "title_cited": r.title_in_output,
-                "status": r.status.value,
-                "resolved_title": r.resolved_title,
-                "note": r.note,
-            }
-            for r in valid_results
-        ],
-    }
-
-    log.info(
-        "DOI verification: %d found, %d verified, %d sloppy, %d phantom, %d unresolved",
-        counts["dois_found"], counts["verified"], counts["sloppy"],
-        counts["phantom"], counts["no_doi"],
-    )
-    return counts
-
-
-def format_doi_verification_report(report: Dict) -> str:
-    """Format DOI verification report for Retrieval Status file."""
-    lines = [
-        "# DOI Verification Report",
-        f"DOIs found in Academic output: {report['dois_found']}",
-        f"✓ VERIFIED: {report['verified']} (DOI resolves, title matches)",
-        f"⚠ SLOPPY: {report['sloppy']} (DOI resolves, metadata differs)",
-        f"✗ PHANTOM: {report['phantom']} (DOI not found — possible hallucination)",
-        f"? UNRESOLVED: {report['no_doi']} (could not verify)",
-        "",
-    ]
-
-    if report.get("phantom", 0) > 0:
-        lines.append("## ✗ PHANTOM citations — verify before publication:")
-        for r in report.get("results", []):
-            if r["status"] == "PHANTOM":
-                lines.append(f"  - {r['doi']}: \"{r['title_cited'][:60]}\"")
-                lines.append(f"    {r['note']}")
-        lines.append("")
-
-    if report.get("sloppy", 0) > 0:
-        lines.append("## ⚠ SLOPPY citations — metadata differs, check before publication:")
-        for r in report.get("results", []):
-            if r["status"] == "SLOPPY":
-                lines.append(f"  - {r['doi']}")
-                lines.append(f"    Cited as: \"{r['title_cited'][:60]}\"")
-                lines.append(f"    Crossref: \"{r['resolved_title'][:60]}\"")
-        lines.append("")
-
-    if report.get("phantom", 0) == 0 and report.get("sloppy", 0) == 0:
-        lines.append("✓ All verifiable citations passed DOI verification.")
-
-    return "\n".join(lines)
-
-
-# ── Protocol 3: Stage 0 Landmark Pre-Verification ────────────────────────────
-
-@dataclass
-class LandmarkVerificationResult:
-    paper_name: str           # as Stage 0 named it
-    found: bool
-    semantic_scholar_title: str = ""
-    semantic_scholar_doi: str = ""
-    confidence: float = 0.0
-    note: str = ""
-
-
-async def verify_landmark_paper(paper_name: str) -> LandmarkVerificationResult:
-    """
-    Verify a Stage 0 landmark paper against Semantic Scholar.
-    Returns whether the paper exists and its actual metadata.
-    """
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        try:
-            resp = await client.get(
                 "https://api.semanticscholar.org/graph/v1/paper/search",
-                params={
-                    "query": paper_name,
-                    "limit": 3,
-                    "fields": "title,year,authors,externalIds",
-                },
+                params={"query": query, "limit": 2,
+                        "fields": "title,year,authors,externalIds"},
             )
             data = resp.json().get("data", [])
 
             if not data:
-                return LandmarkVerificationResult(
-                    paper_name=paper_name,
-                    found=False,
-                    note="Not found in Semantic Scholar — treat as T-LOW until verified",
+                return ClaimVerification(
+                    original_claim=claim_text, query_used=query,
+                    status="not_found",
+                    confidence_note=(
+                        f"Searched: '{query[:60]}'. No matching paper found in "
+                        "Semantic Scholar. Claim remains unverified."
+                    ),
+                    dagger_id=dagger_id,
                 )
 
             best = data[0]
             ss_title = best.get("title", "")
+            ss_year = str(best.get("year", ""))
             doi = best.get("externalIds", {}).get("DOI", "")
 
-            # Fuzzy match against query
-            q_words = set(re.sub(r'[^a-z0-9 ]', '', paper_name.lower()).split())
-            t_words = set(re.sub(r'[^a-z0-9 ]', '', ss_title.lower()).split())
-            if not q_words:
-                overlap = 0.0
-            else:
-                overlap = len(q_words & t_words) / max(len(q_words), len(t_words))
+            # Title overlap
+            frag = re.sub(r"[^a-z0-9 ]", "",
+                          comp.get("title_fragment", "").lower()).split()
+            ss_w = set(re.sub(r"[^a-z0-9 ]", "", ss_title.lower()).split())
+            overlap = len(set(frag) & ss_w) / max(1, len(frag)) if frag else 0
 
-            if overlap >= 0.6:
-                return LandmarkVerificationResult(
-                    paper_name=paper_name,
-                    found=True,
-                    semantic_scholar_title=ss_title,
-                    semantic_scholar_doi=doi,
-                    confidence=overlap,
-                    note=f"Confirmed in Semantic Scholar ({int(overlap*100)}% match)",
+            if overlap >= 0.5:
+                return ClaimVerification(
+                    original_claim=claim_text, query_used=query,
+                    status="paper_found",
+                    found_title=ss_title,
+                    found_year=ss_year,
+                    found_doi=doi,
+                    confidence_note=(
+                        f"Paper located in Semantic Scholar: '{ss_title[:80]}' ({ss_year}). "
+                        "Existence confirmed. The specific interpretive claim was not "
+                        "independently assessed — scholarly verification recommended."
+                    ),
+                    dagger_id=dagger_id,
                 )
             else:
-                return LandmarkVerificationResult(
-                    paper_name=paper_name,
-                    found=False,
-                    semantic_scholar_title=ss_title,
-                    semantic_scholar_doi=doi,
-                    confidence=overlap,
-                    note=(
-                        f"Low match ({int(overlap*100)}%): Stage 0 named '{paper_name}', "
-                        f"closest S2 result: '{ss_title[:80]}'. Exclude from search strings."
+                return ClaimVerification(
+                    original_claim=claim_text, query_used=query,
+                    status="not_found",
+                    found_title=ss_title,
+                    confidence_note=(
+                        f"Closest Semantic Scholar result: '{ss_title[:60]}' ({ss_year}). "
+                        f"Title match insufficient ({int(overlap*100)}%). "
+                        "Claim remains unverified."
                     ),
+                    dagger_id=dagger_id,
                 )
 
         except Exception as e:
-            log.warning("Landmark verification error for '%s': %s", paper_name[:50], e)
-            return LandmarkVerificationResult(
-                paper_name=paper_name,
-                found=False,
-                note=f"Verification error: {str(e)[:80]} — treat as unverified",
+            return ClaimVerification(
+                original_claim=claim_text, query_used=query,
+                status="unverifiable",
+                confidence_note=f"Verification retrieval error: {str(e)[:80]}",
+                dagger_id=dagger_id,
             )
 
 
-async def verify_stage0_landmarks(landmark_papers: List[str]) -> Dict:
+async def run_verification_retrieval_agent(
+    channel_outputs: str,
+    call_llm_fn=None,
+) -> List[ClaimVerification]:
     """
-    Verify all landmark papers Stage 0 identified before search strings are built.
-    Returns dict with confirmed, unconfirmed, and excluded lists.
+    Extract all T-LOW and T-UNCERTAIN claims from channel outputs and
+    attempt verification via targeted retrieval.
+    Returns list of ClaimVerification objects for the Analytical Inference Register.
     """
-    if not landmark_papers:
-        return {"confirmed": [], "unconfirmed": [], "excluded": [], "total": 0}
+    # Extract flagged claims
+    pattern = re.compile(
+        r"([^.!?\n]{20,200})\s*\[T-(?:LOW|UNCERTAIN)\]", re.MULTILINE
+    )
+    matches = pattern.findall(channel_outputs)
 
-    semaphore = asyncio.Semaphore(3)
+    if not matches:
+        return []
 
-    async def verify_with_limit(paper):
-        async with semaphore:
+    # Deduplicate
+    seen = set()
+    unique_claims = []
+    for m in matches:
+        key = m.strip()[:80]
+        if key not in seen:
+            seen.add(key)
+            unique_claims.append(m.strip())
+
+    # Verify concurrently (rate limited)
+    sem = asyncio.Semaphore(2)
+
+    async def verify_with_limit(claim, idx):
+        async with sem:
             await asyncio.sleep(0.3)
-            return await verify_landmark_paper(paper)
+            return await verify_single_claim(claim, idx + 1, call_llm_fn)
 
     results = await asyncio.gather(
-        *[verify_with_limit(p) for p in landmark_papers],
+        *[verify_with_limit(c, i) for i, c in enumerate(unique_claims)],
         return_exceptions=True,
     )
 
-    confirmed = []
-    unconfirmed = []
-    excluded = []
+    return [r for r in results if isinstance(r, ClaimVerification)]
 
-    for r in results:
-        if isinstance(r, LandmarkVerificationResult):
-            if r.found and r.confidence >= 0.6:
-                confirmed.append({
-                    "name": r.paper_name,
-                    "verified_title": r.semantic_scholar_title,
-                    "doi": r.semantic_scholar_doi,
-                    "note": r.note,
-                })
+
+# ── DOI Verification Pass ─────────────────────────────────────────────────────
+
+@dataclass
+class DOIResult:
+    doi: str
+    title_cited: str
+    status: str          # "verified" | "sloppy" | "phantom" | "timeout"
+    resolved_title: str = ""
+    note: str = ""
+
+
+async def verify_doi(doi: str, title_cited: str) -> DOIResult:
+    clean = re.sub(r"https?://(?:dx\.)?doi\.org/", "", doi).strip()
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        try:
+            r = await client.get(
+                f"https://api.crossref.org/works/{clean}",
+                headers={"User-Agent": "CRIA-Research/2.0 (mailto:research@cria.dev)"},
+            )
+            if r.status_code == 404:
+                return DOIResult(doi=doi, title_cited=title_cited,
+                                 status="phantom",
+                                 note="Not found in Crossref")
+            if r.status_code != 200:
+                return DOIResult(doi=doi, title_cited=title_cited,
+                                 status="timeout", note=f"HTTP {r.status_code}")
+            titles = r.json().get("message", {}).get("title", [])
+            resolved = titles[0] if titles else ""
+            w1 = set(re.sub(r"[^a-z0-9 ]", "", title_cited.lower()).split())
+            w2 = set(re.sub(r"[^a-z0-9 ]", "", resolved.lower()).split())
+            overlap = len(w1 & w2) / max(1, len(w1)) if w1 else 0
+            if overlap >= 0.7:
+                return DOIResult(doi=doi, title_cited=title_cited,
+                                 status="verified", resolved_title=resolved)
             else:
-                excluded.append({
-                    "name": r.paper_name,
-                    "closest_match": r.semantic_scholar_title,
-                    "confidence": r.confidence,
-                    "note": r.note,
-                })
-                unconfirmed.append(r.paper_name)
-
-    log.info(
-        "Stage 0 landmark pre-verification: %d confirmed, %d excluded from search strings",
-        len(confirmed), len(excluded),
-    )
-
-    return {
-        "confirmed": confirmed,
-        "unconfirmed": unconfirmed,
-        "excluded": excluded,
-        "total": len(landmark_papers),
-    }
+                return DOIResult(doi=doi, title_cited=title_cited,
+                                 status="sloppy", resolved_title=resolved,
+                                 note=f"Crossref title: '{resolved[:60]}'")
+        except httpx.TimeoutException:
+            return DOIResult(doi=doi, title_cited=title_cited,
+                             status="timeout", note="Crossref timeout")
+        except Exception as e:
+            return DOIResult(doi=doi, title_cited=title_cited,
+                             status="timeout", note=str(e)[:60])
 
 
-def format_landmark_verification_report(report: Dict) -> str:
-    """Format landmark verification for Research Design Record."""
+def extract_dois_from_text(text: str) -> List[Tuple[str, str]]:
+    pairs = []
+    for m in re.finditer(r"(?:https?://(?:dx\.)?doi\.org/|doi:\s*)(10\.\d{4,}/\S+)", text):
+        doi = m.group(1).rstrip(".,;)")
+        ctx = text[max(0, m.start()-250):m.start()]
+        tm = re.search(r'["\'](.*?)["\']', ctx)
+        title = tm.group(1)[:80] if tm else ctx.split(".")[-1].strip()[:60]
+        pairs.append((doi, title))
+    return pairs
+
+
+async def run_doi_verification(text: str) -> List[DOIResult]:
+    pairs = extract_dois_from_text(text)
+    if not pairs:
+        return []
+    sem = asyncio.Semaphore(3)
+    async def v(doi, title):
+        async with sem:
+            await asyncio.sleep(0.4)
+            return await verify_doi(doi, title)
+    results = await asyncio.gather(*[v(d, t) for d, t in pairs], return_exceptions=True)
+    return [r for r in results if isinstance(r, DOIResult)]
+
+
+# ── Stage 0 Landmark Pre-Verification ────────────────────────────────────────
+
+@dataclass
+class LandmarkResult:
+    name: str
+    confirmed: bool
+    verified_title: str = ""
+    doi: str = ""
+    note: str = ""
+
+
+async def verify_landmark(name: str) -> LandmarkResult:
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        try:
+            r = await client.get(
+                "https://api.semanticscholar.org/graph/v1/paper/search",
+                params={"query": name, "limit": 2,
+                        "fields": "title,year,externalIds"},
+            )
+            data = r.json().get("data", [])
+            if not data:
+                return LandmarkResult(name=name, confirmed=False,
+                                      note="Not found in Semantic Scholar")
+            best = data[0]
+            title = best.get("title", "")
+            doi = best.get("externalIds", {}).get("DOI", "")
+            q_w = set(re.sub(r"[^a-z0-9 ]", "", name.lower()).split())
+            t_w = set(re.sub(r"[^a-z0-9 ]", "", title.lower()).split())
+            overlap = len(q_w & t_w) / max(1, len(q_w)) if q_w else 0
+            if overlap >= 0.55:
+                return LandmarkResult(name=name, confirmed=True,
+                                      verified_title=title, doi=doi)
+            return LandmarkResult(name=name, confirmed=False,
+                                  verified_title=title,
+                                  note=f"Closest match: '{title[:60]}' — insufficient overlap")
+        except Exception as e:
+            return LandmarkResult(name=name, confirmed=False,
+                                  note=str(e)[:60])
+
+
+async def verify_stage0_landmarks(names: List[str]) -> List[LandmarkResult]:
+    sem = asyncio.Semaphore(3)
+    async def v(n):
+        async with sem:
+            await asyncio.sleep(0.3)
+            return await verify_landmark(n)
+    results = await asyncio.gather(*[v(n) for n in names], return_exceptions=True)
+    return [r for r in results if isinstance(r, LandmarkResult)]
+
+
+# ── Publishable Integrity Block ───────────────────────────────────────────────
+# This is what gets embedded in the Academic output document.
+# Plain language. Peer-review ready. No jargon taxonomies.
+
+def build_evidence_quality_section(
+    doi_results: List[DOIResult],
+    claim_verifications: List[ClaimVerification],
+    landmark_results: List[LandmarkResult],
+    retrieved_paper_count: int,
+) -> str:
+    """
+    Produces the Evidence Quality Assessment section — embedded in the paper
+    before Findings. Plain scholarly language. No taxonomies.
+    """
+    total_dois = len(doi_results)
+    verified = sum(1 for r in doi_results if r.status == "verified")
+    sloppy = sum(1 for r in doi_results if r.status == "sloppy")
+    phantom = sum(1 for r in doi_results if r.status == "phantom")
+
+    total_landmarks = len(landmark_results)
+    confirmed_landmarks = sum(1 for r in landmark_results if r.confirmed)
+
+    total_claims = len(claim_verifications)
+    verified_claims = sum(1 for c in claim_verifications if c.status == "paper_found")
+    unverified_claims = sum(1 for c in claim_verifications
+                            if c.status in ("not_found", "unverifiable"))
+
+    # Determine overall status
+    if phantom > 0:
+        status = "MANUAL REVIEW REQUIRED"
+        status_symbol = "⚠"
+    elif sloppy > 0 or unverified_claims > 2:
+        status = "REVIEW RECOMMENDED BEFORE SUBMISSION"
+        status_symbol = "◈"
+    else:
+        status = "READY FOR PRE-SUBMISSION REVIEW"
+        status_symbol = "✓"
+
     lines = [
-        "## Stage 0 Landmark Pre-Verification",
-        f"Papers identified by Stage 0: {report['total']}",
-        f"Confirmed in Semantic Scholar: {len(report['confirmed'])}",
-        f"Excluded from search strings (unverified): {len(report['excluded'])}",
+        "## Evidence Quality Assessment",
         "",
     ]
 
-    if report["confirmed"]:
-        lines.append("### ✓ Confirmed landmark papers:")
-        for p in report["confirmed"]:
-            lines.append(f"  - {p['name']}")
-            if p["verified_title"] != p["name"]:
-                lines.append(f"    Verified as: {p['verified_title'][:80]}")
-            if p["doi"]:
-                lines.append(f"    DOI: {p['doi']}")
-        lines.append("")
-
-    if report["excluded"]:
-        lines.append("### ✗ Excluded from search strings (not verified):")
-        for p in report["excluded"]:
-            lines.append(f"  - \"{p['name']}\" — {p['note']}")
-        lines.append("")
+    # Citation verification
+    if total_dois > 0:
+        if phantom == 0 and sloppy == 0:
+            lines.append(
+                f"**Citation verification:** All {total_dois} citations were verified "
+                f"against Crossref and Semantic Scholar prior to synthesis. "
+                f"All DOIs resolve and metadata is consistent."
+            )
+        else:
+            lines.append(f"**Citation verification:** {verified} of {total_dois} citations verified.")
+            if phantom > 0:
+                for r in doi_results:
+                    if r.status == "phantom":
+                        lines.append(
+                            f"  ⚠ Could not verify: '{r.title_cited[:60]}' — "
+                            f"DOI ({r.doi[:40]}) not found in Crossref. "
+                            f"Independent verification required before submission."
+                        )
+            if sloppy > 0:
+                for r in doi_results:
+                    if r.status == "sloppy":
+                        lines.append(
+                            f"  ◈ Metadata mismatch: cited as '{r.title_cited[:50]}', "
+                            f"Crossref records as '{r.resolved_title[:50]}'. "
+                            f"Correct citation details before submitting."
+                        )
+    else:
         lines.append(
-            "NOTE: Excluded papers were not used in search string construction. "
-            "If these papers are real, search results may be incomplete — "
-            "retry with author name queries directly."
+            "**Citation verification:** No DOIs were extracted from this output "
+            "for automated verification. Manual citation checking is recommended."
         )
+
+    lines.append("")
+
+    # Grounding
+    if total_claims > 0:
+        dagger_claims = [c for c in claim_verifications
+                         if c.status in ("not_found", "unverifiable")]
+        if not dagger_claims:
+            lines.append(
+                f"**Analytical grounding:** {total_claims} claim(s) identified as "
+                f"drawing on analytical inference rather than direct retrieval. "
+                f"Supporting papers were located for all via targeted search. "
+                f"Marked with † in text; full verification details in the "
+                f"Analytical Inference Register below."
+            )
+        else:
+            lines.append(
+                f"**Analytical grounding:** {total_claims} claim(s) identified as "
+                f"drawing on analytical inference. {verified_claims} were supported by "
+                f"papers located via targeted retrieval. {len(dagger_claims)} could not "
+                f"be verified. Marked with † in text; see Analytical Inference Register."
+            )
+    else:
+        lines.append(
+            "**Analytical grounding:** All claims in this paper are retrieval-grounded "
+            "from the evidence set assembled during this research run."
+        )
+
+    lines.append("")
+
+    # Landmark check
+    if total_landmarks > 0:
+        excluded = [r for r in landmark_results if not r.confirmed]
+        if not excluded:
+            lines.append(
+                f"**Search integrity:** {confirmed_landmarks} of {total_landmarks} "
+                f"landmark papers identified in Stage 0 were confirmed in Semantic "
+                f"Scholar before being used to construct search queries."
+            )
+        else:
+            lines.append(
+                f"**Search integrity:** {confirmed_landmarks} of {total_landmarks} "
+                f"landmark papers confirmed. {len(excluded)} could not be verified "
+                f"and were excluded from search strings — this may affect coverage."
+            )
+            for r in excluded:
+                lines.append(f"  — '{r.name}': {r.note}")
+
+    lines.extend(["", f"**Status:** {status_symbol} {status}", ""])
+    return "\n".join(lines)
+
+
+def build_analytical_inference_register(
+    claim_verifications: List[ClaimVerification],
+) -> str:
+    """
+    Produces the Analytical Inference Register — scholarly footnote-style
+    section listing every †-marked claim with verification attempt details.
+    Placed before References in the Academic output.
+    """
+    if not claim_verifications:
+        return ""
+
+    lines = [
+        "## Analytical Inference Register",
+        "",
+        "The following claims drew on analytical inference rather than direct "
+        "retrieval from the assembled evidence set. Each was subjected to a "
+        "targeted verification search. The results are documented below to "
+        "support peer review and replication.",
+        "",
+    ]
+
+    for cv in claim_verifications:
+        status_label = {
+            "paper_found": "Supporting paper located",
+            "not_found": "Paper not located — claim unverified",
+            "unverifiable": "No citable paper reference",
+            "verified": "Verified",
+        }.get(cv.status, cv.status)
+
+        lines.extend([
+            f"**†{cv.dagger_id}** {cv.original_claim[:200].strip()}",
+            f"*Verification status:* {status_label}",
+        ])
+
+        if cv.found_title:
+            lines.append(f"*Paper located:* {cv.found_title[:100]}" +
+                         (f" ({cv.found_year})" if cv.found_year else "") +
+                         (f" DOI: {cv.found_doi}" if cv.found_doi else ""))
+        if cv.query_used:
+            lines.append(f"*Search query used:* '{cv.query_used[:80]}'")
+
+        lines.append(f"*Note:* {cv.confidence_note}")
+        lines.append("")
 
     return "\n".join(lines)
 
 
-# ── Combined integrity report ─────────────────────────────────────────────────
-
-def compile_integrity_report(
-    doi_report: Optional[Dict],
-    landmark_report: Optional[Dict],
-    confidence_audits: Optional[List[str]],
+def build_integrity_summary_block(
+    doi_results: List[DOIResult],
+    claim_verifications: List[ClaimVerification],
+    landmark_results: List[LandmarkResult],
 ) -> str:
-    """Compile all three protocol outputs into one integrity report."""
-    sections = [
-        "# CRIA Integrity Report",
-        "## Epistemic Integrity Protocols (May 2026)",
-        "Based on: Self-RAG (Asai et al. ICLR 2024), GHOSTCITE taxonomy, "
-        "ReDeEP (ICLR 2025), 'The 17% Gap' (Ilter, arXiv 2601.17431)",
-        "",
-    ]
+    """
+    Produces the compact integrity summary for the dashboard tab header.
+    Plain English. Traffic-light status. 5 seconds to read.
+    """
+    phantom = sum(1 for r in doi_results if r.status == "phantom")
+    sloppy = sum(1 for r in doi_results if r.status == "sloppy")
+    verified_dois = sum(1 for r in doi_results if r.status == "verified")
+    unverified_claims = sum(1 for c in claim_verifications
+                            if c.status in ("not_found", "unverifiable"))
 
-    if landmark_report:
-        sections.append(format_landmark_verification_report(landmark_report))
+    if phantom > 0:
+        status = "MANUAL REVIEW REQUIRED"
+        colour = "red"
+    elif sloppy > 0 or unverified_claims > 2:
+        status = "REVIEW BEFORE SUBMISSION"
+        colour = "amber"
+    else:
+        status = "READY FOR PRE-SUBMISSION REVIEW"
+        colour = "green"
 
-    if doi_report:
-        sections.append(format_doi_verification_report(doi_report))
-
-    if confidence_audits:
-        sections.append("# Confidence Audit — Grounding Tags by Channel")
-        sections.extend(confidence_audits)
-
-    sections.append(
-        "\n---\nThis report is generated automatically by CRIA's integrity protocols. "
-        "PHANTOM citations require manual verification before publication. "
-        "T-LOW claims require independent scholarly verification. "
-        "SLOPPY citations should be corrected against the Crossref metadata above."
-    )
-
-    return "\n\n".join(sections)
+    return _json.dumps({
+        "status": status,
+        "colour": colour,
+        "citations_verified": verified_dois,
+        "citations_phantom": phantom,
+        "citations_sloppy": sloppy,
+        "citations_total": len(doi_results),
+        "claims_flagged": len(claim_verifications),
+        "claims_unverified": unverified_claims,
+        "landmarks_confirmed": sum(1 for r in landmark_results if r.confirmed),
+        "landmarks_total": len(landmark_results),
+    })

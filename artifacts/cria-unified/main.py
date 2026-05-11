@@ -157,26 +157,24 @@ except ImportError:
 try:
     from cria_integrity_protocols import (
         inject_grounding_instruction,
-        extract_confidence_audit,
-        format_confidence_audit,
-        run_doi_verification_pass,
-        format_doi_verification_report,
+        run_verification_retrieval_agent,
+        run_doi_verification,
         verify_stage0_landmarks,
-        format_landmark_verification_report,
-        compile_integrity_report,
+        build_evidence_quality_section,
+        build_analytical_inference_register,
+        build_integrity_summary_block,
         GROUNDING_INSTRUCTION,
     )
     _INTEGRITY_AVAILABLE = True
 except ImportError:
     _INTEGRITY_AVAILABLE = False
     def inject_grounding_instruction(p, s): return p, s
-    def extract_confidence_audit(t): return {}
-    def format_confidence_audit(a, n): return ""
-    async def run_doi_verification_pass(t): return {}
-    def format_doi_verification_report(r): return ""
-    async def verify_stage0_landmarks(l): return {"confirmed": l, "unconfirmed": [], "excluded": [], "total": len(l)}
-    def format_landmark_verification_report(r): return ""
-    def compile_integrity_report(*a, **k): return ""
+    async def run_verification_retrieval_agent(t, fn=None): return []
+    async def run_doi_verification(t): return []
+    async def verify_stage0_landmarks(l): return []
+    def build_evidence_quality_section(*a, **k): return ""
+    def build_analytical_inference_register(c): return ""
+    def build_integrity_summary_block(*a, **k): return "{}"
     GROUNDING_INSTRUCTION = ""  
 
 try:
@@ -3929,43 +3927,92 @@ class ThreeVoiceRenderer:
             retrieved_papers=unique_retrieved,
         )
 
-        # Protocol 1: confidence audit on grounding tags
-        confidence_audit = {}
-        confidence_audit_text = ""
-        if _INTEGRITY_AVAILABLE:
-            try:
-                confidence_audit = extract_confidence_audit(text)
-                confidence_audit_text = format_confidence_audit(
-                    confidence_audit, "Academic Synthesis")
-                log.info("Confidence audit: %d [R], %d [T-LOW], %d [T-UNCERTAIN]",
-                    confidence_audit.get("retrieved_claims", 0),
-                    confidence_audit.get("training_low_confidence", 0),
-                    confidence_audit.get("uncertain_source", 0))
-            except Exception as e:
-                log.warning("Confidence audit error: %s", e)
+        # ── Epistemic Integrity Protocols ────────────────────────────────
+        # Runs after Academic synthesis. Embeds quality assessment and
+        # Analytical Inference Register directly into the document.
+        doi_results = []
+        claim_verifications = []
+        landmark_results = context.get("landmark_results", [])
+        integrity_summary = "{}"
 
-        # Protocol 2: DOI verification pass
-        doi_report = {}
-        doi_report_text = ""
         if _INTEGRITY_AVAILABLE:
             try:
-                doi_report = await run_doi_verification_pass(text)
-                doi_report_text = format_doi_verification_report(doi_report)
-                if doi_report.get("phantom", 0) > 0:
-                    log.warning("⚠ DOI verification: %d PHANTOM citation(s) in academic output",
-                                doi_report["phantom"])
+                # Protocol 2: DOI verification
+                doi_results = await run_doi_verification(text)
+                phantom = sum(1 for r in doi_results if r.status == "phantom")
+                if phantom > 0:
+                    log.warning("⚠ %d PHANTOM citation(s) in academic output", phantom)
+
+                # Protocol 1b: verify T-LOW/T-UNCERTAIN claims via retrieval
+                claim_verifications = await run_verification_retrieval_agent(
+                    text, call_llm_fn=call_llm
+                )
+                log.info("Integrity: %d DOIs checked, %d claims verified",
+                         len(doi_results), len(claim_verifications))
+
+                # Build plain-language summary for dashboard
+                integrity_summary = build_integrity_summary_block(
+                    doi_results, claim_verifications, landmark_results
+                )
+
+                # Build Evidence Quality Assessment section (embedded in document)
+                quality_section = build_evidence_quality_section(
+                    doi_results, claim_verifications, landmark_results,
+                    retrieved_paper_count=len(unique_retrieved),
+                )
+
+                # Build Analytical Inference Register (embedded before References)
+                inference_register = build_analytical_inference_register(claim_verifications)
+
+                # Embed both into the document at the right structural positions
+                # Insert Evidence Quality Assessment after Methodology, before Findings
+                if "## Findings" in text and quality_section:
+                    text = text.replace(
+                        "## Findings",
+                        quality_section + "\n\n## Findings",
+                        1,
+                    )
+                elif "## 4." in text and quality_section:
+                    text = text.replace(
+                        "## 4.",
+                        quality_section + "\n\n## 4.",
+                        1,
+                    )
+
+                # Insert Analytical Inference Register before References
+                if inference_register:
+                    if "## References" in text:
+                        text = text.replace(
+                            "## References",
+                            inference_register + "\n\n## References",
+                            1,
+                        )
+                    elif "## 8." in text:
+                        text = text.replace(
+                            "## 8.",
+                            inference_register + "\n\n## 8.",
+                            1,
+                        )
+                    else:
+                        text = text + "\n\n" + inference_register
+
+                # Strip inline grounding tags from readable text
+                text = re.sub(r"\[R\+T:[^\]]+\]", "", text)
+                text = re.sub(r"\[R:[^\]]+\]", "", text)
+                text = re.sub(r"\[T-HIGH\]", "", text)
+                text = re.sub(r"\[T-LOW\]", "†", text)  # Convert to dagger
+                text = re.sub(r"\[T-UNCERTAIN\]", "†", text)
+                text = re.sub(r"  +", " ", text)  # Clean double spaces
+
             except Exception as e:
-                log.warning("DOI verification error: %s", e)
+                log.warning("Integrity protocol error: %s", e, exc_info=True)
 
         return {
             "text": text,
             "audience": "Peer-reviewed scholarly community",
             "retrieval_adequate": True,
             "retrieved_paper_count": len(unique_retrieved),
-            "confidence_audit": confidence_audit,
-            "confidence_audit_text": confidence_audit_text,
-            "doi_verification": doi_report,
-            "doi_verification_text": doi_report_text,
+            "integrity_summary": integrity_summary,
         }
 
     async def _render_editorial(self, cog, epi, conv, artefact):
