@@ -138,9 +138,14 @@ class QuestionAnalysis:
     suggested_question_variants: List[str] = field(default_factory=list)
     # 2-3 complete alternative question formulations synthesising the improvements
     # These are starting points, not prescriptions — researcher modifies freely
-    iteration_recommendation: int = 2          # 1, 2, or 3
-    iteration_reasoning: str = ""              # plain-language explanation
-    estimated_cost_range: str = ""             # e.g. "AUD $1.50–2.50"
+    # Split pipeline iteration recommendations
+    cognitive_iterations: int = 2      # Cognitive (breadth): 1–5
+    epistemic_iterations: int = 2      # Epistemic (depth): 1–3
+    iteration_reasoning: str = ""      # plain-language explanation of both
+    estimated_cost_aud: str = ""       # e.g. "AUD $2.10"
+    budget_trade_off: str = ""         # lower-cost alternative with coverage % estimate
+    # Legacy field kept for backward compat
+    iteration_recommendation: int = 2
     analysis_note: str = (
         "This analysis is for your information only. Each suggestion below can be "
         "applied or ignored independently. Use the refinement builder at the bottom "
@@ -198,9 +203,12 @@ class QuestionAnalysis:
             "cria_readiness": self.cria_readiness,
             "readiness_explanation": self.readiness_explanation,
             "suggested_question_variants": self.suggested_question_variants,
+            "cognitive_iterations": self.cognitive_iterations,
+            "epistemic_iterations": self.epistemic_iterations,
             "iteration_recommendation": self.iteration_recommendation,
             "iteration_reasoning": self.iteration_reasoning,
-            "estimated_cost_range": self.estimated_cost_range,
+            "estimated_cost_aud": self.estimated_cost_aud,
+            "budget_trade_off": self.budget_trade_off,
             "analysis_note": self.analysis_note,
         }
 
@@ -294,9 +302,12 @@ Return ONLY valid JSON with this exact structure:
     "second complete alternative with a different framing emphasis",
     "third variant if there is a meaningfully different third approach — else omit"
   ],
-  "iteration_recommendation": 1,
-  "iteration_reasoning": "plain-language explanation of why this iteration count — mention cost implications honestly",
-  "estimated_cost_range": "AUD $X.XX–X.XX per run at this iteration count"
+  "cognitive_iterations": 2,
+  "epistemic_iterations": 2,
+  "iteration_reasoning": "plain-language explanation of BOTH recommendations. Explain: (a) how many sub-domains the question spans and why that drives the Cognitive count; (b) how many genuinely incompatible epistemic framings are in collision and why that drives the Epistemic count; (c) specific estimated cost for the recommended configuration; (d) what the researcher would lose if they reduced either count.",
+  "estimated_cost_aud": "AUD $X.XX — specific cost estimate for the recommended configuration",
+  "budget_trade_off": "If cost is a constraint: [N] Cognitive / [M] Epistemic iterations would cost approximately AUD $X.XX and deliver approximately XX% of the coverage, missing [name specifically what domain or frame-critical work gets cut].",
+  "iteration_recommendation": 2
 }}
 
 Rules:
@@ -323,23 +334,45 @@ Rules:
 - cria_readiness: "ready" = proceed as is. "refine_recommended" = would benefit from
   clarification but will produce useful output either way.
   "refine_strongly_recommended" = the question as stated will likely produce poor results.
-- iteration_recommendation: recommend 1, 2, or 3 iterations based on this logic:
-    1 = well-scoped question, good existing literature, single-domain, exploratory.
-      Cost: approximately AUD $0.80–1.50. Use for: first-pass research, topic surveys,
-      questions with obvious literature.
-    2 = multi-domain question, some sparse areas, substantive research needed.
-      Cost: approximately AUD $1.50–2.50. Use for: most research questions.
-      This is the recommended default.
-    3 = frame-extinction or absence-mapping question, cross-tradition synthesis,
-      sovereign-territory questions, publication-grade research, questions where
-      the important findings are in what is NOT in the literature.
-      Cost: approximately AUD $3.00–5.00. Only recommend when the question
-      genuinely requires it — be honest about the cost.
-  iteration_reasoning: 1-2 sentences in plain language explaining why this count,
-    mentioning cost explicitly. E.g. "This is a multi-domain question crossing
-    economics and Indigenous philosophy — 2 iterations will retrieve the core
-    literature without unnecessary cost (est. AUD $1.50–2.50)."
-  estimated_cost_range: format as "AUD $X.XX–X.XX" for the recommended iteration count.
+- cognitive_iterations: 1–5 based on how many distinct sub-domains the question spans.
+    1 = single domain, clear existing literature
+    2 = 2 sub-domains, moderate breadth (recommended default)
+    3 = 3 distinct sub-domains, some sparse areas
+    4 = 4+ sub-domains or civilisational scope spanning multiple disciplines
+    5 = maximum scope, confirmed absence likely in multiple sub-domains
+  Cognitive cost per iteration ≈ AUD $0.40 (GPT-4o dominant channels).
+  NOTE: Cognitive pipeline benefits from up to 5 iterations on wide-domain questions.
+  Each iteration covers territory the previous one could not — there is no diminishing
+  returns problem for the Cognitive pipeline the way there is for the Epistemic.
+
+- epistemic_iterations: 1–3 based on how many genuinely incompatible epistemic
+  traditions are in collision within the question.
+    1 = single epistemic tradition, clear framing, no major frame collision
+    2 = multiple framings, counter-corpus needed, frame critique warranted (default)
+    3 = genuine collision between incompatible traditions (e.g. Western macro-economics
+        vs Indigenous relational ontology); first pass identifies the collision, second
+        applies it to the retrieved corpus, third documents the irresolvable remainder
+  Epistemic cost per iteration ≈ AUD $0.70 (Claude dominant channels).
+  NOTE: Epistemic pipeline rarely benefits from more than 3 iterations — diminishing
+  returns set in fast once the major framings have been identified and applied.
+  Over-iterating produces circular critique, not deeper analysis.
+
+- estimated_cost_aud: calculate: (cognitive_iterations × 0.40) + (epistemic_iterations × 0.70)
+  + fixed costs (Stage 0 $0.15, meta-layers $0.40, voice renders $0.35 = $0.90 fixed total).
+  Round to nearest $0.10. Format: "AUD $X.XX"
+
+- budget_trade_off: ALWAYS provide a lower-cost alternative with specific trade-off information.
+  Format: "If budget is a constraint: [N] Cognitive / [M] Epistemic iterations would cost
+  approximately AUD $X.XX and deliver approximately XX% of the coverage, missing [name
+  the specific sub-domain or frame-critical work that would be cut]."
+  This is information for the researcher, not a recommendation to spend less.
+  Be specific about what gets lost — "the third Cognitive iteration would search the
+  Indigenous philosophy literature that the first two passes likely missed" is more useful
+  than "some coverage".
+
+- iteration_reasoning: 2-4 sentences explaining BOTH recommendations separately.
+  Address: (a) how many sub-domains → Cognitive count; (b) how many incompatible
+  framings → Epistemic count; (c) what specifically would be missed at lower counts.
 
 Return ONLY valid JSON. No preamble, no markdown fences."""
 
@@ -489,38 +522,65 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
                 f"{question.rstrip('?')} — with particular attention to empirical evidence and dissenting perspectives?",
             ]
 
-    # Iteration recommendation with fallback logic
-    raw_iter = data.get("iteration_recommendation", 2)
-    try:
-        iter_rec = int(raw_iter)
-        iter_rec = max(1, min(3, iter_rec))  # clamp 1–3
-    except (TypeError, ValueError):
-        iter_rec = 2
+    # Split iteration recommendations
+    def _clamp(val, lo, hi, default):
+        try: return max(lo, min(hi, int(val)))
+        except (TypeError, ValueError): return default
 
-    # Fallback reasoning if LLM didn't provide it
+    cog_iter = _clamp(data.get("cognitive_iterations", 2), 1, 5, 2)
+    epi_iter = _clamp(data.get("epistemic_iterations", 2), 1, 3, 2)
+    iter_rec = max(cog_iter, epi_iter)  # legacy compat
+
     iter_reasoning = data.get("iteration_reasoning", "")
-    if not iter_reasoning:
-        cost_map = {1: "AUD $0.80–1.50", 2: "AUD $1.50–2.50", 3: "AUD $3.00–5.00"}
-        scope_assessment = scope.assessment
-        if scope_assessment == "too_broad":
-            iter_rec = 1
-            iter_reasoning = "Question is too broad — narrow it first, then run 1 iteration to test the reformulation. Running more iterations on an unfocused question wastes credits."
-        elif scope_assessment == "likely_absence":
-            iter_rec = 3
-            iter_reasoning = "This question is likely to return sparse evidence — 3 iterations needed to exhaust retrieval strategies and properly document the confirmed absence (est. AUD $3.00–5.00)."
-        elif scope_assessment == "sovereign_territory":
-            iter_rec = 2
-            iter_reasoning = "Sovereign-territory questions require partnership, not iteration. 2 iterations retrieves available academic literature while documenting the sovereignty gap (est. AUD $1.50–2.50)."
-        elif len(vocab_clusters) >= 3 and len(ambiguity_flags) >= 2:
-            iter_rec = 2
-            iter_reasoning = "Multi-domain question with significant vocabulary variation. 2 iterations will retrieve the core literature across disciplines without unnecessary cost (est. AUD $1.50–2.50)."
-        else:
-            iter_reasoning = f"Standard question with clear scope. {iter_rec} iteration{'s' if iter_rec > 1 else ''} recommended (est. {cost_map.get(iter_rec, 'AUD $1.50–2.50')})."
+    budget_trade_off = data.get("budget_trade_off", "")
+    cost_aud = data.get("estimated_cost_aud", "")
 
-    cost_range = data.get("estimated_cost_range", "")
-    if not cost_range:
-        cost_map = {1: "AUD $0.80–1.50", 2: "AUD $1.50–2.50", 3: "AUD $3.00–5.00"}
-        cost_range = cost_map.get(iter_rec, "AUD $1.50–2.50")
+    # Fallback logic when LLM didn't return the fields
+    if not iter_reasoning:
+        scope_assessment = scope.assessment
+        n_domains = len(vocab_clusters)
+        n_framings = len(framing_obs)
+
+        if scope_assessment == "too_broad":
+            cog_iter, epi_iter = 1, 1
+            iter_reasoning = ("Question is too broad — narrow it first, then run 1 Cognitive / "
+                              "1 Epistemic iteration to test the reformulation. Running more "
+                              "iterations on an unfocused question wastes cost without improving results.")
+        elif scope_assessment == "sovereign_territory":
+            cog_iter, epi_iter = 2, 2
+            iter_reasoning = ("Sovereign-territory questions require partnership, not iteration. "
+                              "2 Cognitive iterations retrieves available academic literature; "
+                              "2 Epistemic iterations documents the sovereignty gap and frame assumptions.")
+        elif scope_assessment == "likely_absence":
+            cog_iter = min(n_domains + 1, 4)
+            epi_iter = 2
+            iter_reasoning = (f"Evidence likely sparse — {cog_iter} Cognitive iterations needed "
+                              "to exhaust retrieval strategies across sub-domains and document "
+                              f"confirmed absences. {epi_iter} Epistemic iterations for frame analysis.")
+        else:
+            cog_iter = min(max(n_domains, 2), 3)
+            epi_iter = min(max(n_framings, 1), 2)
+            iter_reasoning = (f"Question spans approximately {n_domains} concept domains "
+                              f"→ {cog_iter} Cognitive iterations. "
+                              f"{n_framings} distinct framing orientation(s) detected "
+                              f"→ {epi_iter} Epistemic iteration(s).")
+
+    # Compute cost if not provided
+    if not cost_aud:
+        total = (cog_iter * 0.40) + (epi_iter * 0.70) + 0.90
+        cost_aud = f"AUD ${total:.2f}"
+
+    # Compute budget trade-off if not provided
+    if not budget_trade_off and (cog_iter > 2 or epi_iter > 2):
+        reduced_cog = max(cog_iter - 1, 1)
+        reduced_epi = max(epi_iter - 1, 1)
+        reduced_cost = (reduced_cog * 0.40) + (reduced_epi * 0.70) + 0.90
+        budget_trade_off = (f"If budget is a constraint: {reduced_cog} Cognitive / "
+                            f"{reduced_epi} Epistemic iterations would cost approximately "
+                            f"AUD ${reduced_cost:.2f}. The reduction would mainly affect "
+                            f"coverage depth in the less-indexed sub-domains.")
+
+    iter_rec = max(cog_iter, epi_iter)
 
     return QuestionAnalysis(
         original_question=question,
@@ -534,7 +594,10 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
         cria_readiness=data.get("cria_readiness", "ready"),
         readiness_explanation=data.get("readiness_explanation", ""),
         suggested_question_variants=variants,
+        cognitive_iterations=cog_iter,
+        epistemic_iterations=epi_iter,
         iteration_recommendation=iter_rec,
         iteration_reasoning=iter_reasoning,
-        estimated_cost_range=cost_range,
+        estimated_cost_aud=cost_aud,
+        budget_trade_off=budget_trade_off,
     )
