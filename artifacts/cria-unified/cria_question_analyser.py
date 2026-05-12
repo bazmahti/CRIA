@@ -390,7 +390,7 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
     raw = await call_llm_fn(
         prompt,
         system_prompt=_system,
-        max_tokens=3000,
+        max_tokens=5000,
         channel_name="Stage0",
     )
     log.info("QuestionAnalyser: used proxy path (channel=Stage0, model=%s)", _ANTHROPIC_MODEL)
@@ -404,24 +404,8 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
                 clean = clean[4:]
         data = json.loads(clean.strip())
     except json.JSONDecodeError as e:
-        log.warning("QuestionAnalyser JSON parse failed: %s", e)
-        # Return minimal analysis
-        return QuestionAnalysis(
-            original_question=question,
-            vocabulary_clusters=[],
-            ambiguity_flags=[],
-            framing_observations=[],
-            scope_signal=ScopeSignal(
-                assessment="well_scoped",
-                explanation="Analysis unavailable — proceeding with question as stated.",
-                suggestion="Proceed with your question. Stage 0 will design the search.",
-            ),
-            observer_note_suggestion=None,
-            profile_suggestion=profile or "general_scholarship",
-            profile_reasoning="Default profile selected.",
-            cria_readiness="ready",
-            readiness_explanation="Proceeding with question as stated.",
-        )
+        log.warning("QuestionAnalyser JSON parse failed: %s — applying fallback budget logic", e)
+        data = {}  # let post-processing produce budget fields from heuristics
 
     # Build structured objects
     vocab_clusters = [
@@ -565,20 +549,28 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
                               f"{n_framings} distinct framing orientation(s) detected "
                               f"→ {epi_iter} Epistemic iteration(s).")
 
-    # Compute cost if not provided
-    if not cost_aud:
-        total = (cog_iter * 0.40) + (epi_iter * 0.70) + 0.90
-        cost_aud = f"AUD ${total:.2f}"
+    # Always compute cost from formula (LLM arithmetic is unreliable)
+    total = (cog_iter * 0.40) + (epi_iter * 0.70) + 0.90
+    cost_aud = f"AUD ${total:.2f}"
 
-    # Compute budget trade-off if not provided
-    if not budget_trade_off and (cog_iter > 2 or epi_iter > 2):
+    # Compute budget trade-off if not provided — always, regardless of iteration count
+    if not budget_trade_off:
         reduced_cog = max(cog_iter - 1, 1)
         reduced_epi = max(epi_iter - 1, 1)
         reduced_cost = (reduced_cog * 0.40) + (reduced_epi * 0.70) + 0.90
-        budget_trade_off = (f"If budget is a constraint: {reduced_cog} Cognitive / "
-                            f"{reduced_epi} Epistemic iterations would cost approximately "
-                            f"AUD ${reduced_cost:.2f}. The reduction would mainly affect "
-                            f"coverage depth in the less-indexed sub-domains.")
+        if reduced_cog == cog_iter and reduced_epi == epi_iter:
+            # Already at minimum (1/1) — no lower option
+            budget_trade_off = (
+                "This is the minimum configuration (1 Cognitive / 1 Epistemic). "
+                "No lower-cost option is available without skipping the run entirely."
+            )
+        else:
+            budget_trade_off = (
+                f"If budget is a constraint: {reduced_cog} Cognitive / "
+                f"{reduced_epi} Epistemic iterations would cost approximately "
+                f"AUD ${reduced_cost:.2f}. The reduction would mainly affect "
+                f"coverage depth in the less-indexed sub-domains."
+            )
 
     iter_rec = max(cog_iter, epi_iter)
 
