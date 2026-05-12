@@ -4817,6 +4817,9 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
 
 # ── Question Analysis endpoint (Stage -1) ────────────────────────────────────
 
+_analyse_jobs: Dict[str, Dict[str, Any]] = {}
+
+
 class AnalyseRequest(BaseModel):
     query: str = Field(..., min_length=10, max_length=MAX_QUERY_LENGTH)
     observer_note: str = Field("", max_length=MAX_OBSERVER_LENGTH)
@@ -4831,16 +4834,8 @@ class AnalyseRequest(BaseModel):
         return v
 
 
-@app.post(f"{BASE_PATH}/analyse")
-@limiter.limit("20/minute")
-async def analyse_endpoint(request: Request, body: AnalyseRequest):
-    """
-    Stage -1: Transparent question analysis.
-    Returns structured analysis for researcher review BEFORE the research run begins.
-    Does not start a research job. Does not modify the question.
-    """
-    if not _ANALYSER_AVAILABLE:
-        raise HTTPException(status_code=503, detail="Question analyser not available")
+async def _run_analyse_job(job_id: str, body: AnalyseRequest) -> None:
+    _analyse_jobs[job_id]["status"] = "running"
     try:
         analysis = await analyse_question(
             question=body.query,
@@ -4848,10 +4843,42 @@ async def analyse_endpoint(request: Request, body: AnalyseRequest):
             profile=body.profile,
             call_llm_fn=call_llm,
         )
-        return analysis.to_dict()
+        _analyse_jobs[job_id].update({"status": "complete", "result": analysis.to_dict(), "error": None})
+        log.info("Analysis job %s complete", job_id)
     except Exception as e:
-        log.error("Question analysis failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)[:200]}")
+        log.error("Analysis job %s failed: %s", job_id, e, exc_info=True)
+        _analyse_jobs[job_id].update({"status": "failed", "result": None, "error": str(e)[:300]})
+
+
+@app.post(f"{BASE_PATH}/analyse")
+@limiter.limit("20/minute")
+async def analyse_endpoint(request: Request, body: AnalyseRequest, background_tasks: BackgroundTasks):
+    """
+    Stage -1: Transparent question analysis — async job.
+    Returns {jobId, status} immediately; poll /analyse/{jobId} for result.
+    """
+    if not _ANALYSER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Question analyser not available")
+    job_id = str(uuid.uuid4())
+    _analyse_jobs[job_id] = {"status": "queued", "result": None, "error": None}
+    background_tasks.add_task(_run_analyse_job, job_id, body)
+    log.info("Analysis job %s queued — %r", job_id, body.query[:80])
+    return {"jobId": job_id, "status": "queued"}
+
+
+@app.get(f"{BASE_PATH}/analyse/{{job_id}}")
+@limiter.limit("60/minute")
+async def analyse_status(request: Request, job_id: str):
+    """Poll for question analysis job result."""
+    job = _analyse_jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Analysis job not found")
+    return {
+        "jobId": job_id,
+        "status": job["status"],
+        "result": job.get("result"),
+        "error": job.get("error"),
+    }
 
 
 @app.post(f"{BASE_PATH}/research",

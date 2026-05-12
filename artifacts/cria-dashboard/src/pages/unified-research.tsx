@@ -1141,14 +1141,27 @@ export default function UnifiedResearch() {
                   setAppliedSuggestions(new Set());
                   try {
                     const BASE = import.meta.env.VITE_CRIA_UNIFIED_BASE_URL || "";
-                    const resp = await fetch(`${BASE}/cria-unified/analyse`, {
+                    // Start async analysis job
+                    const startResp = await fetch(`${BASE}/cria-unified/analyse`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ query, observer_note: observerNote, profile,
                         cognitive_iterations: iterations, epistemic_iterations: epistemicIterations }),
                     });
-                    if (!resp.ok) throw new Error(`Analysis failed: HTTP ${resp.status}`);
-                    const data = await resp.json() as QuestionAnalysis;
+                    if (!startResp.ok) throw new Error(`Analysis failed: HTTP ${startResp.status}`);
+                    const { jobId } = await startResp.json() as { jobId: string; status: string };
+                    // Poll until complete (up to 3 minutes)
+                    const deadline = Date.now() + 3 * 60 * 1000;
+                    let data: QuestionAnalysis | null = null;
+                    while (Date.now() < deadline) {
+                      await new Promise(r => setTimeout(r, 3000));
+                      const pollResp = await fetch(`${BASE}/cria-unified/analyse/${jobId}`);
+                      if (!pollResp.ok) throw new Error(`Poll failed: HTTP ${pollResp.status}`);
+                      const poll = await pollResp.json() as { jobId: string; status: string; result: QuestionAnalysis | null; error: string | null };
+                      if (poll.status === "complete" && poll.result) { data = poll.result; break; }
+                      if (poll.status === "failed") throw new Error(poll.error ?? "Analysis job failed");
+                    }
+                    if (!data) throw new Error("Analysis timed out — please try again");
                     setAnalysis(data);
                     setConfirmedQuery(query);
                     setRefinedQuestion(query);
