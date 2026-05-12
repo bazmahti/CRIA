@@ -113,8 +113,10 @@ LANE_BACKEND: Dict[int, Dict[str, Any]] = {
 }
 
 META_BACKEND = {
-    "env_var": "OPENAI_API_KEY",
-    "model": "o4-mini",
+    "env_var":          "AI_INTEGRATIONS_OPENAI_API_KEY",
+    "env_var_fallback": "OPENAI_API_KEY",
+    "base_url_env":     "AI_INTEGRATIONS_OPENAI_BASE_URL",
+    "model":            "o4-mini",
 }
 
 # ── Per-lane system prompts ───────────────────────────────────────────────────
@@ -387,12 +389,14 @@ async def _generate_tension_question(lane_a_id: int, output_a: str,
     )
     system = "Generate a focused research question. Return only the question, no preamble."
 
-    # Priority: OpenAI > DeepSeek > Claude > Mistral
+    # Priority: Replit proxy > OpenAI direct > DeepSeek > Claude > Mistral
+    _proxy_base = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "").rstrip("/") or None
     candidates = [
-        ("OPENAI_API_KEY",   None,                                          "gpt-4.1-mini",          "openai_compat"),
-        ("DEEPSEEK_API_KEY", "https://api.deepseek.com",                    "deepseek-chat",          "openai_compat"),
-        ("ANTHROPIC_API_KEY", None,                                         "claude-haiku-4-5",       "anthropic"),
-        ("MISTRAL_API_KEY",  "https://api.mistral.ai/v1",                   "mistral-small-latest",   "openai_compat"),
+        ("AI_INTEGRATIONS_OPENAI_API_KEY", _proxy_base,                        "gpt-4.1-mini",          "openai_compat"),
+        ("OPENAI_API_KEY",                 None,                                "gpt-4.1-mini",          "openai_compat"),
+        ("DEEPSEEK_API_KEY",               "https://api.deepseek.com",          "deepseek-chat",          "openai_compat"),
+        ("ANTHROPIC_API_KEY",              None,                                "claude-haiku-4-5",       "anthropic"),
+        ("MISTRAL_API_KEY",                "https://api.mistral.ai/v1",         "mistral-small-latest",   "openai_compat"),
     ]
     for env_var, base_url, model, api_type in candidates:
         key = os.environ.get(env_var, "").strip()
@@ -508,6 +512,13 @@ async def _run_meta_layer(lane_results: List[Dict], question: str, mode: str) ->
     Calls o4-mini (or stub) to produce convergence/divergence/negative-space analysis.
     """
     api_key = os.environ.get(META_BACKEND["env_var"], "").strip()
+    if api_key:
+        # Using Replit proxy key — pass the proxy base URL
+        meta_base_url = os.environ.get(META_BACKEND.get("base_url_env", ""), "").rstrip("/") or None
+    else:
+        # Fall back to direct OpenAI key — use default base URL
+        api_key = os.environ.get(META_BACKEND.get("env_var_fallback", ""), "").strip()
+        meta_base_url = None
     is_stub = not bool(api_key)
 
     if is_stub:
@@ -561,7 +572,7 @@ async def _run_meta_layer(lane_results: List[Dict], question: str, mode: str) ->
 
     try:
         raw = await _call_openai_compat(
-            api_key, None, META_BACKEND["model"],
+            api_key, meta_base_url, META_BACKEND["model"],
             META_SYSTEM_PROMPT, user_msg, max_tokens=3000,
         )
     except Exception as exc:
