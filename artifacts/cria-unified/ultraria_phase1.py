@@ -63,6 +63,92 @@ _OPENAI_KEY     = os.environ.get("OPENAI_API_KEY", "")
 _PROXY_BASE_URL = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
 _PROXY_KEY      = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "replit")
 
+# OpenRouter fallback — free tier, OpenAI-compatible, covers most blocked lanes
+# Register free at openrouter.ai — set OPENROUTER_API_KEY in Replit Secrets
+_OPENROUTER_KEY      = os.environ.get("OPENROUTER_API_KEY", "")
+_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+# Google AI Studio — free tier for Gemini
+# Get key at aistudio.google.com — set GOOGLE_AI_STUDIO_KEY in Replit Secrets
+_GOOGLE_STUDIO_KEY = os.environ.get("GOOGLE_AI_STUDIO_KEY",
+                     os.environ.get("ULTRARIA_GEMINI_API_KEY", ""))
+
+# Groq — free tier for Llama 3.1 70B
+# Register at console.groq.com — set GROQ_API_KEY in Replit Secrets
+_GROQ_KEY      = os.environ.get("GROQ_API_KEY", "")
+_GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+# ── Fallback LaneSpec per lane ────────────────────────────────────────────────
+# When a lane's primary key fails (401/402/429), these specs are tried in order.
+# The epistemic disposition is PRESERVED — only the model/endpoint changes.
+# The output notes which model actually ran.
+
+LANE_FALLBACKS = {
+    "L2": [  # DeepSeek Analytical — fallback to DeepSeek V3 via OpenRouter, then Llama
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "deepseek/deepseek-chat", "label": "DeepSeek V3 via OpenRouter (free tier)"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.1-70b-versatile", "label": "Llama 3.1 70B via Groq (free tier)"},
+    ],
+    "L3": [  # Grok Contrarian — fallback to Llama (contrarian prompting preserved)
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.1-70b-versatile", "label": "Llama 3.1 70B via Groq (free tier)"},
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "meta-llama/llama-3.1-70b-instruct:free", "label": "Llama 3.1 70B via OpenRouter (free tier)"},
+    ],
+    "L4": [  # Mistral European — fallback to Mistral 7B via OpenRouter
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "mistralai/mistral-7b-instruct:free", "label": "Mistral 7B via OpenRouter (free tier)"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "mixtral-8x7b-32768", "label": "Mixtral 8x7B via Groq (free tier)"},
+    ],
+    "L5": [  # Gemini Scientific — fallback to Gemini 1.5 Flash via Google AI Studio
+        {"key": _GOOGLE_STUDIO_KEY,
+         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+         "model": "gemini-1.5-flash", "label": "Gemini 1.5 Flash via Google AI Studio (free tier)"},
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "google/gemini-flash-1.5:free", "label": "Gemini Flash via OpenRouter (free tier)"},
+    ],
+    "L6": [  # Qwen East Asian — fallback to Qwen via OpenRouter
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "qwen/qwen-2.5-72b-instruct:free", "label": "Qwen 2.5 72B via OpenRouter (free tier)"},
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "qwen/qwen-2-72b-instruct", "label": "Qwen 2 72B via OpenRouter"},
+    ],
+}
+
+# Auth/quota error codes that should trigger fallback
+_FALLBACK_TRIGGER_CODES = {400, 401, 402, 403, 429}
+
+# ── Fallback mode flag ────────────────────────────────────────────────────────
+# When a lane runs on a fallback model, this is noted in the output so:
+#   1. The researcher knows which lanes ran on intended vs fallback models
+#   2. The result is flagged as FALLBACK_QUALITY in the meta-layer
+#   3. When the primary model is restored, the run can be repeated for
+#      full-quality output — the fallback result is a preview, not a substitute
+#
+# Set ULTRARIA_STRICT_MODE=true in Replit Secrets to SKIP lanes entirely
+# when their primary model is unavailable (no fallback, honest gap in output).
+# Default: fallback enabled — always produce something rather than nothing.
+_STRICT_MODE = os.environ.get("ULTRARIA_STRICT_MODE", "false").lower() == "true"
+
+FALLBACK_QUALITY_NOTE = (
+    "⚠ FALLBACK MODEL — This lane ran on {fallback_label} rather than its "
+    "intended model ({primary_model}). The epistemic disposition is preserved "
+    "but the depth, training distribution, and analytical capability differ. "
+    "This output is a PREVIEW suitable for Fibonacci concept testing. "
+    "For publication-grade research, restore the primary model and rerun. "
+    "Restore: {restore_instruction}"
+)
+
+RESTORE_INSTRUCTIONS = {
+    "L2": "Top up DeepSeek account at platform.deepseek.com → Billing",
+    "L3": "Verify Grok API key at console.x.ai → API Keys",
+    "L4": "Verify Kimi key at platform.moonshot.ai or Mistral key at console.mistral.ai",
+    "L5": "Gemini quota resets monthly — check aistudio.google.com → API usage, or upgrade plan",
+    "L6": "Get valid Qwen key from dashscope-intl.aliyuncs.com with international endpoint",
+}
+
 
 # ── Lane Definitions ──────────────────────────────────────────────────────────
 
@@ -233,13 +319,56 @@ LANES: List[LaneSpec] = [
 
 # ── Lane LLM calls ────────────────────────────────────────────────────────────
 
+async def _attempt_lane_call(
+    api_key: str,
+    base_url: str,
+    model: str,
+    messages: list,
+    temperature: float,
+    timeout: float,
+) -> str:
+    """Single attempt at one model/endpoint. Raises on any error."""
+    client = AsyncOpenAI(
+        api_key=api_key or "placeholder",
+        base_url=base_url if base_url else None,
+        timeout=httpx.Timeout(timeout=timeout),
+    )
+    resp = await client.chat.completions.create(
+        model=model,
+        messages=messages,
+        max_tokens=4000,
+        temperature=temperature,
+    )
+    return resp.choices[0].message.content or ""
+
+
+def _is_recoverable_error(e: Exception) -> bool:
+    """Return True if this error should trigger fallback (auth/quota/balance)."""
+    msg = str(e).lower()
+    return any(code in msg for code in [
+        "401", "402", "403", "429",
+        "insufficient balance", "invalid api key", "invalid authentication",
+        "quota exceeded", "rate limit", "unauthorized",
+        "incorrect api key", "authentication", "forbidden",
+    ])
+
+
 async def call_lane(
     lane: LaneSpec,
     task: str,
     semaphore: asyncio.Semaphore,
     timeout: float = 90.0,
 ) -> Dict[str, Any]:
-    """Execute one lane's LLM call."""
+    """
+    Execute one lane's LLM call with automatic fallback.
+
+    Fallback chain:
+    1. Try primary model (lane.model / lane.api_key)
+    2. On auth/quota/balance error: try each fallback in LANE_FALLBACKS[lane_id]
+    3. Each fallback result is flagged FALLBACK_QUALITY with restore instructions
+    4. If ULTRARIA_STRICT_MODE=true: skip rather than fall back (honest gap)
+    5. If all attempts fail: return skipped with full error log
+    """
     if not lane.active:
         return {
             "lane_id": lane.lane_id,
@@ -247,36 +376,32 @@ async def call_lane(
             "status": "skipped",
             "reason": "Lane not active — API key not configured",
             "output": "",
+            "fallback_used": False,
         }
 
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                f"You are {lane.name}.\n\n"
+                f"Epistemic disposition: {lane.disposition}\n\n"
+                "Produce a rigorous, substantive analysis. "
+                "Do not produce generic summaries. "
+                "Bring what ONLY your specific intelligence and training can contribute."
+            ),
+        },
+        {"role": "user", "content": task},
+    ]
+
     async with semaphore:
+        # ── Attempt primary model ────────────────────────────────────────────
+        primary_error = None
         try:
-            client = AsyncOpenAI(
-                api_key=lane.api_key or "placeholder",
-                base_url=lane.base_url if lane.base_url else None,
-                timeout=httpx.Timeout(timeout=timeout),
+            output = await _attempt_lane_call(
+                lane.api_key, lane.base_url, lane.model,
+                messages, lane.temperature, timeout,
             )
-            messages = [
-                {
-                    "role": "system",
-                    "content": (
-                        f"You are {lane.name}.\n\n"
-                        f"Epistemic disposition: {lane.disposition}\n\n"
-                        "Produce a rigorous, substantive analysis. "
-                        "Do not produce generic summaries. "
-                        "Bring what ONLY your specific intelligence and training can contribute."
-                    ),
-                },
-                {"role": "user", "content": task},
-            ]
-            resp = await client.chat.completions.create(
-                model=lane.model,
-                messages=messages,
-                max_tokens=4000,
-                temperature=lane.temperature,
-            )
-            output = resp.choices[0].message.content or ""
-            log.info("Lane %s complete: %d chars", lane.lane_id, len(output))
+            log.info("Lane %s complete (primary): %d chars", lane.lane_id, len(output))
             return {
                 "lane_id": lane.lane_id,
                 "name": lane.name,
@@ -284,16 +409,100 @@ async def call_lane(
                 "status": "complete",
                 "output": output,
                 "temperature": lane.temperature,
+                "fallback_used": False,
+                "model_tier": "primary",
             }
         except Exception as e:
-            log.warning("Lane %s failed: %s", lane.lane_id, e)
+            primary_error = e
+            if _is_recoverable_error(e):
+                log.warning("Lane %s primary failed (recoverable): %s", lane.lane_id, e)
+            else:
+                log.warning("Lane %s primary failed (non-recoverable): %s", lane.lane_id, e)
+                # Non-recoverable (network, malformed request etc) — skip fallback
+                return {
+                    "lane_id": lane.lane_id,
+                    "name": lane.name,
+                    "status": "failed",
+                    "reason": str(e),
+                    "output": "",
+                    "fallback_used": False,
+                }
+
+        # ── Primary had recoverable error — check strict mode ────────────────
+        if _STRICT_MODE:
+            log.info("Lane %s: strict mode — skipping rather than falling back", lane.lane_id)
             return {
                 "lane_id": lane.lane_id,
                 "name": lane.name,
-                "status": "failed",
-                "error": str(e)[:200],
+                "status": "skipped",
+                "reason": (
+                    f"Primary model unavailable ({primary_error}). "
+                    "ULTRARIA_STRICT_MODE=true — no fallback used. "
+                    f"{RESTORE_INSTRUCTIONS.get(lane.lane_id, 'Check API key configuration.')}"
+                ),
                 "output": "",
+                "fallback_used": False,
+                "model_tier": "skipped_strict",
             }
+
+        # ── Attempt fallbacks in order ───────────────────────────────────────
+        fallbacks = LANE_FALLBACKS.get(lane.lane_id, [])
+        for fb in fallbacks:
+            if not fb.get("key"):
+                log.debug("Lane %s fallback '%s' skipped — no key", lane.lane_id, fb["label"])
+                continue
+            try:
+                log.info("Lane %s attempting fallback: %s", lane.lane_id, fb["label"])
+                output = await _attempt_lane_call(
+                    fb["key"], fb["base_url"], fb["model"],
+                    messages, lane.temperature, timeout,
+                )
+
+                # Prepend fallback quality flag to output
+                quality_flag = FALLBACK_QUALITY_NOTE.format(
+                    fallback_label=fb["label"],
+                    primary_model=lane.model,
+                    restore_instruction=RESTORE_INSTRUCTIONS.get(
+                        lane.lane_id, "Check API key configuration."
+                    ),
+                )
+                flagged_output = f"{quality_flag}\n\n---\n\n{output}"
+
+                log.info("Lane %s fallback succeeded (%s): %d chars",
+                         lane.lane_id, fb["label"], len(output))
+                return {
+                    "lane_id": lane.lane_id,
+                    "name": lane.name,
+                    "model": fb["model"],
+                    "model_label": fb["label"],
+                    "primary_model": lane.model,
+                    "status": "complete",
+                    "output": flagged_output,
+                    "temperature": lane.temperature,
+                    "fallback_used": True,
+                    "model_tier": "fallback",
+                    "restore_instruction": RESTORE_INSTRUCTIONS.get(lane.lane_id, ""),
+                }
+            except Exception as fb_err:
+                log.warning("Lane %s fallback '%s' failed: %s",
+                            lane.lane_id, fb["label"], fb_err)
+                continue
+
+        # ── All fallbacks exhausted ──────────────────────────────────────────
+        log.error("Lane %s: all attempts failed. Primary: %s", lane.lane_id, primary_error)
+        return {
+            "lane_id": lane.lane_id,
+            "name": lane.name,
+            "status": "failed",
+            "reason": (
+                f"Primary model failed ({primary_error}). "
+                f"All {len(fallbacks)} fallback(s) also failed. "
+                f"{RESTORE_INSTRUCTIONS.get(lane.lane_id, 'Check API key configuration.')}"
+            ),
+            "output": "",
+            "fallback_used": False,
+            "model_tier": "all_failed",
+        }
 
 
 # ── Task Router ───────────────────────────────────────────────────────────────
@@ -372,6 +581,7 @@ class UltraRiaMetaLayer:
         self,
         research_question: str,
         lane_outputs: List[Dict[str, Any]],
+        fallback_context: str = "",
     ) -> Dict[str, str]:
         if not _OPENAI_KEY:
             log.warning("OPENAI_API_KEY not set — using proxy for meta-layer")
@@ -471,6 +681,8 @@ class UltraRiaResult:
     active_lanes: int
     completed_lanes: int
     duration_seconds: float
+    fallback_lanes: int = 0
+    model_tier: str = "full"  # "full" = all primary, "preview" = fallbacks used
     generated_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -484,18 +696,31 @@ class UltraRiaResult:
             "reformulated_question": self.reformulated_question,
             "active_lanes": self.active_lanes,
             "completed_lanes": self.completed_lanes,
+            "fallback_lanes": self.fallback_lanes,
+            "model_tier": self.model_tier,
             "duration_seconds": self.duration_seconds,
             "generated_at": self.generated_at,
         }
 
     def to_markdown(self) -> str:
+        tier_banner = ""
+        if self.model_tier == "preview" and self.fallback_lanes > 0:
+            tier_banner = (
+                f"\n> ⚠ **PREVIEW RUN** — {self.fallback_lanes} lane(s) ran on fallback "
+                "models rather than intended primary models. Results are suitable for "
+                "Fibonacci concept testing. Restore primary models for publication-grade output.\n"
+            )
+
         lines = [
             f"# Ultraria Research Run\n\n"
             f"**Research question:** {self.research_question}\n\n"
             f"**Run ID:** {self.run_id}\n"
+            f"**Model tier:** {'🔬 Preview (fallbacks active)' if self.model_tier == 'preview' else '✓ Full (all primary models)'}\n"
             f"**Active lanes:** {self.active_lanes} | "
-            f"**Completed:** {self.completed_lanes}\n"
-            f"**Duration:** {self.duration_seconds:.1f}s\n\n"
+            f"**Completed:** {self.completed_lanes} | "
+            f"**Fallback:** {self.fallback_lanes}\n"
+            f"**Duration:** {self.duration_seconds:.1f}s\n"
+            f"{tier_banner}\n"
             "---\n"
         ]
 
@@ -600,9 +825,33 @@ class UltraRiaOrchestrator:
                 lane_results.append(lo)
 
         completed = [lo for lo in lane_results if lo.get("status") == "complete"]
+        fallback_lanes = [lo for lo in lane_results if lo.get("fallback_used")]
+
+        if fallback_lanes:
+            log.warning(
+                "Ultraria: %d lane(s) ran on fallback models: %s — PREVIEW quality",
+                len(fallback_lanes),
+                ", ".join(lo["lane_id"] for lo in fallback_lanes),
+            )
+
+        # Build fallback context for meta-layer
+        fallback_context = ""
+        if fallback_lanes:
+            fb_list = ", ".join(
+                f"{lo['lane_id']} ({lo.get('model_label', lo.get('model', 'fallback'))})"
+                for lo in fallback_lanes
+            )
+            fallback_context = (
+                f"FALLBACK QUALITY FLAG: Lanes {fb_list} ran on fallback models. "
+                "Epistemic dispositions were preserved but depth may be reduced. "
+                "Flag in analysis where outputs appear insufficient for the disposition."
+            )
 
         # Meta-layer analysis
-        meta = await self.meta_layer.analyse(research_question, lane_results)
+        meta = await self.meta_layer.analyse(
+            research_question, lane_results,
+            fallback_context=fallback_context,
+        )
 
         # Extract reformulated question from meta analysis
         reformulated = research_question
@@ -625,6 +874,8 @@ class UltraRiaOrchestrator:
             active_lanes=len(active_lanes),
             completed_lanes=len(completed),
             duration_seconds=duration,
+            fallback_lanes=len(fallback_lanes),
+            model_tier="preview" if fallback_lanes else "full",
         )
 
 

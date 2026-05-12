@@ -1,13 +1,12 @@
 """
 ultraria_stub.py — Ultraria Service (Phase 2)
 ============================================================
-Each lane checks for its API key at runtime.
-  • Key present  → real LLM call with full personality prompt
-  • Key absent   → stub output with stub=True flag
+Three-tier fallback system:
+  Tier 1 — Primary model (intended)
+  Tier 2 — Fallback chain (free-tier alternatives via OpenRouter / Groq / Google AI Studio)
+  Tier 3 — Strict mode (ULTRARIA_STRICT_MODE=true): skip rather than fall back
 
-No dashboard or proxy changes needed — API contract is identical to Phase 1.
-
-Lane API key env vars:
+Lane API key env vars (primary):
   ANTHROPIC_API_KEY    → Lane 1 · Claude Opus
   DEEPSEEK_API_KEY     → Lane 2 · DeepSeek
   GEMINI_API_KEY       → Lane 3 · Gemini Flash
@@ -16,6 +15,11 @@ Lane API key env vars:
   QWEN_API_KEY         → Lane 6 · Qwen
   MISTRAL_API_KEY      → Lane 7 · Mistral
   OPENAI_API_KEY       → Meta-layer · o4-mini
+
+Fallback env vars (free tier — activate when primary blocked):
+  OPENROUTER_API_KEY   → openrouter.ai (free, covers DeepSeek/Gemini/Qwen/Llama/Mistral)
+  GROQ_API_KEY         → console.groq.com (free, covers Llama 3.1 70B, Mixtral)
+  GOOGLE_AI_STUDIO_KEY → aistudio.google.com (free, covers Gemini 1.5 Flash)
 
 Author: Dr Barry Ferrier / Claude (Anthropic) — May 2026
 """
@@ -117,6 +121,70 @@ META_BACKEND = {
     "env_var_fallback": "OPENAI_API_KEY",
     "base_url_env":     "AI_INTEGRATIONS_OPENAI_BASE_URL",
     "model":            "o4-mini",
+}
+
+# ── Fallback keys (free-tier providers) ───────────────────────────────────────
+_OPENROUTER_KEY      = os.environ.get("OPENROUTER_API_KEY", "").strip()
+_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+_GOOGLE_STUDIO_KEY   = os.environ.get("GOOGLE_AI_STUDIO_KEY", "").strip()
+_GOOGLE_STUDIO_URL   = "https://generativelanguage.googleapis.com/v1beta/openai"
+_GROQ_KEY            = os.environ.get("GROQ_API_KEY", "").strip()
+_GROQ_BASE_URL       = "https://api.groq.com/openai/v1"
+
+# ULTRARIA_STRICT_MODE=true → skip blocked lanes rather than fall back
+_STRICT_MODE = os.environ.get("ULTRARIA_STRICT_MODE", "false").lower() == "true"
+
+# Fallback chain per lane (keyed by lane integer ID matching LANE_BACKEND)
+# Each entry: {key, base_url, model, label}
+# Key is evaluated at call time so empty-key fallbacks are skipped automatically.
+LANE_FALLBACKS: Dict[int, List[Dict[str, str]]] = {
+    2: [  # DeepSeek — Analytical / Empirical
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "deepseek/deepseek-chat", "label": "DeepSeek V3 via OpenRouter (free tier)"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.1-70b-versatile", "label": "Llama 3.1 70B via Groq (free tier)"},
+    ],
+    3: [  # Gemini — Broad / Cross-Domain
+        {"key": _GOOGLE_STUDIO_KEY, "base_url": _GOOGLE_STUDIO_URL,
+         "model": "gemini-1.5-flash", "label": "Gemini 1.5 Flash via Google AI Studio (free tier)"},
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "google/gemini-flash-1.5:free", "label": "Gemini Flash via OpenRouter (free tier)"},
+    ],
+    4: [  # Kimi — Agentic / Long-Horizon
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "mistralai/mistral-7b-instruct:free", "label": "Mistral 7B via OpenRouter (free tier)"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "mixtral-8x7b-32768", "label": "Mixtral 8x7B via Groq (free tier)"},
+    ],
+    5: [  # Grok — Counter-Institutional / Heterodox
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.1-70b-versatile", "label": "Llama 3.1 70B via Groq (free tier)"},
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "meta-llama/llama-3.1-70b-instruct:free", "label": "Llama 3.1 70B via OpenRouter (free tier)"},
+    ],
+    6: [  # Qwen — Non-Western / Asian Corpus
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "qwen/qwen-2.5-72b-instruct:free", "label": "Qwen 2.5 72B via OpenRouter (free tier)"},
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "qwen/qwen-2-72b-instruct", "label": "Qwen 2 72B via OpenRouter"},
+    ],
+}
+
+FALLBACK_QUALITY_NOTE = (
+    "⚠ FALLBACK MODEL — This lane ran on {fallback_label} rather than its "
+    "intended model ({primary_model}). The epistemic disposition is preserved "
+    "but the depth, training distribution, and analytical capability differ. "
+    "This output is a PREVIEW suitable for concept testing. "
+    "For publication-grade research, restore the primary model and rerun.\n"
+    "Restore: {restore_instruction}"
+)
+
+RESTORE_INSTRUCTIONS: Dict[int, str] = {
+    2: "Top up DeepSeek account at platform.deepseek.com → Billing",
+    3: "Gemini quota resets monthly — check aistudio.google.com → API usage, or upgrade plan",
+    4: "Verify Kimi key at platform.moonshot.ai → API Keys",
+    5: "Verify Grok key at console.x.ai → API Keys",
+    6: "Get valid Qwen key from dashscope-intl.aliyuncs.com with international endpoint",
 }
 
 # ── Per-lane system prompts ───────────────────────────────────────────────────
@@ -433,16 +501,30 @@ def _lane_key(cfg: Dict) -> str:
     return key
 
 
+def _is_recoverable_error(exc: Exception) -> bool:
+    """Return True when the error is auth/quota/balance — should trigger fallback."""
+    msg = str(exc).lower()
+    return any(token in msg for token in [
+        "401", "402", "403", "429",
+        "insufficient balance", "invalid api key", "invalid authentication",
+        "quota exceeded", "rate limit", "unauthorized",
+        "incorrect api key", "authentication", "forbidden",
+    ])
+
+
 # ── Single lane execution ──────────────────────────────────────────────────────
 async def _run_lane(lane: Dict, question: str, mode: str,
                     lane_index: int, prev_outputs: List[Dict]) -> Dict:
     """
-    Executes one lane. Checks for API key — real call if present, stub if not.
-    In Fibonacci spiral mode, generates tension question from two preceding outputs.
+    Executes one lane with three-tier fallback:
+      Tier 1 — Primary model (intended API key + model)
+      Tier 2 — LANE_FALLBACKS chain (free-tier alternatives, keyed/skipped per key availability)
+      Tier 3 — Strict mode: skip rather than fall back (ULTRARIA_STRICT_MODE=true)
+    Fibonacci spiral: generates tension question from two preceding outputs.
     """
     cfg = LANE_BACKEND.get(lane["id"], {})
     api_key = _lane_key(cfg)
-    is_stub = not bool(api_key)
+    lane_id = lane["id"]
 
     # Determine the question this lane will answer
     effective_question = question
@@ -456,59 +538,110 @@ async def _run_lane(lane: Dict, question: str, mode: str,
                 original_question=question,
             )
         except Exception as exc:
-            log.warning("Tension Q gen failed for lane %d: %s", lane["id"], exc)
+            log.warning("Tension Q gen failed for lane %d: %s", lane_id, exc)
             effective_question = question
 
-    findings = ""
-    error = None
+    user_msg = (
+        f"RESEARCH QUESTION:\n{effective_question}\n\n"
+        f"Apply your full analytical methodology. Be specific, evidence-based, "
+        f"and genuinely useful to a serious researcher."
+    )
+    system = LANE_SYSTEM_PROMPTS.get(lane_id, "You are a research intelligence. Analyse the question thoroughly.")
 
-    if is_stub:
-        # Simulate latency
-        delay = 0.8 + (lane_index * 1.1 if mode == "fibonacci_spiral" else 0.3)
-        await asyncio.sleep(delay)
-        findings = STUB_OUTPUTS.get(lane["id"], f"[STUB — {lane['label']} — no API key]")
+    def _base_result(findings: str, is_stub: bool, error: Optional[str] = None,
+                     fallback_used: bool = False, model_tier: str = "primary",
+                     fallback_label: Optional[str] = None,
+                     primary_model: Optional[str] = None) -> Dict:
+        return {
+            "lane_id":        lane_id,
+            "model":          lane["model"] if not fallback_label else fallback_label,
+            "primary_model":  primary_model or lane["model"],
+            "label":          lane["label"],
+            "personality":    lane["personality"],
+            "question_used":  effective_question[:300],
+            "status":         "complete" if not error else "failed",
+            "findings":       findings,
+            "stub":           is_stub,
+            "fallback_used":  fallback_used,
+            "model_tier":     model_tier,
+            "error":          error,
+            "token_estimate": {"input": 0, "output": 0} if is_stub else {"input": 1200, "output": 800},
+        }
+
+    # ── No primary key: stub or fallback ──────────────────────────────────────
+    if not api_key:
+        # Try fallbacks immediately if no primary key configured
+        primary_error: Optional[Exception] = None
+        primary_error_str = f"[No primary API key configured for L{lane_id}]"
     else:
-        user_msg = (
-            f"RESEARCH QUESTION:\n{effective_question}\n\n"
-            f"Apply your full analytical methodology. Be specific, evidence-based, "
-            f"and genuinely useful to a serious researcher."
-        )
-        system = LANE_SYSTEM_PROMPTS.get(lane["id"], "You are a research intelligence. Analyse the question thoroughly.")
+        # ── Tier 1: Attempt primary model ────────────────────────────────────
         try:
             if cfg.get("type") == "anthropic":
-                findings = await _call_anthropic(
-                    api_key, system, user_msg,
-                    model=cfg["model"], max_tokens=2048,
-                )
+                findings = await _call_anthropic(api_key, system, user_msg,
+                                                 model=cfg["model"], max_tokens=2048)
             else:
-                findings = await _call_openai_compat(
-                    api_key,
-                    cfg.get("base_url"),
-                    cfg["model"],
-                    system, user_msg,
-                    max_tokens=2048,
-                )
+                findings = await _call_openai_compat(api_key, cfg.get("base_url"),
+                                                     cfg["model"], system, user_msg,
+                                                     max_tokens=2048)
+            log.info("Lane %d (%s) primary succeeded", lane_id, lane["label"])
+            return _base_result(findings, is_stub=False, model_tier="primary")
         except Exception as exc:
-            log.error("Lane %d (%s) real call failed: %s", lane["id"], lane["label"], exc)
-            error = str(exc)
-            findings = (
-                f"[CALL FAILED — {lane['label']} — {type(exc).__name__}: "
-                f"{str(exc)[:200]}]"
-            )
-            is_stub = True  # treat as stub for downstream flagging
+            primary_error = exc
+            primary_error_str = str(exc)
+            if _is_recoverable_error(exc):
+                log.warning("Lane %d (%s) primary recoverable error: %s", lane_id, lane["label"], exc)
+            else:
+                # Non-recoverable (network error, malformed request etc) — no fallback
+                log.error("Lane %d (%s) non-recoverable error: %s", lane_id, lane["label"], exc)
+                return _base_result(
+                    f"[CALL FAILED — {lane['label']} — {type(exc).__name__}: {str(exc)[:200]}]",
+                    is_stub=True, error=primary_error_str, model_tier="failed",
+                )
 
-    return {
-        "lane_id":        lane["id"],
-        "model":          lane["model"],
-        "label":          lane["label"],
-        "personality":    lane["personality"],
-        "question_used":  effective_question[:300],
-        "status":         "complete" if not error else "failed",
-        "findings":       findings,
-        "stub":           is_stub,
-        "error":          error,
-        "token_estimate": {"input": 0, "output": 0} if is_stub else {"input": 1200, "output": 800},
-    }
+    # ── Tier 2/3: Primary unavailable — check strict mode ────────────────────
+    if _STRICT_MODE:
+        restore = RESTORE_INSTRUCTIONS.get(lane_id, "Check API key configuration.")
+        log.info("Lane %d: strict mode — skipping (no fallback)", lane_id)
+        return _base_result(
+            f"[SKIPPED — strict mode — {restore}]",
+            is_stub=True, model_tier="skipped_strict",
+        )
+
+    # ── Tier 2: Try fallback chain ────────────────────────────────────────────
+    fallbacks = LANE_FALLBACKS.get(lane_id, [])
+    for fb in fallbacks:
+        if not fb.get("key"):
+            log.debug("Lane %d fallback '%s' skipped — no key", lane_id, fb["label"])
+            continue
+        try:
+            log.info("Lane %d attempting fallback: %s", lane_id, fb["label"])
+            findings = await _call_openai_compat(
+                fb["key"], fb["base_url"], fb["model"], system, user_msg, max_tokens=2048,
+            )
+            quality_flag = FALLBACK_QUALITY_NOTE.format(
+                fallback_label=fb["label"],
+                primary_model=lane["model"],
+                restore_instruction=RESTORE_INSTRUCTIONS.get(lane_id, "Check API key configuration."),
+            )
+            log.info("Lane %d fallback succeeded (%s)", lane_id, fb["label"])
+            return _base_result(
+                f"{quality_flag}\n\n---\n\n{findings}",
+                is_stub=False, fallback_used=True, model_tier="fallback",
+                fallback_label=fb["model"], primary_model=lane["model"],
+            )
+        except Exception as fb_err:
+            log.warning("Lane %d fallback '%s' failed: %s", lane_id, fb["label"], fb_err)
+            continue
+
+    # ── All attempts exhausted ────────────────────────────────────────────────
+    restore = RESTORE_INSTRUCTIONS.get(lane_id, "Check API key configuration.")
+    log.error("Lane %d: all attempts failed. Primary: %s", lane_id, primary_error_str)
+    delay = 0.3  # brief delay to match overall timing
+    await asyncio.sleep(delay)
+    return _base_result(
+        f"[ALL ATTEMPTS FAILED — {lane['label']} — {primary_error_str[:150]}. {restore}]",
+        is_stub=True, error=primary_error_str, model_tier="all_failed",
+    )
 
 
 # ── Meta-layer ─────────────────────────────────────────────────────────────────
@@ -656,6 +789,7 @@ async def _run_ultraria_job(job_id: str, request: "UltraRunRequest") -> None:
 
         meta = await _run_meta_layer(lane_results, request.query, request.mode)
 
+        fallback_count = sum(1 for r in lane_results if r.get("fallback_used"))
         result = {
             "query":                   request.query,
             "mode":                    request.mode,
@@ -668,6 +802,8 @@ async def _run_ultraria_job(job_id: str, request: "UltraRunRequest") -> None:
             "phase":                   "2-real" if any(not r.get("stub") for r in lane_results) else "1-stub",
             "stub_lanes":              [r["lane_id"] for r in lane_results if r.get("stub")],
             "live_lanes":              [r["lane_id"] for r in lane_results if not r.get("stub")],
+            "fallback_lanes":          fallback_count,
+            "model_tier":              "preview" if fallback_count > 0 else "full",
         }
 
         _jobs[job_id].update({
@@ -731,16 +867,27 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     configured = [l for l in LANES if _lane_key(LANE_BACKEND[l["id"]])]
-    stub = [l for l in LANES if not _lane_key(LANE_BACKEND[l["id"]])]
+    no_primary = [l for l in LANES if not _lane_key(LANE_BACKEND[l["id"]])]
     meta_live = bool(os.environ.get(META_BACKEND["env_var"], "").strip())
+    fallback_keys = {
+        "OpenRouter": bool(_OPENROUTER_KEY),
+        "Groq":       bool(_GROQ_KEY),
+        "Google AI Studio": bool(_GOOGLE_STUDIO_KEY),
+    }
+    active_fallbacks = [k for k, v in fallback_keys.items() if v]
+    strict = " [STRICT MODE]" if _STRICT_MODE else ""
     log.info("╔══════════════════════════════════════════════════════════╗")
-    log.info("║  ULTRARIA SERVICE — Phase 2                             ║")
+    log.info("║  ULTRARIA SERVICE — Phase 2 (Three-Tier Fallback)      ║")
     log.info("║  7 lanes · Fibonacci spiral · o4-mini meta-layer        ║")
     log.info("╠══════════════════════════════════════════════════════════╣")
     if configured:
-        log.info("║  LIVE lanes: %s", ", ".join(f"L{l['id']} {l['label']}" for l in configured))
-    if stub:
-        log.info("║  STUB lanes: %s", ", ".join(f"L{l['id']}" for l in stub))
+        log.info("║  PRIMARY lanes: %s", ", ".join(f"L{l['id']} {l['label']}" for l in configured))
+    if no_primary:
+        log.info("║  No primary key: %s%s", ", ".join(f"L{l['id']}" for l in no_primary), strict)
+    if active_fallbacks:
+        log.info("║  Fallback keys: %s", ", ".join(active_fallbacks))
+    else:
+        log.info("║  Fallback keys: NONE — set OPENROUTER_API_KEY / GROQ_API_KEY / GOOGLE_AI_STUDIO_KEY")
     log.info("║  Meta-layer: %s", "LIVE (o4-mini)" if meta_live else "STUB")
     log.info("╚══════════════════════════════════════════════════════════╝")
 
