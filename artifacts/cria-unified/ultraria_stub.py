@@ -362,13 +362,18 @@ async def _call_openai_compat(api_key: str, base_url: Optional[str],
     if base_url:
         kwargs["base_url"] = base_url
     client = AsyncOpenAI(**kwargs)
+    # o-series reasoning models use max_completion_tokens, not max_tokens
+    _o_series = model.startswith(("o1", "o3", "o4"))
+    token_kwargs: Dict[str, Any] = (
+        {"max_completion_tokens": max_tokens} if _o_series else {"max_tokens": max_tokens}
+    )
     response = await client.chat.completions.create(
         model=model,
-        max_tokens=max_tokens,
         messages=[
             {"role": "system", "content": system},
             {"role": "user",   "content": user_msg},
         ],
+        **token_kwargs,
     )
     return response.choices[0].message.content or ""
 
