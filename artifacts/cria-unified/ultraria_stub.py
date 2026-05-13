@@ -140,33 +140,33 @@ _STRICT_MODE = os.environ.get("ULTRARIA_STRICT_MODE", "false").lower() == "true"
 LANE_FALLBACKS: Dict[int, List[Dict[str, str]]] = {
     2: [  # DeepSeek — Analytical / Empirical
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
-         "model": "deepseek/deepseek-chat", "label": "DeepSeek V3 via OpenRouter (free tier)"},
-        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
-         "model": "llama-3.1-70b-versatile", "label": "Llama 3.1 70B via Groq (free tier)"},
+         "model": "deepseek/deepseek-chat", "label": "DeepSeek V3 via OpenRouter"},
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B via OpenRouter (free)"},
     ],
     3: [  # Gemini — Broad / Cross-Domain
         {"key": _GOOGLE_STUDIO_KEY, "base_url": _GOOGLE_STUDIO_URL,
-         "model": "gemini-1.5-flash", "label": "Gemini 1.5 Flash via Google AI Studio (free tier)"},
+         "model": "gemini-2.0-flash", "label": "Gemini 2.0 Flash via Google AI Studio (free tier)"},
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
-         "model": "google/gemini-flash-1.5:free", "label": "Gemini Flash via OpenRouter (free tier)"},
+         "model": "google/gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash Lite via OpenRouter"},
     ],
     4: [  # Kimi — Agentic / Long-Horizon
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
-         "model": "mistralai/mistral-7b-instruct:free", "label": "Mistral 7B via OpenRouter (free tier)"},
-        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
-         "model": "mixtral-8x7b-32768", "label": "Mixtral 8x7B via Groq (free tier)"},
+         "model": "mistralai/mistral-small-24b-instruct-2501", "label": "Mistral Small 24B via OpenRouter"},
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B via OpenRouter (free)"},
     ],
     5: [  # Grok — Counter-Institutional / Heterodox
-        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
-         "model": "llama-3.1-70b-versatile", "label": "Llama 3.1 70B via Groq (free tier)"},
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
-         "model": "meta-llama/llama-3.1-70b-instruct:free", "label": "Llama 3.1 70B via OpenRouter (free tier)"},
+         "model": "nousresearch/hermes-3-llama-3.1-405b:free", "label": "Hermes 3 405B via OpenRouter (free)"},
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B via OpenRouter (free)"},
     ],
     6: [  # Qwen — Non-Western / Asian Corpus
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
-         "model": "qwen/qwen-2.5-72b-instruct:free", "label": "Qwen 2.5 72B via OpenRouter (free tier)"},
+         "model": "qwen/qwen3-next-80b-a3b-instruct:free", "label": "Qwen 3 80B via OpenRouter (free)"},
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
-         "model": "qwen/qwen-2-72b-instruct", "label": "Qwen 2 72B via OpenRouter"},
+         "model": "qwen/qwen-2.5-72b-instruct", "label": "Qwen 2.5 72B via OpenRouter"},
     ],
 }
 
