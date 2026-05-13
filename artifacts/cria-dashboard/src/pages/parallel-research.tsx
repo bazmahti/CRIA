@@ -486,9 +486,14 @@ export default function ParallelResearch() {
   const [query, setQuery] = useState("");
   const [observerNote, setObserverNote] = useState("");
   const [dissonanceBudget, setDissonanceBudget] = useState(0.2);
-  const [maxIterations, setMaxIterations] = useState(1);
+  const [maxIterations, setMaxIterations] = useState(2);
+  const [cognitiveIterations, setCognitiveIterations] = useState(2);
+  const [epistemicIterations, setEpistemicIterations] = useState(2);
   const [voice, setVoice] = useState("both");
   const [profile, setProfile] = useState("General scholarship");
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [analysing, setAnalysing] = useState(false);
+  const [analyserError, setAnalyserError] = useState<string | null>(null);
 
   const [jobId, setJobId] = useState<string | null>(null);
   const [job, setJob] = useState<JobState | null>(null);
@@ -543,6 +548,8 @@ export default function ParallelResearch() {
           observer_note: observerNote,
           dissonance_budget: dissonanceBudget,
           max_iterations: maxIterations,
+          cognitive_iterations: cognitiveIterations,
+          epistemic_iterations: epistemicIterations,
           voice,
           profile,
         }),
@@ -557,7 +564,39 @@ export default function ParallelResearch() {
     } finally {
       setLaunching(false);
     }
-  }, [query, observerNote, dissonanceBudget, maxIterations, voice, profile, poll, stopPolling]);
+  }, [query, observerNote, dissonanceBudget, maxIterations, cognitiveIterations, epistemicIterations, voice, profile, poll, stopPolling]);
+
+  const runAnalyser = useCallback(async () => {
+    if (!query.trim()) return;
+    setAnalysing(true);
+    setAnalyserError(null);
+    try {
+      const resp = await fetch("/api/analyse-question", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: query.trim(), observer_note: observerNote, profile,
+          cognitive_iterations: cognitiveIterations, epistemic_iterations: epistemicIterations }),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      setAnalysis(data);
+      // Auto-set split iterations from analyser
+      if (data.cognitive_iterations && [1,2,3,4,5].includes(data.cognitive_iterations)) {
+        setCognitiveIterations(data.cognitive_iterations);
+        setMaxIterations(data.cognitive_iterations);
+      }
+      if (data.epistemic_iterations && [1,2,3].includes(data.epistemic_iterations)) {
+        setEpistemicIterations(data.epistemic_iterations);
+      }
+      if (data.dissonance_recommendation) {
+        setDissonanceBudget(data.dissonance_recommendation);
+      }
+    } catch (e) {
+      setAnalyserError("Analysis unavailable — proceeding with question as stated.");
+    } finally {
+      setAnalysing(false);
+    }
+  }, [query, observerNote, profile, cognitiveIterations, epistemicIterations]);
 
   const running = job?.status === "running";
   const bothDone = job?.v2.status !== "pending" && job?.v2.status !== "running" &&
@@ -607,30 +646,95 @@ export default function ParallelResearch() {
               className="w-full rounded-lg bg-background border border-border/60 px-4 py-2.5 text-base md:text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
             />
           </div>
-          <div className="flex items-end gap-6 flex-wrap">
+          {/* Question Analyser */}
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={runAnalyser}
+              disabled={analysing || launching || running || !query.trim()}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-500/40 bg-violet-500/8 text-violet-400 text-xs font-semibold hover:bg-violet-500/15 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {analysing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span>◈</span>}
+              {analysing ? "Analysing…" : "Analyse Question"}
+            </button>
+            {analyserError && (
+              <span className="text-[10px] text-muted-foreground italic">{analyserError}</span>
+            )}
+            {analysis?.estimated_cost_aud && !analyserError && (
+              <span className="text-[10px] text-muted-foreground">
+                Estimated: <span className="text-primary font-medium">{analysis.estimated_cost_aud}</span>
+              </span>
+            )}
+          </div>
+
+          {/* Analyser results panel */}
+          {analysis && !analyserError && (
+            <div className="rounded-lg border border-border/40 bg-background/40 p-3 space-y-2 text-[11px]">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg bg-emerald-500/8 border border-emerald-500/20 px-2.5 py-2 text-center">
+                  <div className="text-base font-bold text-emerald-500">{analysis.cognitive_iterations}</div>
+                  <div className="text-[9px] text-emerald-500 font-medium">Cognitive · breadth</div>
+                </div>
+                <div className="rounded-lg bg-violet-500/8 border border-violet-500/20 px-2.5 py-2 text-center">
+                  <div className="text-base font-bold text-violet-400">{analysis.epistemic_iterations}</div>
+                  <div className="text-[9px] text-violet-400 font-medium">Epistemic · depth</div>
+                </div>
+              </div>
+              {analysis.iteration_reasoning && (
+                <p className="text-muted-foreground leading-relaxed">{analysis.iteration_reasoning}</p>
+              )}
+              {analysis.budget_trade_off && (
+                <p className="text-muted-foreground/70 italic border-t border-border/30 pt-2">{analysis.budget_trade_off}</p>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-end gap-4 flex-wrap">
+            {/* Cognitive iterations */}
             <div>
-              <label className="text-[11px] text-muted-foreground block mb-1.5">Iterations</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] text-muted-foreground">Cognitive</label>
+                <span className="text-[9px] text-emerald-500 font-medium">1–5</span>
+              </div>
               <select
-                value={maxIterations}
-                onChange={(e) => setMaxIterations(Number(e.target.value))}
-                className="rounded-lg bg-background border border-border/60 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                value={cognitiveIterations}
+                onChange={(e) => { setCognitiveIterations(Number(e.target.value)); setMaxIterations(Number(e.target.value)); }}
+                className="rounded-lg bg-background border border-emerald-500/30 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
               >
-                <option value={1}>1 (~30–60s)</option>
-                <option value={2}>2 (~60–120s)</option>
+                <option value={1}>1 — Single domain</option>
+                <option value={2}>2 — Standard</option>
+                <option value={3}>3 — Wide domain</option>
+                <option value={4}>4 — Civilisational</option>
+                <option value={5}>5 — Maximum scope</option>
+              </select>
+            </div>
+            {/* Epistemic iterations */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] text-muted-foreground">Epistemic</label>
+                <span className="text-[9px] text-violet-400 font-medium">1–3</span>
+              </div>
+              <select
+                value={epistemicIterations}
+                onChange={(e) => setEpistemicIterations(Number(e.target.value))}
+                className="rounded-lg bg-background border border-violet-500/30 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+              >
+                <option value={1}>1 — Single framing</option>
+                <option value={2}>2 — Standard</option>
+                <option value={3}>3 — Frame collision</option>
               </select>
             </div>
             <div>
-              <label className="text-[11px] text-muted-foreground block mb-1.5">Dissonance Budget (v4)</label>
+              <label className="text-[11px] text-muted-foreground block mb-1.5">Dissonance</label>
               <input
                 type="number"
                 value={dissonanceBudget}
                 onChange={(e) => setDissonanceBudget(Number(e.target.value))}
                 min={0} max={0.8} step={0.05}
-                className="w-24 rounded-lg bg-background border border-border/60 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="w-20 rounded-lg bg-background border border-border/60 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
             </div>
             <div>
-              <label className="text-[11px] text-muted-foreground block mb-1.5">Voice (v4)</label>
+              <label className="text-[11px] text-muted-foreground block mb-1.5">Voice</label>
               <select
                 value={voice}
                 onChange={(e) => setVoice(e.target.value)}
@@ -638,35 +742,58 @@ export default function ParallelResearch() {
               >
                 <option value="both">Both</option>
                 <option value="academic">Academic</option>
-                <option value="ferrier_popular">Ferrier Popular</option>
+                <option value="editorial">Editorial</option>
+                <option value="practitioner">Practitioner</option>
               </select>
             </div>
             <div>
-              <label className="text-[11px] text-muted-foreground block mb-1.5">Profile (v4)</label>
+              <label className="text-[11px] text-muted-foreground block mb-1.5">Research Stream</label>
               <select
                 value={profile}
                 onChange={(e) => setProfile(e.target.value)}
                 className="rounded-lg bg-background border border-border/60 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
               >
-                <option>General scholarship</option>
-                <option>HUM research</option>
-                <option>Indigenous studies</option>
-                <option>Civilisational research</option>
-                <option>Critical AI studies</option>
+                <optgroup label="General">
+                  <option value="general_scholarship">General Scholarship</option>
+                  <option value="new_economy">New Economy</option>
+                  <option value="critical_ai">Critical AI Studies</option>
+                </optgroup>
+                <optgroup label="Civilisational">
+                  <option value="civilisational_academic">Civilisational Academic</option>
+                  <option value="civilisational_research">Civilisational Research</option>
+                  <option value="hum_research">HUM Research</option>
+                  <option value="indigenous_studies">Indigenous Studies</option>
+                </optgroup>
+                <optgroup label="Environmental">
+                  <option value="environmental_academic">Environmental Academic</option>
+                  <option value="ecological_crisis">Ecological Crisis</option>
+                  <option value="planetary_boundaries">Planetary Boundaries</option>
+                </optgroup>
+                <optgroup label="Health">
+                  <option value="health_academic">Health Academic</option>
+                  <option value="mental_health">Mental Health</option>
+                  <option value="integrative_health">Integrative Health</option>
+                </optgroup>
+                <optgroup label="Activist">
+                  <option value="food_sovereignty">Food Sovereignty</option>
+                  <option value="economic_justice">Economic Justice</option>
+                  <option value="democracy_governance">Democracy & Governance</option>
+                </optgroup>
               </select>
             </div>
-            <button
-              onClick={launch}
-              disabled={launching || running || !query.trim()}
-              className="ml-auto flex items-center gap-2.5 px-6 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {launching || running ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Running…</>
-              ) : (
-                <><Zap className="w-4 h-4" /> Launch Both Engines</>
-              )}
-            </button>
           </div>
+
+          <button
+            onClick={launch}
+            disabled={launching || running || !query.trim()}
+            className="w-full flex items-center justify-center gap-2.5 px-6 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {launching || running ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Running…</>
+            ) : (
+              <><Zap className="w-4 h-4" /> Launch Both Engines</>
+            )}
+          </button>
           {error && (
             <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
               <XCircle className="w-3.5 h-3.5" /> {error}

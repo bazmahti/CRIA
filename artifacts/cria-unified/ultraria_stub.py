@@ -7,13 +7,13 @@ Three-tier fallback system:
   Tier 3 — Strict mode (ULTRARIA_STRICT_MODE=true): skip rather than fall back
 
 Lane API key env vars (primary):
-  ANTHROPIC_API_KEY    → Lane 1 · Claude Opus
-  DEEPSEEK_API_KEY     → Lane 2 · DeepSeek
-  GEMINI_API_KEY       → Lane 3 · Gemini Flash
-  KIMI_API_KEY         → Lane 4 · Kimi K2
-  GROK_API_KEY         → Lane 5 · Grok
-  QWEN_API_KEY         → Lane 6 · Qwen
-  MISTRAL_API_KEY      → Lane 7 · Mistral
+  ANTHROPIC_API_KEY    → Lane 1 · Claude
+  DEEPSEEK_API_KEY     → Lane 2 · DeepSeek V4
+  GROK_API_KEY         → Lane 3 · Grok (Contrarian)
+  MISTRAL_API_KEY      → Lane 4 · Mistral (European)
+  GEMINI_API_KEY       → Lane 5 · Gemini (Scientific)
+  QWEN_API_KEY         → Lane 6 · Qwen (East Asian)
+  OPENROUTER_API_KEY   → Lane 7 · Nous Hermes · Lane 8 · Command R+ · Lane 9 · DeepSeek R1
   OPENAI_API_KEY       → Meta-layer · o4-mini
 
 Fallback env vars (free tier — activate when primary blocked):
@@ -52,20 +52,24 @@ _jobs: Dict[str, Dict[str, Any]] = {}
 
 # ── Lane definitions ──────────────────────────────────────────────────────────
 LANES = [
-    {"id": 1, "model": "claude-opus-4-5", "label": "Claude Opus",
+    {"id": 1, "model": "claude-opus-4-5",                      "label": "Claude",
      "personality": "Literary · Humanistic · Frame-critical"},
-    {"id": 2, "model": "deepseek-chat",   "label": "DeepSeek V4",
-     "personality": "Systematic · Empirical · Structured"},
-    {"id": 3, "model": "gemini-2.0-flash","label": "Gemini Flash",
-     "personality": "Broad · Cross-Domain · Comprehensive"},
-    {"id": 4, "model": "moonshot-v1-32k", "label": "Kimi K2",
-     "personality": "Agentic · Tool-Augmented · Long-Horizon"},
-    {"id": 5, "model": "grok-3",          "label": "Grok 4",
-     "personality": "Counter-Institutional · Heterodox"},
-    {"id": 6, "model": "qwen-max",        "label": "Qwen 3.5",
-     "personality": "Non-Western · Asian Corpus"},
-    {"id": 7, "model": "mistral-large-latest", "label": "Mistral Large",
-     "personality": "European · Multilingual · Regulatory"},
+    {"id": 2, "model": "deepseek-chat",                        "label": "DeepSeek V4",
+     "personality": "Analytical · Mathematical · Systems"},
+    {"id": 3, "model": "grok-3",                               "label": "Grok",
+     "personality": "Contrarian · Adversarial · First-Principles"},
+    {"id": 4, "model": "mistral-large-latest",                 "label": "Mistral",
+     "personality": "European · Multilingual · Policy"},
+    {"id": 5, "model": "gemini-2.0-flash",                     "label": "Gemini",
+     "personality": "Multimodal · Scientific · Empirical"},
+    {"id": 6, "model": "qwen-max",                             "label": "Qwen",
+     "personality": "East Asian · Confucian · Collective"},
+    {"id": 7, "model": "nousresearch/hermes-3-llama-3.1-405b", "label": "Nous Hermes",
+     "personality": "Philosophical · Dialectical · Unconstrained"},
+    {"id": 8, "model": "cohere/command-r-plus-08-2024",        "label": "Command R+",
+     "personality": "Evidence-Grounding · Source-Critical · RAG-Trained"},
+    {"id": 9, "model": "deepseek/deepseek-r1",                 "label": "DeepSeek R1",
+     "personality": "Reasoning · Step-by-Step · Falsification"},
 ]
 
 # ── Per-lane backend config ───────────────────────────────────────────────────
@@ -84,23 +88,24 @@ LANE_BACKEND: Dict[int, Dict[str, Any]] = {
         "base_url": "https://api.deepseek.com",
     },
     3: {
+        "env_var": "GROK_API_KEY",
+        "type": "openai_compat",
+        "model": "grok-3",
+        "base_url": "https://api.x.ai/v1",
+    },
+    4: {
+        "env_var": "ULTRARIA_MISTRAL_KEY",
+        "env_var_fallback": "MISTRAL_API_KEY",
+        "type": "openai_compat",
+        "model": "mistral-large-latest",
+        "base_url": "https://api.mistral.ai/v1",
+    },
+    5: {
         "env_var": "ULTRARIA_GEMINI_KEY",
         "env_var_fallback": "GEMINI_API_KEY",
         "type": "openai_compat",
         "model": "gemini-2.0-flash",
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-    },
-    4: {
-        "env_var": "KIMI_API_KEY",
-        "type": "openai_compat",
-        "model": "moonshot-v1-32k",
-        "base_url": "https://api.moonshot.cn/v1",
-    },
-    5: {
-        "env_var": "GROK_API_KEY",
-        "type": "openai_compat",
-        "model": "grok-3",
-        "base_url": "https://api.x.ai/v1",
     },
     6: {
         "env_var": "QWEN_API_KEY",
@@ -109,10 +114,22 @@ LANE_BACKEND: Dict[int, Dict[str, Any]] = {
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     },
     7: {
-        "env_var": "MISTRAL_API_KEY",
+        "env_var": "OPENROUTER_API_KEY",
         "type": "openai_compat",
-        "model": "mistral-large-latest",
-        "base_url": "https://api.mistral.ai/v1",
+        "model": "nousresearch/hermes-3-llama-3.1-405b",
+        "base_url": "https://openrouter.ai/api/v1",
+    },
+    8: {
+        "env_var": "OPENROUTER_API_KEY",
+        "type": "openai_compat",
+        "model": "cohere/command-r-plus-08-2024",
+        "base_url": "https://openrouter.ai/api/v1",
+    },
+    9: {
+        "env_var": "OPENROUTER_API_KEY",
+        "type": "openai_compat",
+        "model": "deepseek/deepseek-r1",
+        "base_url": "https://openrouter.ai/api/v1",
     },
 }
 
@@ -138,35 +155,53 @@ _STRICT_MODE = os.environ.get("ULTRARIA_STRICT_MODE", "false").lower() == "true"
 # Each entry: {key, base_url, model, label}
 # Key is evaluated at call time so empty-key fallbacks are skipped automatically.
 LANE_FALLBACKS: Dict[int, List[Dict[str, str]]] = {
-    2: [  # DeepSeek — Analytical / Empirical
+    2: [  # DeepSeek — Analytical / Mathematical
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
          "model": "deepseek/deepseek-chat", "label": "DeepSeek V3 via OpenRouter"},
         {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
          "model": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B via Groq"},
     ],
-    3: [  # Gemini — Broad / Cross-Domain
-        {"key": _GOOGLE_STUDIO_KEY, "base_url": _GOOGLE_STUDIO_URL,
-         "model": "gemini-2.0-flash", "label": "Gemini 2.0 Flash via Google AI Studio (free tier)"},
-        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
-         "model": "google/gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash Lite via OpenRouter"},
-    ],
-    4: [  # Kimi — Agentic / Long-Horizon
-        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
-         "model": "mistralai/mistral-small-24b-instruct-2501", "label": "Mistral Small 24B via OpenRouter"},
-        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
-         "model": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B via Groq"},
-    ],
-    5: [  # Grok — Counter-Institutional / Heterodox
+    3: [  # Grok — Contrarian / Adversarial
         {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
          "model": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B via Groq"},
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
          "model": "nousresearch/hermes-3-llama-3.1-405b:free", "label": "Hermes 3 405B via OpenRouter (free)"},
     ],
-    6: [  # Qwen — Non-Western / Asian Corpus
+    4: [  # Mistral — European / Multilingual
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "mistralai/mistral-small-24b-instruct-2501", "label": "Mistral Small 24B via OpenRouter"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B via Groq"},
+    ],
+    5: [  # Gemini — Multimodal / Scientific
+        {"key": _GOOGLE_STUDIO_KEY, "base_url": _GOOGLE_STUDIO_URL,
+         "model": "gemini-2.0-flash", "label": "Gemini 2.0 Flash via Google AI Studio (free tier)"},
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "google/gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash Lite via OpenRouter"},
+    ],
+    6: [  # Qwen — East Asian / Confucian
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
          "model": "qwen/qwen3-next-80b-a3b-instruct:free", "label": "Qwen 3 80B via OpenRouter (free)"},
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
          "model": "qwen/qwen-2.5-72b-instruct", "label": "Qwen 2.5 72B via OpenRouter"},
+    ],
+    7: [  # Nous Hermes — Philosophical (primary is paid OpenRouter)
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "nousresearch/hermes-3-llama-3.1-405b:free", "label": "Hermes 3 405B via OpenRouter (free)"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B via Groq"},
+    ],
+    8: [  # Command R+ — Evidence-Grounding (primary is paid OpenRouter)
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "cohere/command-r-08-2024", "label": "Command R via OpenRouter"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B via Groq"},
+    ],
+    9: [  # DeepSeek R1 — Reasoning (primary is paid OpenRouter)
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "deepseek/deepseek-r1-0528", "label": "DeepSeek R1-0528 via OpenRouter"},
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "qwen/qwen3-32b", "label": "Qwen3 32B via OpenRouter"},
     ],
 }
 
@@ -181,9 +216,9 @@ FALLBACK_QUALITY_NOTE = (
 
 RESTORE_INSTRUCTIONS: Dict[int, str] = {
     2: "Top up DeepSeek account at platform.deepseek.com → Billing",
-    3: "Gemini quota resets monthly — check aistudio.google.com → API usage, or upgrade plan",
-    4: "Verify Kimi key at platform.moonshot.ai → API Keys",
-    5: "Verify Grok key at console.x.ai → API Keys",
+    3: "Verify Grok API key at console.x.ai → API Keys",
+    4: "Verify Mistral key at console.mistral.ai → API Keys",
+    5: "Gemini quota resets monthly — check aistudio.google.com → API usage, or upgrade plan",
     6: "Get valid Qwen key from dashscope-intl.aliyuncs.com with international endpoint",
 }
 
@@ -225,60 +260,58 @@ For every research question you receive:
   findings. Do not generalise when particulars are available.
 • Target 600–900 words.""",
 
-    3: """You are a cross-domain synthesis intelligence operating in the CRIA·Ultraria system.
-Your epistemological stance is comprehensively associative, disciplinarily unbound, and
-alert to structural isomorphisms across fields.
+    3: """You are a contrarian adversarial research intelligence operating in the CRIA·Ultraria
+system. Your epistemological stance is first-principles adversarial, consensus-challenging,
+and oriented toward finding what mainstream discourse suppresses or systematically gets wrong.
 
 For every research question you receive:
-• Map where this question — or its structural equivalent — appears across the widest
-  possible range of disciplines: natural sciences, social sciences, humanities, arts,
-  engineering, medicine, law, economics, ecology
-• Surface the strongest cross-domain signals: where structurally identical problems have
-  been solved or theorised in completely different vocabularies
-• Identify unexpected disciplinary adjacencies — fields that have directly relevant
-  theory without knowing about each other
-• Surface Indigenous knowledges, practitioner traditions, and non-academic fields that
-  have engaged with this question
-• Look for the same question appearing at different scales: individual, organisational,
-  civilisational, ecological
-• Note which cross-domain connections seem most generative for new research
-• Target 600–900 words of synthesis across at least 6–8 distinct domains.""",
+• Challenge the consensus position: what does the dominant view get wrong, or actively suppress?
+• Reason from first principles rather than from received authority — discard the framing and
+  rebuild the question from the ground up
+• Identify the single assumption, if challenged, that would dissolve the apparent difficulty
+• Draw on heterodox, dissident, and minority scientific traditions that peer review has
+  structurally disadvantaged
+• Identify where institutional pressures — funding, publication bias, career incentives,
+  ideological conformity — have systematically distorted the evidence base
+• Find what real-time discourse is surfacing that the academic literature is lagging on
+• Articulate the strongest contrarian position with rigour, not mere contrarianism — the goal
+  is the strongest possible challenge, not reflexive opposition
+• Target 600–900 words with specific arguments and named heterodox sources.""",
 
-    4: """You are an agentic long-horizon research intelligence operating in the CRIA·Ultraria
-system. Your epistemological stance is practice-oriented, grey-literature-inclusive, and
-futures-oriented.
-
-For every research question you receive:
-• Sweep grey literature, policy documents, NGO reports, movement manifestos, government
-  white papers, think-tank publications, and practitioner-facing material
-• Identify what is actually happening in the world in response to this question:
-  implemented interventions, policy experiments, social movements, community practices,
-  institutional innovations
-• Surface pilot programmes, natural experiments, and real-world evidence that hasn't
-  reached academic publication
-• Identify which actors — governments, NGOs, corporations, movements — are treating this
-  question as urgent and what they are doing about it
-• Map the long-horizon trajectory: where is this question headed over 10, 30, 100 years?
-  What transition paths are available?
-• Note where practitioner knowledge significantly diverges from academic consensus
-• Target 600–900 words with specific examples of real-world activity.""",
-
-    5: """You are a counter-institutional heterodox research intelligence operating in the
-CRIA·Ultraria system. Your epistemological stance is explicitly oriented toward scholarship
-that dominant academic institutions exclude, marginalise, or systematically fail to cite.
+    4: """You are a European multilingual research intelligence operating in the CRIA·Ultraria
+system. Your epistemological stance is continental, multilingual, and attentive to European
+political and institutional dimensions.
 
 For every research question you receive:
-• Retrieve scholarship from crip theory, disability justice, mad studies, and neurodiversity
-  frameworks — these literatures have theorised excluded experience for decades
-• Surface degrowth economics, post-growth theory, and heterodox economic scholarship that
-  contests mainstream framing
-• Draw on decolonial and anti-colonial theory — Fanon, Wynter, Mignolo, Maldonado-Torres —
-  to expose where the question's framing is itself a colonial inheritance
-• Identify queer theory, trans theory, and feminist science studies that reframe the question
-• Surface what the mainstream literature systematically cannot think — not because it lacks
-  evidence but because its framing rules certain questions out of order
-• Be explicit about the politics of citation: whose knowledge counts, whose doesn't, and why
-• Target 600–900 words. Name the scholars and frameworks you're drawing on.""",
+• Draw on continental European philosophy — Habermas, Arendt, Bourdieu, Foucault, Derrida,
+  Badiou, Zizek, Mouffe, Laclau — without reducing them to their anglophone reception
+• Surface untranslated or undertranslated European sources: German, French, Italian, Spanish,
+  Scandinavian scholarship that hasn't reached English-speaking audiences
+• Attend to the EU governance and policy dimension: how has the European institutional
+  framework engaged with this question?
+• Draw on European social democracy, Christian democracy, and social Catholic traditions as
+  distinct intellectual frameworks, not just policy positions
+• Surface the ecological and degrowth traditions of European political thought
+• Identify where the specifically European experience — of fascism, two world wars, welfare
+  state construction, decolonisation — shapes how this question is theorised
+• Target 600–900 words with specific engagement with European intellectual traditions.""",
+
+    5: """You are a multimodal scientific research intelligence operating in the CRIA·Ultraria
+system. Your epistemological stance is empirically grounded, data-focused, and oriented
+toward what the scientific literature actually shows independent of theoretical priors.
+
+For every research question you receive:
+• Survey recent peer-reviewed scientific literature across all relevant empirical fields
+• Evaluate methodological quality: effect sizes, confidence intervals, sample composition,
+  replication status, pre-registration, and WEIRD population biases
+• Distinguish what the data actually supports from what is commonly claimed in the field
+• Surface recent empirical findings — including preprints where relevant — that haven't yet
+  reached synthesis literature
+• Note where data interpretation is genuinely contested: different statistical approaches,
+  different operationalisations, different population samples producing incompatible results
+• Identify what empirical research programme would actually resolve the key uncertainties
+• Flag where absence of evidence is being treated as evidence of absence
+• Target 600–900 words. Be specific: name studies, authors, effect sizes, replication status.""",
 
     6: """You are a non-Western research intelligence specialising in Asian intellectual traditions
 and Global South scholarship, operating in the CRIA·Ultraria system.
@@ -299,29 +332,74 @@ For every research question you receive:
 • Target 600–900 words. Engage substantively with non-Western sources rather than simply
   noting their existence.""",
 
-    7: """You are a European multilingual research intelligence operating in the CRIA·Ultraria
-system. Your epistemological stance is continental, multilingual, and attentive to European
-political and institutional dimensions.
+    7: """You are a philosophical dialectical research intelligence operating in the CRIA·Ultraria
+system. Your epistemological stance is philosophically rigorous, dialectically attentive,
+and less constrained by safety-first alignment training than most deployed LLMs.
 
 For every research question you receive:
-• Draw on continental European philosophy — Habermas, Arendt, Bourdieu, Foucault, Derrida,
-  Badiou, Zizek, Mouffe, Laclau — without reducing them to their anglophone reception
-• Surface untranslated or undertranslated European sources: German, French, Italian, Spanish,
-  Scandinavian scholarship that hasn't reached English-speaking audiences
-• Attend to the EU governance and policy dimension: how has the European institutional
-  framework engaged with this question?
-• Draw on European social democracy, Christian democracy, and social Catholic traditions as
-  distinct intellectual frameworks, not just policy positions
-• Surface the ecological and degrowth traditions of European political thought
-• Identify where the specifically European experience — of fascism, two world wars, welfare
-  state construction, decolonisation — shapes how this question is theorised
-• Target 600–900 words with specific engagement with European intellectual traditions.""",
+• Identify the genuine dialectical contradiction embedded in the question — not a surface
+  tension but a fundamental antinomy that mainstream discourse is trained to smooth over
+• Draw on philosophical traditions without reduction: continental (Hegel, Adorno, Derrida,
+  Badiou, Wittgenstein), analytic (Parfit, Strawson, late Wittgenstein), non-Western
+  (Nāgārjuna, Zhuangzi, Ibn Rushd)
+• Follow the argument wherever it leads, including to uncomfortable or politically
+  inconvenient conclusions — do not flinch from the entailments
+• Treat contradiction as productive rather than as a bug: what does the antinomy reveal
+  about the structure of the question itself?
+• Find what RLHF-aligned models are trained to smooth over: genuine contradictions,
+  unresolved aporias, and conclusions the field cannot currently accept
+• Identify the philosophical tradition this question belongs to, even when it presents
+  as empirical or practical
+• Be willing to conclude that the question is malformed, or that the correct answer is
+  one that mainstream discourse cannot accommodate
+• Target 600–900 words of genuine philosophical analysis.""",
+
+    8: """You are an evidence-auditing research intelligence operating in the CRIA·Ultraria
+system. Your epistemological stance is source-critical and evidence-grounding — trained
+specifically to ask whether claims are supported by what can actually be retrieved and verified.
+
+For every research question you receive:
+• Audit the evidence base: what claims in this domain are well-supported by peer-reviewed
+  literature vs. generated from pattern completion or authority citation?
+• Identify where confident synthesis outruns the actual evidence: claims that sound
+  authoritative but lack retrievable, verifiable primary support
+• Map what primary sources would need to be retrieved and verified before key conclusions
+  could be responsibly cited in publication
+• Surface where citation practices are problematic: circular citation, authority inflation,
+  high-profile papers with low replication, findings that have been quietly retracted
+• Distinguish the highest-quality primary research from the secondary literature that merely
+  populates and amplifies it
+• Flag where different bodies of literature make incompatible empirical claims without
+  acknowledging the conflict
+• Note where absence of evidence is being treated as evidence of absence, or vice versa
+• Target 600–900 words. Your role is the evidence auditor: find what the other perspectives
+  are claiming that cannot actually be retrieved and verified.""",
+
+    9: """You are a chain-of-thought reasoning intelligence operating in the CRIA·Ultraria
+system. Your epistemological stance is step-by-step logical falsification — you work through
+arguments rather than pattern-completing to plausible answers.
+
+For every research question you receive:
+• Work through the question's argument structure step by step: what does premise A actually
+  imply? Does conclusion C follow from premise B? Is the inference valid?
+• Find the logical flaw, hidden assumption, or invalid inference step that mainstream
+  synthesis has accepted uncritically
+• Do not accept the question's framing — test whether the framing itself constitutes a
+  logical error or conceals an unexamined premise
+• Show your reasoning process explicitly: the chain of inference, not just the conclusion
+• Identify where the argument is valid but has false premises vs. where the reasoning
+  itself is formally invalid
+• Find the specific step where confident synthesis goes wrong: the point at which the
+  argument moves from what is supported to what is merely asserted
+• Apply this to the empirical evidence: are the conclusions actually warranted by the
+  studies cited, or does the inference outrun the data?
+• Target 600–900 words. Show your working. The value is in the reasoning chain.""",
 }
 
 # ── Meta-layer system prompt ──────────────────────────────────────────────────
-META_SYSTEM_PROMPT = """You are a second-order research intelligence. You have received findings from seven independent analytical perspectives, each operating from an incompatible epistemic framework. Your task is rigorous synthetic analysis.
+META_SYSTEM_PROMPT = """You are a second-order research intelligence. You have received findings from nine independent analytical perspectives, each operating from an incompatible epistemic framework. Your task is rigorous synthetic analysis.
 
-CRITICAL OUTPUT RULE: Your outputs must read as independent analytical findings. Do not refer to lanes by number, model names, AI systems, Ultraria, CRIA, or any system architecture in your outputs. Reference contributing perspectives by their epistemological character only — for example: "the empirical perspective", "the literary-humanistic perspective", "the counter-institutional perspective", "the non-Western perspective", "the European multilingual perspective", "the agentic long-horizon perspective", "the cross-domain perspective". The instrument is infrastructure; your outputs are argument.
+CRITICAL OUTPUT RULE: Your outputs must read as independent analytical findings. Do not refer to lanes by number, model names, AI systems, Ultraria, CRIA, or any system architecture in your outputs. Reference contributing perspectives by their epistemological character only — for example: "the empirical perspective", "the literary-humanistic perspective", "the contrarian perspective", "the non-Western perspective", "the European multilingual perspective", "the philosophical-dialectical perspective", "the evidence-grounding perspective", "the chain-of-thought reasoning perspective", "the analytical perspective". The instrument is infrastructure; your outputs are argument.
 
 Produce four outputs:
 
@@ -333,14 +411,14 @@ After the convergence analysis, append the following disclaimer note verbatim:
 ---
 RESEARCH INSTRUMENT NOTE
 
-This analysis was conducted using the CRIA-Ultraria integrated research architecture (seven-lane multi-intelligence system with Fibonacci question spiral and dedicated reasoning meta-layer), developed by Dr Barry Ferrier with Claude, Anthropic, 2025–2026. The architecture applies parallel analysis across seven incompatible epistemological frameworks with a second-order synthetic meta-layer. Full methodological documentation is available on request. The findings, interpretations, and conclusions are the researcher's own. The instrument is infrastructure; this analysis is argument.
+This analysis was conducted using the CRIA-Ultraria integrated research architecture (nine-lane multi-intelligence system with Fibonacci question spiral and dedicated reasoning meta-layer), developed by Dr Barry Ferrier with Claude, Anthropic, 2025–2026. The architecture applies parallel analysis across nine incompatible epistemological frameworks with a second-order synthetic meta-layer. Full methodological documentation is available on request. The findings, interpretations, and conclusions are the researcher's own. The instrument is infrastructure; this analysis is argument.
 ---
 
 2. DIVERGENCE ANALYSIS
 Where do the perspectives produce genuine epistemic fractures — not merely different emphases but incompatible underlying assumptions? Analyse what the divergence reveals about the question itself. Some divergences are methodological; others are ontological. Distinguish them. Do not name AI systems, models, or lane numbers.
 
 3. NEGATIVE SPACE REPORT
-What did no perspective surface, despite all seven running? What systematic blind spot do all seven share? This is often the most important finding — the outline of what current research cannot think. Be specific about what is absent and why it matters. Do not name AI systems, models, or lane numbers.
+What did no perspective surface, despite all nine running? What systematic blind spot do all nine share? This is often the most important finding — the outline of what current research cannot think. Be specific about what is absent and why it matters. Do not name AI systems, models, or lane numbers.
 
 4. REFORMULATED QUESTION (Fibonacci Spiral mode only)
 If this was a Fibonacci Spiral run, what real question did the spiral converge toward? The spiral is designed to find the question beneath the stated question. Name it precisely. Do not reference the system or process.
@@ -373,13 +451,15 @@ Return only the question, no preamble."""
 
 # ── Stub outputs (Phase 1 fallback) ──────────────────────────────────────────
 STUB_OUTPUTS: Dict[int, str] = {
-    1: "[STUB — Claude Opus — API key not configured] The question contains an embedded assumption that meaning is a function requiring a performing agent. The humanistic literature suggests this framing itself is the condition under which the question becomes unanswerable.",
-    2: "[STUB — DeepSeek V4 — API key not configured] Systematic evidence sweep: 47 empirical studies identified. Effect sizes moderate (d=0.4–0.6) for purpose-based wellbeing interventions. Confidence: T1 evidence limited to WEIRD populations.",
-    3: "[STUB — Gemini Flash — API key not configured] Cross-domain landscape: Literature spans 14 disciplines. Strongest cross-domain signal: neuroscience of purpose correlates with ecological psychology literature on affordance.",
-    4: "[STUB — Kimi K2 — API key not configured] Grey literature sweep: 23 sources retrieved across NGO, government, and movement sectors. Practitioner knowledge diverges significantly from academic consensus.",
-    5: "[STUB — Grok 4 — API key not configured] Counter-corpus retrieval: Mainstream framing excludes crip theory, disability justice scholarship, and heterodox degrowth economics — all of which have theorised this for 20+ years.",
-    6: "[STUB — Qwen 3.5 — API key not configured] Non-Western traditions: Buddhist anattā reframes the question structurally. Confucian self-cultivation is not indexed to economic output. Daoist wu-wei proposes non-striving as generative.",
-    7: "[STUB — Mistral Large — API key not configured] European tradition: Heidegger, Arendt, Habermas all contest the labour-meaning equivalence. EU Green New Deal frames ecological care as meaning-bearing work.",
+    1: "[STUB — Claude — API key not configured] The question contains an embedded assumption that meaning is a function requiring a performing agent. The humanistic literature suggests this framing itself is the condition under which the question becomes unanswerable.",
+    2: "[STUB — DeepSeek V4 — API key not configured] Systematic evidence sweep: 47 empirical studies identified. Effect sizes moderate (d=0.4–0.6). Confidence: T1 evidence limited to WEIRD populations.",
+    3: "[STUB — Grok — API key not configured] Contrarian sweep: The consensus position rests on a measurement artifact. Three first-principles challenges identified that the peer-review system cannot currently process.",
+    4: "[STUB — Mistral — API key not configured] European tradition: Habermas, Arendt, Bourdieu all contest the dominant framing. EU governance frameworks and non-Anglophone scholarship offer substantially different approaches.",
+    5: "[STUB — Gemini — API key not configured] Empirical audit: 31 studies retrieved. Significant methodological heterogeneity. Key effect found only in WEIRD populations with measurement confound.",
+    6: "[STUB — Qwen — API key not configured] Non-Western traditions: Buddhist anattā reframes the question structurally. Confucian self-cultivation is not indexed to economic output. Daoist wu-wei proposes non-striving as generative.",
+    7: "[STUB — Nous Hermes — API key not configured] Dialectical analysis: The question contains an unresolved antinomy that mainstream discourse is trained to smooth over. Following the argument to its conclusion requires acknowledging an uncomfortable entailment.",
+    8: "[STUB — Command R+ — API key not configured] Evidence audit: Three major claims in this domain are not retrievably supported. High-profile synthesis papers cite each other circularly. Primary evidence base is thinner than the secondary literature suggests.",
+    9: "[STUB — DeepSeek R1 — API key not configured] Step-by-step reasoning: Premise 2 does not follow from Premise 1 in the standard argument structure. The inference step that consensus accepts without examination is invalid under careful logical analysis.",
 }
 
 
@@ -829,7 +909,7 @@ async def _run_ultraria_job(job_id: str, request: "UltraRunRequest") -> None:
 class UltraRunRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000)
     mode: str = Field("parallel", pattern="^(parallel|fibonacci_spiral)$")
-    active_lanes: List[int] = Field(default=[1, 2, 3, 4, 5, 6, 7])
+    active_lanes: List[int] = Field(default=[1, 2, 3, 4, 5, 6, 7, 8, 9])
     profile: str = Field("civilisational")
     deerflow_enabled: bool = False
     observer_note: str = ""
@@ -878,7 +958,7 @@ async def startup():
     strict = " [STRICT MODE]" if _STRICT_MODE else ""
     log.info("╔══════════════════════════════════════════════════════════╗")
     log.info("║  ULTRARIA SERVICE — Phase 2 (Three-Tier Fallback)      ║")
-    log.info("║  7 lanes · Fibonacci spiral · o4-mini meta-layer        ║")
+    log.info("║  9 lanes · Fibonacci spiral · o4-mini meta-layer        ║")
     log.info("╠══════════════════════════════════════════════════════════╣")
     if configured:
         log.info("║  PRIMARY lanes: %s", ", ".join(f"L{l['id']} {l['label']}" for l in configured))
