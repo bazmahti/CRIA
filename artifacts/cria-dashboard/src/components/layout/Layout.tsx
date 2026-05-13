@@ -27,9 +27,8 @@ const NAV = [
 ];
 
 const MODES = [
-  { label: "CRIA only", icon: Brain, href: "/unified", internal: true },
-  { label: "CRIA + Ultraria", icon: Layers, href: "/cria-unified/unified", internal: false },
-  { label: "Scaffolder", icon: FileText, href: "/cria-unified/scaffold", internal: false },
+  { label: "CRIA Unified", icon: Brain, href: "/unified", internal: true },
+  { label: "CRIA + Ultraria", icon: Layers, href: "/research", internal: true },
 ];
 
 function ModeBar({ location }: { location: string }) {
