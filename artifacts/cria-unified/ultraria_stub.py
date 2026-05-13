@@ -141,8 +141,8 @@ LANE_FALLBACKS: Dict[int, List[Dict[str, str]]] = {
     2: [  # DeepSeek — Analytical / Empirical
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
          "model": "deepseek/deepseek-chat", "label": "DeepSeek V3 via OpenRouter"},
-        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
-         "model": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B via OpenRouter (free)"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B via Groq"},
     ],
     3: [  # Gemini — Broad / Cross-Domain
         {"key": _GOOGLE_STUDIO_KEY, "base_url": _GOOGLE_STUDIO_URL,
@@ -153,14 +153,14 @@ LANE_FALLBACKS: Dict[int, List[Dict[str, str]]] = {
     4: [  # Kimi — Agentic / Long-Horizon
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
          "model": "mistralai/mistral-small-24b-instruct-2501", "label": "Mistral Small 24B via OpenRouter"},
-        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
-         "model": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B via OpenRouter (free)"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B via Groq"},
     ],
     5: [  # Grok — Counter-Institutional / Heterodox
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B via Groq"},
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
          "model": "nousresearch/hermes-3-llama-3.1-405b:free", "label": "Hermes 3 405B via OpenRouter (free)"},
-        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
-         "model": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B via OpenRouter (free)"},
     ],
     6: [  # Qwen — Non-Western / Asian Corpus
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
