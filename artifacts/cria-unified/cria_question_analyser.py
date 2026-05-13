@@ -559,7 +559,6 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
         reduced_epi = max(epi_iter - 1, 1)
         reduced_cost = (reduced_cog * 0.40) + (reduced_epi * 0.70) + 0.90
         if reduced_cog == cog_iter and reduced_epi == epi_iter:
-            # Already at minimum (1/1) — no lower option
             budget_trade_off = (
                 "This is the minimum configuration (1 Cognitive / 1 Epistemic). "
                 "No lower-cost option is available without skipping the run entirely."
