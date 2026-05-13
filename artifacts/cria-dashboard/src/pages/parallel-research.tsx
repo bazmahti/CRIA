@@ -571,26 +571,48 @@ export default function ParallelResearch() {
     setAnalysing(true);
     setAnalyserError(null);
     try {
-      const resp = await fetch("/api/analyse-question", {
+      const BASE = import.meta.env.VITE_CRIA_UNIFIED_BASE_URL || "";
+      // Start analysis job
+      const startResp = await fetch(`${BASE}/cria-unified/analyse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim(), observer_note: observerNote, profile,
-          cognitive_iterations: cognitiveIterations, epistemic_iterations: epistemicIterations }),
+        body: JSON.stringify({
+          query: query.trim(),
+          observer_note: observerNote,
+          profile,
+          cognitive_iterations: cognitiveIterations,
+          epistemic_iterations: epistemicIterations,
+        }),
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      setAnalysis(data);
-      // Auto-set split iterations from analyser
-      if (data.cognitive_iterations && [1,2,3,4,5].includes(data.cognitive_iterations)) {
-        setCognitiveIterations(data.cognitive_iterations);
-        setMaxIterations(data.cognitive_iterations);
+      if (!startResp.ok) throw new Error(`HTTP ${startResp.status}`);
+      const { jobId } = await startResp.json();
+
+      // Poll for result
+      let attempts = 0;
+      while (attempts < 30) {
+        await new Promise(r => setTimeout(r, 1500));
+        const pollResp = await fetch(`${BASE}/cria-unified/analyse/${jobId}`);
+        if (!pollResp.ok) throw new Error(`Poll HTTP ${pollResp.status}`);
+        const pollData = await pollResp.json();
+        if (pollData.status === "complete" && pollData.result) {
+          const data = pollData.result;
+          setAnalysis(data);
+          if (data.cognitive_iterations && [1,2,3,4,5].includes(data.cognitive_iterations)) {
+            setCognitiveIterations(data.cognitive_iterations);
+            setMaxIterations(data.cognitive_iterations);
+          }
+          if (data.epistemic_iterations && [1,2,3].includes(data.epistemic_iterations)) {
+            setEpistemicIterations(data.epistemic_iterations);
+          }
+          if (data.dissonance_recommendation) {
+            setDissonanceBudget(data.dissonance_recommendation);
+          }
+          return;
+        }
+        if (pollData.status === "failed") throw new Error(pollData.error || "Analysis failed");
+        attempts++;
       }
-      if (data.epistemic_iterations && [1,2,3].includes(data.epistemic_iterations)) {
-        setEpistemicIterations(data.epistemic_iterations);
-      }
-      if (data.dissonance_recommendation) {
-        setDissonanceBudget(data.dissonance_recommendation);
-      }
+      throw new Error("Analysis timed out");
     } catch (e) {
       setAnalyserError("Analysis unavailable — proceeding with question as stated.");
     } finally {
