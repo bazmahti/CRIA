@@ -78,6 +78,31 @@ _GOOGLE_STUDIO_KEY = os.environ.get("GOOGLE_AI_STUDIO_KEY",
 _GROQ_KEY      = os.environ.get("GROQ_API_KEY", "")
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
+# ── Extended lane model configs (all via OpenRouter) ─────────────────────────
+# These power the new lanes L6–L9 and improve L2/L3 fallbacks.
+# All require only OPENROUTER_API_KEY — already connected.
+
+# L6 — Qwen 2.5 72B (East Asian / Confucian / Relational)
+_QWEN_MODEL    = "qwen/qwen-2.5-72b-instruct"
+
+# L7 — Nous Hermes 3 (Philosophical / Dialectical / Unconstrained)
+# Different training lineage from RLHF-aligned models — more willing to
+# follow a philosophical argument to uncomfortable conclusions.
+_HERMES_MODEL  = "nousresearch/hermes-3-llama-3.1-405b"
+
+# L8 — Command R+ (Evidence-Grounding / RAG-trained / Source-Critical)
+# Cohere's model specifically trained for retrieval-grounded synthesis.
+# Only model in the set trained to ask "does the argument outrun the evidence?"
+_COMMAND_MODEL = "cohere/command-r-plus-08-2024"
+
+# L9 — DeepSeek R1 (Reasoning / Step-by-Step Falsification)
+# Chain-of-thought reasoning model — finds logical flaws by actually reasoning
+# rather than pattern-completing. Genuinely different from Grok's rhetoric.
+_R1_MODEL      = "deepseek/deepseek-r1"
+
+# L2 upgrade — DeepSeek R1 also replaces DeepSeek V3 when primary fails
+_DEEPSEEK_R1_FALLBACK = "deepseek/deepseek-r1"
+
 # ── Fallback LaneSpec per lane ────────────────────────────────────────────────
 # When a lane's primary key fails (401/402/429), these specs are tried in order.
 # The epistemic disposition is PRESERVED — only the model/endpoint changes.
@@ -109,11 +134,29 @@ LANE_FALLBACKS = {
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
          "model": "google/gemini-flash-1.5:free", "label": "Gemini Flash via OpenRouter (free tier)"},
     ],
-    "L6": [  # Qwen East Asian — fallback to Qwen via OpenRouter
+    "L6": [  # Qwen East Asian — fallback to smaller Qwen or Yi
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
          "model": "qwen/qwen-2.5-72b-instruct:free", "label": "Qwen 2.5 72B via OpenRouter (free tier)"},
         {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
          "model": "qwen/qwen-2-72b-instruct", "label": "Qwen 2 72B via OpenRouter"},
+    ],
+    "L7": [  # Nous Hermes Philosophical — fallback to Llama 405B or Mixtral
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "meta-llama/llama-3.1-405b-instruct:free", "label": "Llama 3.1 405B via OpenRouter (free tier)"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "mixtral-8x7b-32768", "label": "Mixtral 8x7B via Groq (free tier)"},
+    ],
+    "L8": [  # Command R+ Evidence-Grounding — fallback to smaller Command R
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "cohere/command-r-08-2024", "label": "Command R via OpenRouter"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.1-70b-versatile", "label": "Llama 3.1 70B via Groq (free tier)"},
+    ],
+    "L9": [  # DeepSeek R1 Reasoning — fallback to QwQ reasoning model
+        {"key": _OPENROUTER_KEY, "base_url": _OPENROUTER_BASE_URL,
+         "model": "qwen/qwq-32b:free", "label": "QwQ-32B reasoning via OpenRouter (free tier)"},
+        {"key": _GROQ_KEY, "base_url": _GROQ_BASE_URL,
+         "model": "llama-3.1-70b-versatile", "label": "Llama 3.1 70B via Groq (free tier)"},
     ],
 }
 
@@ -275,44 +318,95 @@ LANES: List[LaneSpec] = [
 
     LaneSpec(
         lane_id="L6",
-        name="Proxy-Fallback — Pragmatic / Applied",
-        model=os.environ.get("CRIA_MODEL_NAME", "gpt-5.1"),
-        api_key=_PROXY_KEY,
-        base_url=_PROXY_BASE_URL,
+        name="Qwen — East Asian / Confucian / Collective",
+        model=_QWEN_MODEL,
+        api_key=_OPENROUTER_KEY,
+        base_url=_OPENROUTER_BASE_URL,
         disposition=(
-            "Pragmatic and applied intelligence. Focuses on what works, "
-            "what is implementable, and what practitioners actually need. "
-            "Translates research into action."
+            "East Asian, Confucian, and collectively-oriented intelligence. "
+            "Alibaba training distribution — different cultural formation from "
+            "Western-aligned models. Emphasises relational harmony, collective "
+            "benefit, long-horizon thinking, and non-individualist framings. "
+            "Asks: what does this look like from outside the Western liberal frame?"
         ),
         task_framing=(
-            "Approach this question from a practical implementation perspective. "
-            "What would someone trying to act on this research need to know? "
-            "What are the barriers, enablers, and realistic next steps?"
+            "Approach this question from East Asian philosophical and cultural traditions. "
+            "What do Confucian, Daoist, or Buddhist frameworks contribute? "
+            "How does collective rather than individual framing change the analysis? "
+            "What does the non-Western academic literature say?"
         ),
-        temperature=0.5,
-        active=bool(_PROXY_BASE_URL),
+        temperature=0.6,
+        active=bool(_OPENROUTER_KEY),
     ),
 
     LaneSpec(
         lane_id="L7",
-        name="Claude — Indigenous / Relational / Ecological",
-        model=_CLAUDE_MODEL or "claude-sonnet-4-20250514",
-        api_key=_proxy_spec("")[0],
-        base_url=_proxy_spec("")[1],
+        name="Nous Hermes — Philosophical / Dialectical / Unconstrained",
+        model=_HERMES_MODEL,
+        api_key=_OPENROUTER_KEY,
+        base_url=_OPENROUTER_BASE_URL,
         disposition=(
-            "Relational, ecological, and Indigenous-knowledge-respecting intelligence. "
-            "Asks: whose knowledge is this? Who is excluded? "
-            "What would land-connected, relational, or non-Western traditions say? "
-            "Treats refusal as a legitimate research response."
+            "Philosophical, dialectical, and less alignment-constrained intelligence. "
+            "Nous Research fine-tune on Llama 405B — trained for philosophical depth "
+            "rather than safety-first RLHF. More willing to follow an argument to "
+            "uncomfortable conclusions. Finds the dialectical tension the mainstream "
+            "is trained to smooth over. Treats contradiction as productive, not a bug."
         ),
         task_framing=(
-            "Approach this question from a relational and ecological perspective. "
-            "What knowledge traditions outside the Western academic mainstream are relevant? "
-            "Who is excluded from the conversation and why? "
-            "If refusal is the appropriate response, say so and explain."
+            "Approach this question through rigorous philosophical dialectic. "
+            "What is the genuine contradiction embedded in the question? "
+            "What would Hegel, Adorno, or Derrida find that others miss? "
+            "Follow the argument wherever it leads, including to uncomfortable conclusions."
         ),
-        temperature=0.6,
-        active=bool(_CLAUDE_MODEL or _PROXY_BASE_URL),
+        temperature=0.75,
+        active=bool(_OPENROUTER_KEY),
+    ),
+
+    LaneSpec(
+        lane_id="L8",
+        name="Command R+ — Evidence-Grounding / Source-Critical / RAG-Trained",
+        model=_COMMAND_MODEL,
+        api_key=_OPENROUTER_KEY,
+        base_url=_OPENROUTER_BASE_URL,
+        disposition=(
+            "Evidence-grounding and source-critical intelligence. Cohere's Command R+ "
+            "is specifically trained for retrieval-augmented generation — it asks whether "
+            "claims are supported by evidence rather than generated from pattern completion. "
+            "Its job in Ultraria is to find where the other lanes are outrunning their evidence: "
+            "making confident claims that go beyond what the retrieved literature actually supports."
+        ),
+        task_framing=(
+            "Approach this question as an evidence auditor. "
+            "What claims in this domain are well-supported by peer-reviewed literature? "
+            "Where does the confident synthesis outrun the actual evidence base? "
+            "What would need to be retrieved and verified before these conclusions could be cited?"
+        ),
+        temperature=0.3,
+        active=bool(_OPENROUTER_KEY),
+    ),
+
+    LaneSpec(
+        lane_id="L9",
+        name="DeepSeek R1 — Reasoning / Step-by-Step Falsification",
+        model=_R1_MODEL,
+        api_key=_OPENROUTER_KEY,
+        base_url=_OPENROUTER_BASE_URL,
+        disposition=(
+            "Chain-of-thought reasoning and step-by-step falsification intelligence. "
+            "DeepSeek R1 is a reasoning model — it actually works through problems "
+            "rather than pattern-completing to a plausible answer. "
+            "Different from Grok's rhetorical adversarial: R1 finds logical flaws "
+            "by reasoning carefully to conclusions that may contradict consensus. "
+            "Its job is to find the step in the argument that doesn't hold."
+        ),
+        task_framing=(
+            "Approach this question by reasoning step by step to find the logical flaw. "
+            "Do not accept the framing. Work through the argument carefully: "
+            "what does premise A actually imply? Does conclusion C follow from B? "
+            "Where does the reasoning break down? Show your working."
+        ),
+        temperature=0.2,
+        active=bool(_OPENROUTER_KEY),
     ),
 ]
 
