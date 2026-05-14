@@ -614,7 +614,8 @@ export default function ParallelResearch() {
       }
       throw new Error("Analysis timed out");
     } catch (e) {
-      setAnalyserError("Analysis unavailable — proceeding with question as stated.");
+      const msg = e instanceof Error ? e.message : String(e);
+      setAnalyserError(`Analysis unavailable (${msg}) — proceeding with question as stated.`);
     } finally {
       setAnalysing(false);
     }
