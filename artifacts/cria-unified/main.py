@@ -4824,6 +4824,10 @@ class AnalyseRequest(BaseModel):
     query: str = Field(..., min_length=10, max_length=MAX_QUERY_LENGTH)
     observer_note: str = Field("", max_length=MAX_OBSERVER_LENGTH)
     profile: str = Field("general_scholarship", max_length=100)
+    cognitive_iterations: int = Field(2, ge=1, le=5)
+    epistemic_iterations: int = Field(2, ge=1, le=3)
+
+    model_config = {"extra": "ignore"}  # silently drop unknown fields
 
     @field_validator("query")
     @classmethod
