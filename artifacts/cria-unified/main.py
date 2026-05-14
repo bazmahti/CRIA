@@ -155,6 +155,18 @@ except ImportError:
     EXTENDED_API_MAP = {}
 
 try:
+    from cria_quality_monitor import (
+        QualityScorecard, extract_scorecard, store_scorecard,
+        ensure_quality_schema, get_quality_trends,
+        get_benchmark_comparison, get_recent_scorecards,
+        register_benchmark, QUALITY_SCHEMA_SQL,
+    )
+    _QUALITY_MONITOR_AVAILABLE = True
+except ImportError:
+    _QUALITY_MONITOR_AVAILABLE = False
+    log.warning("Quality monitor not available")
+
+try:
     from cria_integrity_protocols import (
         inject_grounding_instruction,
         run_verification_retrieval_agent,
@@ -403,6 +415,8 @@ async def _init_db_pool() -> asyncpg.Pool:
     log.info("DB pool ready")
     if _LEDGER_AVAILABLE:
         await ensure_ledger_schema(pool)
+    if _QUALITY_MONITOR_AVAILABLE:
+        await ensure_quality_schema(pool)
     log_config_summary(log)
     return pool
 
@@ -4787,6 +4801,33 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
         result["fallback_used"] = bool(used_list and any(m != MODEL_CHAIN[0] for m in used_list))
         result["primary_model"] = MODEL_CHAIN[0]
         await db_complete_job(job_id, result)
+
+        # ── Quality scorecard — extract and store ────────────────────────────
+        if _QUALITY_MONITOR_AVAILABLE and _DB_AVAILABLE:
+            try:
+                academic_result = result.get("voices", {}).get("academic", {})
+                scorecard = extract_scorecard(
+                    job_id=job_id,
+                    question=artefact.research_question,
+                    profile=artefact.profile,
+                    cognitive_iterations=getattr(artefact, "cognitive_iterations",
+                                                 artefact.max_iterations),
+                    epistemic_iterations=getattr(artefact, "epistemic_iterations",
+                                                 min(artefact.max_iterations, 2)),
+                    academic_voice_result=academic_result if isinstance(academic_result, dict) else {},
+                    all_findings=context.get("previous_findings", []),
+                    design_record=context.get("design_record"),
+                )
+                asyncio.create_task(store_scorecard(_db_pool, scorecard))
+                # Attach scorecard summary to result for dashboard display
+                result["quality_scorecard"] = scorecard.to_dict()
+                result["quality_summary"] = scorecard.to_plain_english()
+                log.info("Quality scorecard queued: score=%.1f phantom=%d grounding=%.0f%%",
+                         scorecard.quality_score, scorecard.dois_phantom,
+                         scorecard.grounding_ratio * 100)
+            except Exception as _qe:
+                log.warning("Quality scorecard extraction failed: %s", _qe)
+
         # Write ALL outputs to .md files (meta-layer, pipeline papers, etc.)
         output_files = {}
         if _OUTPUT_WRITER_AVAILABLE:
@@ -5245,6 +5286,50 @@ async def list_outputs(q: str = ""):
             for p in sorted(OUTPUT_DIR.glob("*.md"), key=lambda f: f.stat().st_mtime, reverse=True)[:50]
         ]
     return {"available": True, "count": len(files), "files": files}
+
+
+# ── Quality Monitoring Endpoints ─────────────────────────────────────────────
+
+@app.get(f"{BASE_PATH}/quality/scorecards")
+async def get_scorecards_endpoint(request: Request, profile: str = None, limit: int = 20):
+    """Recent quality scorecards for dashboard quality panel."""
+    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        return {"scorecards": [], "available": False}
+    data = await get_recent_scorecards(_db_pool, limit=min(limit, 50), profile=profile)
+    return {"scorecards": data, "available": True}
+
+
+@app.get(f"{BASE_PATH}/quality/trends")
+async def get_trends_endpoint(request: Request, profile: str = None, weeks: int = 12):
+    """Weekly quality trend aggregations."""
+    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        return {"trends": [], "available": False}
+    data = await get_quality_trends(_db_pool, profile=profile, weeks=weeks)
+    return {"trends": data, "available": True}
+
+
+@app.get(f"{BASE_PATH}/quality/compare/{{job_id}}")
+async def compare_to_baseline(request: Request, job_id: str):
+    """Compare run quality against baseline average."""
+    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        return {"available": False}
+    data = await get_benchmark_comparison(_db_pool, job_id)
+    return data or {"available": False}
+
+
+@app.post(f"{BASE_PATH}/quality/benchmark")
+async def save_benchmark_endpoint(request: Request):
+    """Mark a run as a named benchmark."""
+    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Quality monitor not available")
+    body = await request.json()
+    job_id = body.get("job_id", "")
+    name = body.get("name", "")
+    notes = body.get("notes", "")
+    if not job_id or not name:
+        raise HTTPException(status_code=400, detail="job_id and name required")
+    await register_benchmark(_db_pool, job_id, name, notes)
+    return {"status": "ok", "benchmark_name": name}
 
 
 @app.get(f"{BASE_PATH}/health")
