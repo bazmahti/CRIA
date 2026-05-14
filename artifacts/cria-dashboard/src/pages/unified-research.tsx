@@ -1177,7 +1177,7 @@ export default function UnifiedResearch() {
                     if (!data) throw new Error("Analysis timed out — please try again");
                     setAnalysis(data);
                     setConfirmedQuery(query);
-                    setRefinedQuestion(query);
+                    setRefinedQuestion("");  // Start blank — chips populate it
                     // Auto-apply split iteration recommendations
                     if (data.cognitive_iterations && [1,2,3,4,5].includes(data.cognitive_iterations)) {
                       setIterations(data.cognitive_iterations);
@@ -1592,7 +1592,7 @@ export default function UnifiedResearch() {
                         onChange={e => setRefinedQuestion(e.target.value)}
                         rows={3}
                         className="w-full bg-background/70 border border-primary/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
-                        placeholder="Your refined question will appear here as you apply suggestions above…"
+                        placeholder="Click a suggestion chip above to build your refined question, or type directly here…"
                       />
                       <div className="flex items-center gap-2 mt-2">
                         <button
@@ -1602,14 +1602,14 @@ export default function UnifiedResearch() {
                               setAnalysisExpanded(false);
                             }
                           }}
-                          disabled={!refinedQuestion.trim() || refinedQuestion.trim() === query}
+                          disabled={!refinedQuestion.trim()}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                           <CheckCheck className="w-3.5 h-3.5" />
                           Use this question
                         </button>
                         <button
-                          onClick={() => { setRefinedQuestion(analysis!.original_question); setAppliedSuggestions(new Set()); }}
+                          onClick={() => { setRefinedQuestion(confirmedQuery || query); setAppliedSuggestions(new Set()); }}
                           className="px-3 py-1.5 rounded-lg border border-border/50 text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors"
                         >
                           Reset to original
