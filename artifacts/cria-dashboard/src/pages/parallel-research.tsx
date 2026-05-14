@@ -587,9 +587,9 @@ export default function ParallelResearch() {
       if (!startResp.ok) throw new Error(`HTTP ${startResp.status}`);
       const { jobId } = await startResp.json();
 
-      // Poll for result
+      // Poll for result — allow up to 120s (analyser LLM call can take ~70s)
       let attempts = 0;
-      while (attempts < 30) {
+      while (attempts < 80) {
         await new Promise(r => setTimeout(r, 1500));
         const pollResp = await fetch(`${BASE}/cria-unified/analyse/${jobId}`);
         if (!pollResp.ok) throw new Error(`Poll HTTP ${pollResp.status}`);
