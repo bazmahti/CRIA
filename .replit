@@ -64,4 +64,4 @@ packages = ["libxcrypt", "xcodebuild", "zlib"]
 
 [userenv.shared]
 CORS_ALLOWED_ORIGINS = "https://convergent-research-hub.replit.app,https://d54542fa-70d1-4299-aef4-6f64dc49ea62-00-2otvmxu2q6fvv.spock.replit.dev"
-CRIA_MODEL_NAME = "gpt-5.1"
+CRIA_MODEL_NAME = "gpt-4.1"
