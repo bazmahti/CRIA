@@ -705,6 +705,19 @@ export default function UnifiedResearch() {
     )} title={integritySummary.status} />
   ) : null;
 
+  // Quality alerts from the monitoring system
+  const qualityAlerts = (() => {
+    try {
+      return (result as any)?.quality_alerts || null;
+    } catch { return null; }
+  })();
+
+  const qualityScore = (() => {
+    try {
+      return (result as any)?.quality_scorecard?.quality_score || null;
+    } catch { return null; }
+  })();
+
   const pipelineTabs: { key: PipelineTab; label: string }[] = [
     { key: "cognitive", label: "CRIA-Cognitive" },
     { key: "epistemic", label: "CRIA-Epistemic" },
@@ -1696,6 +1709,50 @@ export default function UnifiedResearch() {
                   </span>
                   . Results are valid but quality may vary.
                 </div>
+              </div>
+            )}
+
+            {/* Quality alert banner — surfaces alerts without opening any panel */}
+            {qualityAlerts && qualityAlerts.count > 0 && (
+              <div className={cn(
+                "mb-3 rounded-lg px-3 py-2.5 text-xs border",
+                qualityAlerts.has_critical
+                  ? "bg-red-500/8 border-red-500/30 text-red-600"
+                  : "bg-amber-500/8 border-amber-500/30 text-amber-700"
+              )}>
+                <div className="flex items-start gap-2">
+                  <span className="text-sm mt-0.5">{qualityAlerts.has_critical ? "⚠" : "◈"}</span>
+                  <div className="flex-1">
+                    <div className="font-semibold mb-1">{qualityAlerts.summary}</div>
+                    {qualityAlerts.alerts?.slice(0, 2).map((alert: any) => (
+                      <div key={alert.alert_id} className="text-[10px] opacity-80 mb-0.5">
+                        {alert.message}
+                      </div>
+                    ))}
+                    {qualityAlerts.alerts?.length > 2 && (
+                      <div className="text-[10px] opacity-60">
+                        +{qualityAlerts.alerts.length - 2} more in Integrity Report
+                      </div>
+                    )}
+                    {qualityAlerts.alerts?.[0]?.action && (
+                      <div className="text-[10px] font-medium mt-1.5 border-t border-current/20 pt-1.5">
+                        Action: {qualityAlerts.alerts[0].action}
+                      </div>
+                    )}
+                  </div>
+                  {qualityScore !== null && (
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-lg font-bold">{Math.round(qualityScore)}</div>
+                      <div className="text-[9px] opacity-60">quality score</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {qualityScore !== null && (!qualityAlerts || qualityAlerts.count === 0) && (
+              <div className="mb-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                <span className="text-green-500">✓</span>
+                <span>Quality score: <span className="font-semibold text-foreground">{Math.round(qualityScore)}/100</span> · No alerts</span>
               </div>
             )}
 

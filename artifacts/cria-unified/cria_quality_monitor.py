@@ -569,3 +569,406 @@ async def get_recent_scorecards(pool, limit: int = 20, profile: str = None) -> L
     except Exception as e:
         log.warning("Failed to get recent scorecards: %s", e)
         return []
+
+
+# ── Alert thresholds ──────────────────────────────────────────────────────────
+
+# Single-run red flags — bad regardless of baseline
+SINGLE_RUN_THRESHOLDS = {
+    "phantom_count_critical": 2,      # ≥2 phantom citations = immediate alert
+    "phantom_rate_critical": 0.15,    # ≥15% phantom rate = critical
+    "grounding_ratio_critical": 0.35, # ≤35% retrieval grounding = critical
+    "t_low_unverified_critical": 6,   # ≥6 unverified T-LOW claims = alert
+    "quality_score_critical": 45,     # score below 45 = immediate alert
+}
+
+# Cross-run degradation signals — compared against profile baseline
+DEGRADATION_THRESHOLDS = {
+    "quality_score_drop": 15,         # drop of ≥15 points from baseline
+    "phantom_rate_rise": 0.08,        # phantom rate risen ≥8 percentage points
+    "grounding_ratio_drop": 0.15,     # grounding ratio dropped ≥15pp
+    "depth_drop": 2.5,                # papers/iteration dropped ≥2.5
+    "verification_rate_drop": 0.20,   # verification success dropped ≥20pp
+}
+
+# Trend alert — consecutive weeks declining
+TREND_WEEKS_THRESHOLD = 3             # 3+ consecutive weeks of decline = trend alert
+
+
+@dataclass
+class QualityAlert:
+    """A single quality alert with severity and recommended action."""
+    alert_id: str
+    job_id: str
+    severity: str            # "critical" | "warning" | "info"
+    signal: str              # short machine-readable signal name
+    message: str             # plain English for researcher
+    metric_value: float      # the value that triggered the alert
+    threshold: float         # the threshold it crossed
+    action: str              # what to do
+    detected_at: str         # ISO timestamp
+
+
+def check_single_run_alerts(scorecard: "QualityScorecard") -> List[QualityAlert]:
+    """
+    Check a single run's scorecard for immediate red flags.
+    No baseline needed — these are bad on their own terms.
+    """
+    import uuid as _uuid
+    alerts = []
+    ts = datetime.now(timezone.utc).isoformat()
+
+    def alert(severity, signal, message, value, threshold, action):
+        alerts.append(QualityAlert(
+            alert_id=str(_uuid.uuid4())[:8],
+            job_id=scorecard.job_id,
+            severity=severity,
+            signal=signal,
+            message=message,
+            metric_value=value,
+            threshold=threshold,
+            action=action,
+            detected_at=ts,
+        ))
+
+    # Phantom citations — most severe
+    if scorecard.dois_phantom >= SINGLE_RUN_THRESHOLDS["phantom_count_critical"]:
+        alert(
+            "critical", "phantom_citations",
+            f"{scorecard.dois_phantom} citations in this output could not be verified in Crossref. "
+            "These may be hallucinated references. Do not cite without independent verification.",
+            float(scorecard.dois_phantom),
+            float(SINGLE_RUN_THRESHOLDS["phantom_count_critical"]),
+            "Open the Analytical Inference Register. Verify each flagged citation manually "
+            "before using this output in any research context."
+        )
+    elif scorecard.phantom_rate >= SINGLE_RUN_THRESHOLDS["phantom_rate_critical"]:
+        alert(
+            "critical", "high_phantom_rate",
+            f"{int(scorecard.phantom_rate * 100)}% of citations in this output are unverified. "
+            "This is substantially above normal and suggests source attribution problems.",
+            scorecard.phantom_rate,
+            SINGLE_RUN_THRESHOLDS["phantom_rate_critical"],
+            "Review all citations against the DOI Verification Report before using this output."
+        )
+
+    # Low grounding ratio
+    if scorecard.grounding_ratio > 0 and scorecard.grounding_ratio <= SINGLE_RUN_THRESHOLDS["grounding_ratio_critical"]:
+        alert(
+            "critical", "low_grounding",
+            f"Only {int(scorecard.grounding_ratio * 100)}% of claims in this output are grounded "
+            "in retrieved documents. The majority are drawn from model training knowledge. "
+            "This output should be treated as an analytical essay, not a systematic review.",
+            scorecard.grounding_ratio,
+            SINGLE_RUN_THRESHOLDS["grounding_ratio_critical"],
+            "Treat findings as preliminary. Run with more Cognitive iterations or check "
+            "whether the connector suite returned adequate results for this question."
+        )
+
+    # High unverified T-LOW claims
+    if scorecard.claims_unverified >= SINGLE_RUN_THRESHOLDS["t_low_unverified_critical"]:
+        alert(
+            "warning", "high_unverified_claims",
+            f"{scorecard.claims_unverified} claims were flagged as low-confidence training "
+            "knowledge and could not be verified by targeted retrieval. "
+            "These appear in the Analytical Inference Register marked with †.",
+            float(scorecard.claims_unverified),
+            float(SINGLE_RUN_THRESHOLDS["t_low_unverified_critical"]),
+            "Review the Analytical Inference Register. Each unverified claim needs "
+            "independent scholarly verification before publication."
+        )
+
+    # Quality score below critical threshold
+    if scorecard.quality_score > 0 and scorecard.quality_score <= SINGLE_RUN_THRESHOLDS["quality_score_critical"]:
+        alert(
+            "critical", "low_quality_score",
+            f"Composite quality score is {scorecard.quality_score:.0f}/100. "
+            "This output has multiple quality signals indicating it requires significant "
+            "review before use.",
+            scorecard.quality_score,
+            float(SINGLE_RUN_THRESHOLDS["quality_score_critical"]),
+            "Do not use this output without thorough manual review. "
+            "Consider re-running with adjusted profile or iteration settings."
+        )
+
+    return alerts
+
+
+def check_degradation_alerts(
+    scorecard: "QualityScorecard",
+    comparison: Optional[Dict],
+) -> List[QualityAlert]:
+    """
+    Check for degradation signals by comparing against baseline.
+    Fires when metrics have declined significantly from recent average.
+    """
+    import uuid as _uuid
+    alerts = []
+
+    if not comparison or not comparison.get("baseline") or not comparison.get("deltas"):
+        return alerts
+
+    deltas = comparison["deltas"]
+    baseline = comparison["baseline"]
+    ts = datetime.now(timezone.utc).isoformat()
+
+    def alert(severity, signal, message, value, threshold, action):
+        alerts.append(QualityAlert(
+            alert_id=str(_uuid.uuid4())[:8],
+            job_id=scorecard.job_id,
+            severity=severity,
+            signal=signal,
+            message=message,
+            metric_value=value,
+            threshold=threshold,
+            action=action,
+            detected_at=ts,
+        ))
+
+    # Quality score drop
+    if deltas.get("quality_score", 0) <= -DEGRADATION_THRESHOLDS["quality_score_drop"]:
+        alert(
+            "warning", "quality_score_degradation",
+            f"Quality score dropped {abs(deltas['quality_score']):.0f} points compared to "
+            f"recent baseline ({baseline.get('avg_score', 0):.0f} → {scorecard.quality_score:.0f}). "
+            "This may indicate model performance change or question/connector mismatch.",
+            abs(deltas["quality_score"]),
+            DEGRADATION_THRESHOLDS["quality_score_drop"],
+            "Compare this output against a recent run on a similar question. "
+            "Check whether the model version has changed in Replit Secrets."
+        )
+
+    # Phantom rate rising
+    if deltas.get("phantom_rate", 0) >= DEGRADATION_THRESHOLDS["phantom_rate_rise"]:
+        alert(
+            "warning", "phantom_rate_rising",
+            f"Phantom citation rate has risen {deltas['phantom_rate']*100:.1f} percentage points "
+            "above recent baseline. Hallucinated citations are becoming more frequent. "
+            "This is a documented signal of model degradation.",
+            deltas["phantom_rate"],
+            DEGRADATION_THRESHOLDS["phantom_rate_rise"],
+            "Check CLAUDE_MODEL in Replit Secrets — a model version change may have occurred. "
+            "Review phantom citations in the DOI Verification Report."
+        )
+
+    # Grounding ratio dropping
+    if deltas.get("grounding_ratio", 0) <= -DEGRADATION_THRESHOLDS["grounding_ratio_drop"]:
+        alert(
+            "warning", "grounding_declining",
+            f"Retrieval grounding ratio has dropped {abs(deltas['grounding_ratio'])*100:.0f} "
+            "percentage points from recent baseline. The model is drawing more on training "
+            "knowledge and less on retrieved documents. This matches the MRCR v2 degradation pattern.",
+            abs(deltas["grounding_ratio"]),
+            DEGRADATION_THRESHOLDS["grounding_ratio_drop"],
+            "Run a benchmark question to confirm. If confirmed, check model version "
+            "and consider switching to Opus 4.6 via Other Models."
+        )
+
+    # Retrieval depth shallowing — earliest signal
+    if deltas.get("papers_per_cog_iteration", 0) <= -DEGRADATION_THRESHOLDS["depth_drop"]:
+        alert(
+            "warning", "retrieval_depth_shallowing",
+            f"Papers retrieved per Cognitive iteration has dropped "
+            f"{abs(deltas['papers_per_cog_iteration']):.1f} from recent baseline. "
+            "Stage 0 may be generating shallower search strings — an early degradation signal "
+            "documented in the Laurenzo dataset (6.6 → 2.0 papers before March 2026 collapse).",
+            abs(deltas["papers_per_cog_iteration"]),
+            DEGRADATION_THRESHOLDS["depth_drop"],
+            "Run the question analyser on a known-good question and check the vocabulary "
+            "mapping depth. Compare Stage 0 output in Research Design Record against prior runs."
+        )
+
+    return alerts
+
+
+async def check_trend_alerts(pool, profile: str) -> List[QualityAlert]:
+    """
+    Check for sustained multi-week degradation trends.
+    Fires when quality has declined for 3+ consecutive weeks.
+    """
+    import uuid as _uuid
+    alerts = []
+
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT week_start, avg_quality_score, avg_phantom_rate,
+                       avg_grounding_ratio, avg_papers_per_iter
+                FROM quality_trends
+                WHERE profile = $1
+                ORDER BY week_start DESC
+                LIMIT 5
+            """, profile)
+
+        if len(rows) < TREND_WEEKS_THRESHOLD:
+            return []  # Not enough data for trend detection
+
+        # Check for consecutive declining quality score
+        scores = [float(r["avg_quality_score"]) for r in rows]
+        declining = all(scores[i] < scores[i+1] for i in range(TREND_WEEKS_THRESHOLD - 1))
+
+        if declining:
+            total_drop = scores[0] - scores[TREND_WEEKS_THRESHOLD - 1]
+            alerts.append(QualityAlert(
+                alert_id=str(_uuid.uuid4())[:8],
+                job_id=f"trend_{profile}",
+                severity="warning",
+                signal="sustained_quality_decline",
+                message=(
+                    f"Quality score on {profile} profile has declined for "
+                    f"{TREND_WEEKS_THRESHOLD} consecutive weeks "
+                    f"(total drop: {total_drop:.0f} points). "
+                    "This matches the pattern of silent model degradation documented "
+                    "in March–April 2026."
+                ),
+                metric_value=total_drop,
+                threshold=float(TREND_WEEKS_THRESHOLD),
+                action=(
+                    "Run a benchmark question that previously produced high-quality output. "
+                    "Compare the new result against the stored benchmark. "
+                    "If degradation is confirmed, document the model version and date "
+                    "for the record."
+                ),
+                detected_at=datetime.now(timezone.utc).isoformat(),
+            ))
+    except Exception as e:
+        log.warning("Trend alert check failed: %s", e)
+
+    return alerts
+
+
+# ── Model version tracking ────────────────────────────────────────────────────
+
+async def record_model_version(pool, job_id: str, model_versions: Dict[str, str]) -> None:
+    """
+    Record which models ran which channels for this job.
+    A model version change followed by quality score drop = degradation signature.
+    """
+    try:
+        async with pool.acquire() as conn:
+            # Check if model_versions column exists, add if not
+            has_col = await conn.fetchval(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name='quality_scorecards' AND column_name='model_versions'"
+            )
+            if not has_col:
+                await conn.execute(
+                    "ALTER TABLE quality_scorecards ADD COLUMN IF NOT EXISTS "
+                    "model_versions JSONB"
+                )
+                await conn.execute(
+                    "ALTER TABLE quality_scorecards ADD COLUMN IF NOT EXISTS "
+                    "stage0_model TEXT"
+                )
+
+            stage0_model = model_versions.get("Stage0", model_versions.get("stage0", ""))
+            import json as _json
+            await conn.execute(
+                "UPDATE quality_scorecards SET model_versions=$1, stage0_model=$2 "
+                "WHERE job_id=$3",
+                _json.dumps(model_versions), stage0_model, job_id,
+            )
+    except Exception as e:
+        log.warning("Model version recording failed: %s", e)
+
+
+async def get_model_version_history(pool, profile: str = None, limit: int = 20) -> List[Dict]:
+    """
+    Retrieve model version history to detect silent model changes.
+    If stage0_model changes between runs, that's the primary degradation signature.
+    """
+    try:
+        async with pool.acquire() as conn:
+            # Check column exists
+            has_col = await conn.fetchval(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name='quality_scorecards' AND column_name='stage0_model'"
+            )
+            if not has_col:
+                return []
+
+            if profile:
+                rows = await conn.fetch("""
+                    SELECT job_id, run_timestamp, profile, stage0_model,
+                           quality_score, phantom_rate
+                    FROM quality_scorecards
+                    WHERE profile = $1 AND stage0_model IS NOT NULL
+                    ORDER BY created_at DESC LIMIT $2
+                """, profile, limit)
+            else:
+                rows = await conn.fetch("""
+                    SELECT job_id, run_timestamp, profile, stage0_model,
+                           quality_score, phantom_rate
+                    FROM quality_scorecards
+                    WHERE stage0_model IS NOT NULL
+                    ORDER BY created_at DESC LIMIT $1
+                """, limit)
+            return [dict(r) for r in rows]
+    except Exception as e:
+        log.warning("Model version history failed: %s", e)
+        return []
+
+
+# ── Unified alert runner ──────────────────────────────────────────────────────
+
+async def run_all_alerts(
+    pool,
+    scorecard: "QualityScorecard",
+    comparison: Optional[Dict],
+) -> List[QualityAlert]:
+    """
+    Run all alert checks for a completed run.
+    Returns combined list sorted by severity (critical first).
+    """
+    alerts = []
+    alerts.extend(check_single_run_alerts(scorecard))
+    alerts.extend(check_degradation_alerts(scorecard, comparison))
+    try:
+        trend_alerts = await check_trend_alerts(pool, scorecard.profile)
+        alerts.extend(trend_alerts)
+    except Exception as e:
+        log.warning("Trend alerts failed: %s", e)
+
+    # Sort: critical first, then warning, then info
+    severity_order = {"critical": 0, "warning": 1, "info": 2}
+    alerts.sort(key=lambda a: severity_order.get(a.severity, 3))
+
+    if alerts:
+        log.warning("Quality alerts for job %s: %d alert(s) — %s",
+                    scorecard.job_id, len(alerts),
+                    [a.signal for a in alerts])
+
+    return alerts
+
+
+def format_alerts_for_dashboard(alerts: List[QualityAlert]) -> Dict:
+    """Format alerts for embedding in research result and dashboard display."""
+    if not alerts:
+        return {"count": 0, "alerts": [], "has_critical": False, "summary": ""}
+
+    has_critical = any(a.severity == "critical" for a in alerts)
+    summary_parts = []
+    if has_critical:
+        critical_count = sum(1 for a in alerts if a.severity == "critical")
+        summary_parts.append(f"⚠ {critical_count} critical quality issue(s) require attention")
+    warning_count = sum(1 for a in alerts if a.severity == "warning")
+    if warning_count:
+        summary_parts.append(f"{warning_count} warning(s) detected")
+
+    return {
+        "count": len(alerts),
+        "has_critical": has_critical,
+        "summary": " · ".join(summary_parts),
+        "alerts": [
+            {
+                "alert_id": a.alert_id,
+                "severity": a.severity,
+                "signal": a.signal,
+                "message": a.message,
+                "action": a.action,
+                "metric_value": a.metric_value,
+                "detected_at": a.detected_at,
+            }
+            for a in alerts
+        ],
+    }

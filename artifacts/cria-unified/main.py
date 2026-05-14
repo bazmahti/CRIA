@@ -160,6 +160,8 @@ try:
         ensure_quality_schema, get_quality_trends,
         get_benchmark_comparison, get_recent_scorecards,
         register_benchmark, QUALITY_SCHEMA_SQL,
+        run_all_alerts, format_alerts_for_dashboard,
+        record_model_version, get_model_version_history,
     )
     _QUALITY_MONITOR_AVAILABLE = True
 except ImportError:
@@ -4802,7 +4804,7 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
         result["primary_model"] = MODEL_CHAIN[0]
         await db_complete_job(job_id, result)
 
-        # ── Quality scorecard — extract and store ────────────────────────────
+        # ── Quality scorecard, alerts, and model version tracking ───────────
         if _QUALITY_MONITOR_AVAILABLE and _DB_AVAILABLE:
             try:
                 academic_result = result.get("voices", {}).get("academic", {})
@@ -4818,15 +4820,45 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
                     all_findings=context.get("previous_findings", []),
                     design_record=context.get("design_record"),
                 )
-                asyncio.create_task(store_scorecard(_db_pool, scorecard))
-                # Attach scorecard summary to result for dashboard display
+
+                # Store scorecard
+                await store_scorecard(_db_pool, scorecard)
+
+                # Record model versions used in this run
+                models_used_map = {
+                    "Stage0": context.get("stage0_model", MODEL_CHAIN[0]),
+                    "primary": MODEL_CHAIN[0],
+                    "analytical": os.environ.get("ANALYTICAL_MODEL", ""),
+                    "reasoning": os.environ.get("REASONING_MODEL", ""),
+                }
+                asyncio.create_task(record_model_version(_db_pool, job_id, models_used_map))
+
+                # Run alert checks (single-run + degradation + trend)
+                comparison = await get_benchmark_comparison(_db_pool, job_id)
+                alerts = await run_all_alerts(_db_pool, scorecard, comparison)
+                alerts_formatted = format_alerts_for_dashboard(alerts)
+
+                # Attach to result for dashboard display
                 result["quality_scorecard"] = scorecard.to_dict()
                 result["quality_summary"] = scorecard.to_plain_english()
-                log.info("Quality scorecard queued: score=%.1f phantom=%d grounding=%.0f%%",
-                         scorecard.quality_score, scorecard.dois_phantom,
-                         scorecard.grounding_ratio * 100)
+                result["quality_alerts"] = alerts_formatted
+                result["quality_comparison"] = comparison
+
+                if alerts_formatted["has_critical"]:
+                    log.warning(
+                        "QUALITY CRITICAL — job %s: %s",
+                        job_id, alerts_formatted["summary"]
+                    )
+                elif alerts_formatted["count"] > 0:
+                    log.info("Quality alerts for job %s: %s",
+                             job_id, alerts_formatted["summary"])
+                else:
+                    log.info("Quality scorecard: score=%.1f phantom=%d grounding=%.0f%% — no alerts",
+                             scorecard.quality_score, scorecard.dois_phantom,
+                             scorecard.grounding_ratio * 100)
+
             except Exception as _qe:
-                log.warning("Quality scorecard extraction failed: %s", _qe)
+                log.warning("Quality monitoring failed: %s", _qe, exc_info=True)
 
         # Write ALL outputs to .md files (meta-layer, pipeline papers, etc.)
         output_files = {}
@@ -5316,6 +5348,59 @@ async def compare_to_baseline(request: Request, job_id: str):
         return {"available": False}
     data = await get_benchmark_comparison(_db_pool, job_id)
     return data or {"available": False}
+
+
+@app.get(f"{BASE_PATH}/quality/model-versions")
+async def get_model_versions_endpoint(request: Request, profile: str = None, limit: int = 20):
+    """Model version history — detects silent model changes (primary degradation signature)."""
+    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        return {"versions": [], "available": False}
+    data = await get_model_version_history(_db_pool, profile=profile, limit=limit)
+    # Detect version changes
+    version_changes = []
+    for i in range(len(data) - 1):
+        if data[i].get("stage0_model") != data[i+1].get("stage0_model"):
+            version_changes.append({
+                "detected_at": data[i].get("run_timestamp"),
+                "from_model": data[i+1].get("stage0_model"),
+                "to_model": data[i].get("stage0_model"),
+                "quality_score_after": data[i].get("quality_score"),
+                "quality_score_before": data[i+1].get("quality_score"),
+            })
+    return {"versions": data, "version_changes": version_changes, "available": True}
+
+
+@app.get(f"{BASE_PATH}/quality/alerts/{{job_id}}")
+async def get_job_alerts(request: Request, job_id: str):
+    """Get quality alerts for a specific job."""
+    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        return {"alerts": [], "available": False}
+    # Re-fetch scorecard and comparison and re-run alerts
+    try:
+        scorecards = await get_recent_scorecards(_db_pool, limit=100)
+        sc_data = next((s for s in scorecards if s.get("job_id") == job_id), None)
+        if not sc_data:
+            return {"alerts": [], "note": "No scorecard found for this job"}
+        # Reconstruct scorecard object
+        sc = QualityScorecard(
+            job_id=sc_data["job_id"],
+            question_preview=sc_data.get("question_preview", ""),
+            profile=sc_data.get("profile", ""),
+            cognitive_iterations=sc_data.get("cognitive_iterations", 2),
+            epistemic_iterations=sc_data.get("epistemic_iterations", 2),
+            run_timestamp=str(sc_data.get("run_timestamp", "")),
+            dois_phantom=sc_data.get("dois_phantom", 0),
+            phantom_rate=sc_data.get("phantom_rate", 0.0),
+            grounding_ratio=sc_data.get("grounding_ratio", 0.0),
+            claims_training_low=sc_data.get("claims_training_low", 0),
+            claims_unverified=sc_data.get("claims_unverified", 0),
+            quality_score=sc_data.get("quality_score", 0.0),
+        )
+        comparison = await get_benchmark_comparison(_db_pool, job_id)
+        alerts = await run_all_alerts(_db_pool, sc, comparison)
+        return format_alerts_for_dashboard(alerts)
+    except Exception as e:
+        return {"alerts": [], "error": str(e)[:200]}
 
 
 @app.post(f"{BASE_PATH}/quality/benchmark")
