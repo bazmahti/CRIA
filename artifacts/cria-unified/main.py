@@ -5288,6 +5288,7 @@ async def list_outputs(q: str = ""):
     return {"available": True, "count": len(files), "files": files}
 
 
+
 # ── Quality Monitoring Endpoints ─────────────────────────────────────────────
 
 @app.get(f"{BASE_PATH}/quality/scorecards")

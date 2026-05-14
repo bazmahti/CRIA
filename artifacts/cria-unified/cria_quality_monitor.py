@@ -286,7 +286,7 @@ def extract_scorecard(
 QUALITY_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS quality_scorecards (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    job_id                  TEXT UNIQUE NOT NULL,
+    job_id                  TEXT UNIQUE NOT NULL REFERENCES research_jobs(job_id) ON DELETE CASCADE,
     question_preview        TEXT,
     profile                 TEXT,
     cognitive_iterations    INTEGER,
