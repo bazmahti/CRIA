@@ -252,7 +252,7 @@ except ImportError:
 # ============================================================
 
 BASE_PATH = os.environ.get("BASE_PATH", "/cria-unified")
-MODEL_NAME = os.environ.get("CRIA_MODEL_NAME", "gpt-5.1")
+MODEL_NAME = os.environ.get("CRIA_MODEL_NAME", "gpt-4.1")
 _chain_env = os.environ.get("CRIA_MODEL_CHAIN", "")
 MODEL_CHAIN: list[str] = (
     [m.strip() for m in _chain_env.split(",") if m.strip()]

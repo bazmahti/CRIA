@@ -24,15 +24,40 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 # ── Model names from environment ──────────────────────────────────────────────
-CLAUDE_MODEL     = os.environ.get("CLAUDE_MODEL", "")           # e.g. claude-sonnet-4-20250514
+CLAUDE_MODEL     = os.environ.get("CLAUDE_MODEL", "")           # e.g. gpt-4.1
 ANALYTICAL_MODEL = os.environ.get("ANALYTICAL_MODEL", "")       # e.g. gpt-4o
-REASONING_MODEL  = os.environ.get("REASONING_MODEL", "")        # e.g. o3
-FALLBACK_MODEL   = os.environ.get("CRIA_MODEL_NAME", "gpt-5.1") # primary from main chain
+REASONING_MODEL  = os.environ.get("REASONING_MODEL", "")        # e.g. gpt-4.1
+FALLBACK_MODEL   = os.environ.get("CRIA_MODEL_NAME", "gpt-4.1") # primary from main chain
+
+# Models verified to work via the Replit AI proxy (OpenAI-compatible endpoint).
+# Any model name NOT in this set is silently replaced with SAFE_FALLBACK so
+# channels never hard-fail with UNSUPPORTED_MODEL 400 errors.
+_SUPPORTED_PROXY_MODELS = {"gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"}
+_SAFE_FALLBACK = "gpt-4.1"
+
+import logging as _log_mod
+_cfg_log = _log_mod.getLogger("cria-channel-config")
+
+
+def _validated(model: str) -> str:
+    """Return model if proxy-supported, else _SAFE_FALLBACK with a warning."""
+    if not model:
+        return ""
+    if model in _SUPPORTED_PROXY_MODELS:
+        return model
+    _cfg_log.warning(
+        "Model '%s' not supported by proxy — substituting '%s'", model, _SAFE_FALLBACK
+    )
+    return _SAFE_FALLBACK
 
 
 def resolve(preferred: str, fallback: str = FALLBACK_MODEL) -> str:
-    """Return preferred model if configured, else fallback."""
-    return preferred if preferred else fallback
+    """Return preferred model if configured and proxy-supported, else fallback."""
+    chosen = _validated(preferred) if preferred else ""
+    if chosen:
+        return chosen
+    safe_fallback = _validated(fallback) if fallback else _SAFE_FALLBACK
+    return safe_fallback if safe_fallback else _SAFE_FALLBACK
 
 
 @dataclass
