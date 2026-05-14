@@ -1,9 +1,16 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import { clerkMiddleware } from "@clerk/express";
+import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { pythonServiceProxies } from "./lib/python-proxy";
+import {
+  CLERK_PROXY_PATH,
+  clerkProxyMiddleware,
+  getClerkProxyHost,
+} from "./middlewares/clerkProxyMiddleware";
 
 const app: Express = express();
 
@@ -18,6 +25,9 @@ app.use((_req, res, next) => {
   // No HSTS here — TLS is terminated at Replit's edge, not this server
   next();
 });
+
+// ── Clerk proxy — must be before body parsers ────────────────────────────────
+app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = (process.env["CORS_ALLOWED_ORIGINS"] ?? "").split(",").map(s => s.trim()).filter(Boolean);
@@ -75,6 +85,15 @@ app.use((req, res, next) => {
 // Prevent oversized payloads from exhausting memory
 app.use(express.json({ limit: "512kb" }));
 app.use(express.urlencoded({ extended: true, limit: "512kb" }));
+
+app.use(
+  clerkMiddleware((req) => ({
+    publishableKey: publishableKeyFromHost(
+      getClerkProxyHost(req) ?? "",
+      process.env.CLERK_PUBLISHABLE_KEY,
+    ),
+  })),
+);
 
 app.use("/api", router);
 

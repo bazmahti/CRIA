@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useClerk, useUser } from "@clerk/react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -12,6 +13,7 @@ import {
   Brain,
   History,
   Search,
+  LogOut,
 } from "lucide-react";
 import StorageWarning from "@/components/StorageWarning";
 
@@ -63,6 +65,43 @@ function ModeBar({ location }: { location: string }) {
           </a>
         );
       })}
+    </div>
+  );
+}
+
+function UserFooter() {
+  const { signOut } = useClerk();
+  const { user } = useUser();
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+  return (
+    <div className="px-3 py-3 border-t border-sidebar-border">
+      <div className="flex items-center gap-2.5 px-2">
+        {user?.imageUrl ? (
+          <img src={user.imageUrl} alt="" className="w-6 h-6 rounded-full flex-shrink-0 ring-1 ring-primary/30" />
+        ) : (
+          <div className="w-6 h-6 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
+            <span className="text-[9px] font-semibold text-primary">
+              {(user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0] ?? "?").toUpperCase()}
+            </span>
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-medium text-foreground truncate leading-none mb-0.5">
+            {user?.firstName ?? user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ?? "Researcher"}
+          </p>
+          <p className="text-[9px] text-muted-foreground truncate font-mono leading-none">
+            {user?.emailAddresses?.[0]?.emailAddress ?? ""}
+          </p>
+        </div>
+        <button
+          onClick={() => signOut({ redirectUrl: `${basePath}/sign-in` })}
+          title="Sign out"
+          className="flex-shrink-0 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/60 transition-colors"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -143,12 +182,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Footer */}
-        <div className="px-5 py-3 border-t border-sidebar-border">
-          <p className="text-[10px] text-muted-foreground font-mono">
-            CRIA Unified · Cognitive · Epistemic · Convergent
-          </p>
-        </div>
+        <UserFooter />
       </aside>
 
       {/* Main content with sticky mode bar at top */}
