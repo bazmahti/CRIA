@@ -4841,11 +4841,31 @@ class AnalyseRequest(BaseModel):
 async def _run_analyse_job(job_id: str, body: AnalyseRequest) -> None:
     _analyse_jobs[job_id]["status"] = "running"
     try:
+        # Wrap call_llm to always use the proxy path (not Anthropic SDK)
+        # This avoids the AI_INTEGRATIONS_ANTHROPIC_API_KEY routing issue
+        async def _proxy_call(prompt: str, system_prompt: str = "", max_tokens: int = 5000, **kw) -> str:
+            """Direct proxy call bypassing Anthropic SDK routing."""
+            _client = get_llm_client()  # OpenAI-compatible proxy client
+            _model = MODEL_CHAIN[0]     # primary model from proxy
+            try:
+                resp = await _client.chat.completions.create(
+                    model=_model,
+                    max_completion_tokens=min(max_tokens, 5000),
+                    messages=[
+                        {"role": "system", "content": system_prompt or "You are a rigorous research analyst."},
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+                return resp.choices[0].message.content or ""
+            except Exception as proxy_err:
+                log.error("Analyser proxy call failed: %s", proxy_err)
+                raise
+
         analysis = await analyse_question(
             question=body.query,
             observer_note=body.observer_note,
             profile=body.profile,
-            call_llm_fn=call_llm,
+            call_llm_fn=_proxy_call,
         )
         _analyse_jobs[job_id].update({"status": "complete", "result": analysis.to_dict(), "error": None})
         log.info("Analysis job %s complete", job_id)
