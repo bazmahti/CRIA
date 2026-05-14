@@ -1262,28 +1262,28 @@ export default function UnifiedResearch() {
                 {analysis && (() => {
                   // Helper to apply a suggestion to the refined question
                   const applySuggestion = (id: string, text: string, mode: "append" | "replace_excerpt" | "replace_all" = "append", excerpt?: string) => {
-                    setAppliedSuggestions(prev => {
-                      const next = new Set(prev);
-                      if (next.has(id)) {
-                        next.delete(id);
-                        // Revert — rebuild from scratch (just reset to original for simplicity)
-                        setRefinedQuestion(analysis.original_question);
-                      } else {
-                        next.add(id);
-                        setRefinedQuestion(prev_q => {
-                          const base = prev_q || analysis.original_question;
-                          if (mode === "replace_all") return text;
-                          if (mode === "replace_excerpt" && excerpt) {
-                            return base.replace(excerpt, text);
-                          }
-                          // append — add with space, avoid double-space
-                          const trimmed = base.trimEnd();
-                          const addition = text.startsWith("...") ? text.slice(3) : text;
-                          return trimmed + " " + addition;
-                        });
-                      }
-                      return next;
-                    });
+                    // Both state updates must happen at the top level — never nest setters
+                    const isApplied = appliedSuggestions.has(id);
+                    const nextApplied = new Set(appliedSuggestions);
+
+                    if (isApplied) {
+                      // Toggle off — revert to original
+                      nextApplied.delete(id);
+                      setAppliedSuggestions(nextApplied);
+                      setRefinedQuestion(confirmedQuery || analysis.original_question || "");
+                    } else {
+                      // Toggle on — apply to refined question
+                      nextApplied.add(id);
+                      setAppliedSuggestions(nextApplied);
+                      setRefinedQuestion(prev_q => {
+                        const base = prev_q || confirmedQuery || analysis.original_question || "";
+                        if (mode === "replace_all") return text;
+                        if (mode === "replace_excerpt" && excerpt) return base.replace(excerpt, text);
+                        const trimmed = base.trimEnd();
+                        const addition = text.startsWith("...") ? text.slice(3) : text;
+                        return trimmed + " " + addition;
+                      });
+                    }
                   };
 
                   const SuggestionChip = ({ id, label, text, mode = "append" as const, excerpt }: {
