@@ -35,4 +35,4 @@ start_service "cria-unified/ultraria_stub" PORT=8004 ULTRARIA_PORT=8004
 # Node's python-proxy.ts has a 45-second ECONNREFUSED retry loop,
 # so Node can start immediately — no need to block here.
 echo "[start.sh] Python services starting in background — launching Node api-server now"
-exec node --enable-source-maps "$WORKSPACE_ROOT/artifacts/api-server/dist/index.mjs"
+exec env NODE_ENV=production node --enable-source-maps "$WORKSPACE_ROOT/artifacts/api-server/dist/index.mjs"
