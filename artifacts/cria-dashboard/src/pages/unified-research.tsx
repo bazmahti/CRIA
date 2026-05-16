@@ -541,6 +541,33 @@ export default function UnifiedResearch() {
   // Refinement builder state
   const [refinedQuestion, setRefinedQuestion] = useState<string>("");
   const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
+
+  // Moved to top-level to avoid IIFE render-time state update issues
+  const applySuggestion = useCallback((
+    id: string, text: string,
+    mode: "append" | "replace_excerpt" | "replace_all" = "append",
+    excerpt?: string,
+    originalQuestion?: string,
+  ) => {
+    setAppliedSuggestions(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+    setRefinedQuestion(prev_q => {
+      // Toggle off — revert
+      if (appliedSuggestions.has(id)) {
+        return originalQuestion || "";
+      }
+      // Toggle on — apply
+      const base = prev_q || originalQuestion || "";
+      if (mode === "replace_all") return text;
+      if (mode === "replace_excerpt" && excerpt) return base.replace(excerpt, text);
+      const trimmed = base.trimEnd();
+      const addition = text.startsWith("...") ? text.slice(3) : text;
+      return trimmed + " " + addition;
+    });
+  }, [appliedSuggestions]);
   const [savedToHistory, setSavedToHistory] = useState(false);
 
   const [job, setJob] = useState<UnifiedJobState | null>(null);
@@ -940,14 +967,24 @@ export default function UnifiedResearch() {
                     { value: "post_ai_flourishing", label: "Post-AI Flourishing" },
                     { value: "new_economy", label: "New Economy / Post-Growth" },
                     { value: "democracy_governance", label: "Democracy and Governance" },
+                    { value: "indigenous_futures", label: "Indigenous Futures & Sovereignty" },
+                    { value: "consciousness_studies", label: "Consciousness & Meaning Studies" },
+                    { value: "media_epistemics", label: "Media, Truth & Public Epistemics" },
                   ],
                   environmental: [
                     { value: "environmental_polycrisis", label: "Environmental Polycrisis" },
-                    { value: "food_sovereignty", label: "Food Sovereignty and Agriculture" },
+                    { value: "climate_policy", label: "Climate Policy & Emissions" },
+                    { value: "biodiversity_species", label: "Biodiversity & Species Loss" },
+                    { value: "ocean_marine", label: "Ocean, Reef & Marine Systems" },
+                    { value: "water_ecology", label: "Water, Catchment & Algal Bloom" },
+                    { value: "food_sovereignty", label: "Food Sovereignty & Agriculture" },
                     { value: "ocaa_daily_editorial", label: "OCAA Daily Editorial" },
                   ],
                   technology: [
                     { value: "ai_alignment", label: "AI Alignment and Safety" },
+                    { value: "platform_accountability", label: "Platform Accountability" },
+                    { value: "digital_rights", label: "Digital Rights & Privacy" },
+                    { value: "ip_copyright", label: "Intellectual Property & Copyright" },
                     { value: "neurodiversity_health", label: "Neurodiversity and Health" },
                     { value: "therapeutic_clinical", label: "Therapeutic-Clinical" },
                   ],
@@ -965,12 +1002,30 @@ export default function UnifiedResearch() {
                     { value: "longevity_ageing", label: "Longevity and Ageing" },
                   ],
                   activist: [
+                    { value: "economic_justice", label: "Economic Justice & Inequality" },
+                    { value: "budget_policy", label: "Budget & Fiscal Policy Analysis" },
+                    { value: "corporate_accountability", label: "Corporate Accountability & Tax" },
+                    { value: "labour_rights", label: "Labour Rights & Workers" },
+                    { value: "housing_inequality", label: "Housing & Spatial Inequality" },
+                    { value: "human_rights", label: "Human Rights & Civil Liberties" },
+                    { value: "indigenous_rights", label: "Indigenous Rights & Treaty" },
+                    { value: "refugee_asylum", label: "Refugee, Asylum & Detention" },
+                    { value: "gambling_addiction", label: "Gambling & Addiction Harm" },
+                    { value: "arms_security", label: "Arms, Security & Military Spending" },
+                    { value: "international_law", label: "International Law & Treaties" },
+                    { value: "ip_copyright", label: "Intellectual Property & Copyright" },
+                    { value: "creative_economy", label: "Creative Economy & Artists Rights" },
+                    { value: "open_access_commons", label: "Open Access & Knowledge Commons" },
+                    { value: "media_epistemics", label: "Media & Misinformation" },
                     { value: "environmental_polycrisis", label: "Environmental Polycrisis" },
                     { value: "food_sovereignty", label: "Food Sovereignty" },
-                    { value: "new_economy", label: "New Economy / Post-Growth" },
                     { value: "democracy_governance", label: "Democracy and Governance" },
-                    { value: "ai_alignment", label: "AI Alignment and Safety" },
-                    { value: "neurodiversity_health", label: "Neurodiversity and Health" },
+                  ],
+                  general: [
+                    { value: "general_scholarship", label: "General Scholarship" },
+                    { value: "partnership_sensitive", label: "Partnership-Sensitive Research" },
+                    { value: "international_law", label: "International Law & Treaties" },
+                    { value: "education_policy", label: "Education Policy & Access" },
                   ],
                 };
                 const subProfiles = streamProfiles[activeStream] ?? [];
@@ -1260,31 +1315,8 @@ export default function UnifiedResearch() {
                 )}
 
                 {analysis && (() => {
-                  // Helper to apply a suggestion to the refined question
-                  const applySuggestion = (id: string, text: string, mode: "append" | "replace_excerpt" | "replace_all" = "append", excerpt?: string) => {
-                    // Both state updates must happen at the top level — never nest setters
-                    const isApplied = appliedSuggestions.has(id);
-                    const nextApplied = new Set(appliedSuggestions);
-
-                    if (isApplied) {
-                      // Toggle off — revert to original
-                      nextApplied.delete(id);
-                      setAppliedSuggestions(nextApplied);
-                      setRefinedQuestion(confirmedQuery || analysis.original_question || "");
-                    } else {
-                      // Toggle on — apply to refined question
-                      nextApplied.add(id);
-                      setAppliedSuggestions(nextApplied);
-                      setRefinedQuestion(prev_q => {
-                        const base = prev_q || confirmedQuery || analysis.original_question || "";
-                        if (mode === "replace_all") return text;
-                        if (mode === "replace_excerpt" && excerpt) return base.replace(excerpt, text);
-                        const trimmed = base.trimEnd();
-                        const addition = text.startsWith("...") ? text.slice(3) : text;
-                        return trimmed + " " + addition;
-                      });
-                    }
-                  };
+                  // applySuggestion is defined at component level (useCallback above)
+                  const originalQ = analysis.original_question || confirmedQuery || "";
 
                   const SuggestionChip = ({ id, label, text, mode = "append" as const, excerpt }: {
                     id: string; label: string; text: string;
@@ -1294,7 +1326,7 @@ export default function UnifiedResearch() {
                     const applied = appliedSuggestions.has(id);
                     return (
                       <button
-                        onClick={() => applySuggestion(id, text, mode, excerpt)}
+                        onClick={() => applySuggestion(id, text, mode, excerpt, originalQ)}
                         title={text}
                         className={cn(
                           "flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full border transition-all",
@@ -1609,7 +1641,7 @@ export default function UnifiedResearch() {
                           Use this question
                         </button>
                         <button
-                          onClick={() => { setRefinedQuestion(confirmedQuery || query); setAppliedSuggestions(new Set()); }}
+                          onClick={() => { setRefinedQuestion(originalQ); setAppliedSuggestions(new Set()); }}
                           className="px-3 py-1.5 rounded-lg border border-border/50 text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors"
                         >
                           Reset to original
