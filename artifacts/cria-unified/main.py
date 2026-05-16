@@ -4805,7 +4805,7 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
         await db_complete_job(job_id, result)
 
         # ── Quality scorecard, alerts, and model version tracking ───────────
-        if _QUALITY_MONITOR_AVAILABLE and _DB_AVAILABLE:
+        if _QUALITY_MONITOR_AVAILABLE and (_db_pool is not None):
             try:
                 academic_result = result.get("voices", {}).get("academic", {})
                 scorecard = extract_scorecard(
@@ -5326,7 +5326,7 @@ async def list_outputs(q: str = ""):
 @app.get(f"{BASE_PATH}/quality/scorecards")
 async def get_scorecards_endpoint(request: Request, profile: str = None, limit: int = 20):
     """Recent quality scorecards for dashboard quality panel."""
-    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+    if not _QUALITY_MONITOR_AVAILABLE or not (_db_pool is not None):
         return {"scorecards": [], "available": False}
     data = await get_recent_scorecards(_db_pool, limit=min(limit, 50), profile=profile)
     return {"scorecards": data, "available": True}
@@ -5335,7 +5335,7 @@ async def get_scorecards_endpoint(request: Request, profile: str = None, limit: 
 @app.get(f"{BASE_PATH}/quality/trends")
 async def get_trends_endpoint(request: Request, profile: str = None, weeks: int = 12):
     """Weekly quality trend aggregations."""
-    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+    if not _QUALITY_MONITOR_AVAILABLE or not (_db_pool is not None):
         return {"trends": [], "available": False}
     data = await get_quality_trends(_db_pool, profile=profile, weeks=weeks)
     return {"trends": data, "available": True}
@@ -5344,7 +5344,7 @@ async def get_trends_endpoint(request: Request, profile: str = None, weeks: int 
 @app.get(f"{BASE_PATH}/quality/compare/{{job_id}}")
 async def compare_to_baseline(request: Request, job_id: str):
     """Compare run quality against baseline average."""
-    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+    if not _QUALITY_MONITOR_AVAILABLE or not (_db_pool is not None):
         return {"available": False}
     data = await get_benchmark_comparison(_db_pool, job_id)
     return data or {"available": False}
@@ -5353,7 +5353,7 @@ async def compare_to_baseline(request: Request, job_id: str):
 @app.get(f"{BASE_PATH}/quality/model-versions")
 async def get_model_versions_endpoint(request: Request, profile: str = None, limit: int = 20):
     """Model version history — detects silent model changes (primary degradation signature)."""
-    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+    if not _QUALITY_MONITOR_AVAILABLE or not (_db_pool is not None):
         return {"versions": [], "available": False}
     data = await get_model_version_history(_db_pool, profile=profile, limit=limit)
     # Detect version changes
@@ -5373,7 +5373,7 @@ async def get_model_versions_endpoint(request: Request, profile: str = None, lim
 @app.get(f"{BASE_PATH}/quality/alerts/{{job_id}}")
 async def get_job_alerts(request: Request, job_id: str):
     """Get quality alerts for a specific job."""
-    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+    if not _QUALITY_MONITOR_AVAILABLE or not (_db_pool is not None):
         return {"alerts": [], "available": False}
     # Re-fetch scorecard and comparison and re-run alerts
     try:
@@ -5406,7 +5406,7 @@ async def get_job_alerts(request: Request, job_id: str):
 @app.post(f"{BASE_PATH}/quality/benchmark")
 async def save_benchmark_endpoint(request: Request):
     """Mark a run as a named benchmark."""
-    if not _QUALITY_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+    if not _QUALITY_MONITOR_AVAILABLE or not (_db_pool is not None):
         raise HTTPException(status_code=503, detail="Quality monitor not available")
     body = await request.json()
     job_id = body.get("job_id", "")
