@@ -61,9 +61,11 @@ function buildProxyHandler(basePath: string, targetPort: number) {
       const forwardHeaders = { ...req.headers };
       forwardHeaders["host"] = `127.0.0.1:${targetPort}`;
       forwardHeaders["connection"] = "close";
-      if (bodyBuffer.length > 0) {
-        forwardHeaders["content-length"] = String(bodyBuffer.length);
-      }
+      // We've buffered the full body, so chunked encoding no longer applies.
+      // Remove it so FastAPI/uvicorn doesn't expect a chunked stream and
+      // return 422 when it receives a plain body with a content-length instead.
+      delete forwardHeaders["transfer-encoding"];
+      forwardHeaders["content-length"] = String(bodyBuffer.length);
 
       const options: http.RequestOptions = {
         hostname: "127.0.0.1",
