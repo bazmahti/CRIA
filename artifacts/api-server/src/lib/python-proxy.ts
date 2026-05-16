@@ -67,6 +67,14 @@ function buildProxyHandler(basePath: string, targetPort: number) {
       delete forwardHeaders["transfer-encoding"];
       forwardHeaders["content-length"] = String(bodyBuffer.length);
 
+      // Diagnostic logging for /analyse — remove once production 422 is resolved
+      if (req.url?.includes("analyse")) {
+        logger.info(
+          { path: targetPath, bodyBytes: bodyBuffer.length, bodyPreview: bodyBuffer.slice(0, 200).toString("utf8"), contentType: forwardHeaders["content-type"] },
+          "proxy-analyse-debug",
+        );
+      }
+
       const options: http.RequestOptions = {
         hostname: "127.0.0.1",
         port: targetPort,

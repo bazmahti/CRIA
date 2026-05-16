@@ -4728,6 +4728,23 @@ app.add_middleware(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Log the raw body bytes on 422 so we can diagnose production proxy issues."""
+    try:
+        raw = await request.body()
+        log.error(
+            "422 validation error on %s %s — body_bytes=%d body_preview=%r errors=%s",
+            request.method, request.url.path,
+            len(raw), raw[:300], exc.errors(),
+        )
+    except Exception as inner:
+        log.error("422 validation error (could not read body: %s) errors=%s", inner, exc.errors())
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
 
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
