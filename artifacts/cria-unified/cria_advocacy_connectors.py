@@ -639,6 +639,184 @@ def get_connectors_for_profile(profile: str) -> List:
             + ENVIRONMENTAL_CONNECTORS[:8]
             + NEW_ECONOMY_CONNECTORS[:4]
         ),
+
+        # ── Activist & Issue Research profiles ───────────────────────────────
+
+        # Budget/fiscal policy — government spending priorities vs public interest
+        "budget_policy": (
+            ECONOMICS_RESEARCH_CONNECTORS
+            + NEW_ECONOMY_CONNECTORS
+            + DEMOCRACY_CONNECTORS[:4]
+            + ENVIRONMENTAL_CONNECTORS[:4]
+        ),
+
+        # Economic justice — inequality, corporate tax, wage theft, redistribution
+        "economic_justice": (
+            ECONOMICS_RESEARCH_CONNECTORS
+            + NEW_ECONOMY_CONNECTORS
+            + DEMOCRACY_CONNECTORS
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # Corporate accountability — tax evasion, lobbying, regulatory capture
+        "corporate_accountability": (
+            ECONOMICS_RESEARCH_CONNECTORS
+            + NEW_ECONOMY_CONNECTORS
+            + DEMOCRACY_CONNECTORS
+        ),
+
+        # Labour rights — workers, unions, wages, conditions, gig economy
+        "labour_rights": (
+            ECONOMICS_RESEARCH_CONNECTORS
+            + NEW_ECONOMY_CONNECTORS[:6]
+            + DEMOCRACY_CONNECTORS[:4]
+        ),
+
+        # Housing and inequality — affordability, homelessness, spatial inequality
+        "housing_inequality": (
+            NEW_ECONOMY_CONNECTORS
+            + ECONOMICS_RESEARCH_CONNECTORS
+            + DEMOCRACY_CONNECTORS[:4]
+        ),
+
+        # Human rights — international law, civil liberties, detention, torture
+        "human_rights": (
+            DEMOCRACY_CONNECTORS
+            + CIVILISATIONAL_CONNECTORS[:4]
+            + NEW_ECONOMY_CONNECTORS[:4]
+        ),
+
+        # Indigenous rights and sovereignty — land rights, self-determination, treaty
+        "indigenous_rights": (
+            CIVILISATIONAL_CONNECTORS
+            + DEMOCRACY_CONNECTORS
+        ),
+
+        # Refugee and asylum — detention, border policy, international protection
+        "refugee_asylum": (
+            DEMOCRACY_CONNECTORS
+            + CIVILISATIONAL_CONNECTORS[:4]
+            + NEW_ECONOMY_CONNECTORS[:4]
+        ),
+
+        # Gambling and addiction harm — social harm, regulation, industry lobbying
+        "gambling_addiction": (
+            DEMOCRACY_CONNECTORS[:4]
+            + NEW_ECONOMY_CONNECTORS[:4]
+            + NEURODIVERSITY_CONNECTORS[:4]
+        ),
+
+        # Media and epistemics — misinformation, media ownership, public discourse
+        "media_epistemics": (
+            DEMOCRACY_CONNECTORS
+            + AI_ALIGNMENT_CONNECTORS[:4]
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # Platform accountability — Big Tech, surveillance capitalism, digital rights
+        "platform_accountability": (
+            AI_ALIGNMENT_CONNECTORS
+            + DEMOCRACY_CONNECTORS
+            + NEW_ECONOMY_CONNECTORS[:4]
+        ),
+
+        # ── Environmental sub-profiles ───────────────────────────────────────
+
+        # Biodiversity and species — extinction, habitat, rewilding
+        "biodiversity_species": (
+            ENVIRONMENTAL_CONNECTORS
+            + [gbif, bhl]
+            + FOOD_SOVEREIGNTY_CONNECTORS[:4]
+        ),
+
+        # Ocean and marine — reef, fisheries, ocean acidification, marine protected areas
+        "ocean_marine": (
+            ENVIRONMENTAL_CONNECTORS[:8]
+            + [gbif]
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # Water — freshwater, catchment, allocation, algal bloom
+        "water_ecology": (
+            ENVIRONMENTAL_CONNECTORS[:8]
+            + FOOD_SOVEREIGNTY_CONNECTORS[:4]
+        ),
+
+        # Climate policy — emissions, targets, carbon markets, policy instruments
+        "climate_policy": (
+            ENVIRONMENTAL_CONNECTORS[:8]
+            + NEW_ECONOMY_CONNECTORS[:4]
+            + DEMOCRACY_CONNECTORS[:4]
+        ),
+
+        # ── Civilisational sub-profiles ──────────────────────────────────────
+
+        # Indigenous futures — sovereignty, futures studies, knowledge systems
+        "indigenous_futures": (
+            CIVILISATIONAL_CONNECTORS
+            + DEMOCRACY_CONNECTORS[:4]
+        ),
+
+        # Consciousness studies — philosophy of mind, contemplative, meaning
+        "consciousness_studies": (
+            CIVILISATIONAL_CONNECTORS
+            + AI_ALIGNMENT_CONNECTORS[:4]
+        ),
+
+        # ── Technology sub-profiles ──────────────────────────────────────────
+
+        # Digital rights and privacy — surveillance, data sovereignty
+        "digital_rights": (
+            AI_ALIGNMENT_CONNECTORS
+            + DEMOCRACY_CONNECTORS
+        ),
+
+        # International law — trade law, humanitarian law, human rights law, sovereignty
+        "international_law": (
+            DEMOCRACY_CONNECTORS
+            + CIVILISATIONAL_CONNECTORS[:4]
+            + NEW_ECONOMY_CONNECTORS[:4]
+        ),
+
+        # Education policy — access, equity, curriculum, privatisation
+        "education_policy": (
+            DEMOCRACY_CONNECTORS[:4]
+            + NEW_ECONOMY_CONNECTORS[:4]
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # Arms and security — military spending, arms trade, conflict, AUKUS
+        "arms_security": (
+            DEMOCRACY_CONNECTORS
+            + CIVILISATIONAL_CONNECTORS[:4]
+            + NEW_ECONOMY_CONNECTORS[:4]
+        ),
+
+        # Intellectual property and copyright — creator rights, patent, AI/copyright,
+        # platform royalties, fair use, open access, TRIPS, moral rights
+        "ip_copyright": (
+            DEMOCRACY_CONNECTORS
+            + AI_ALIGNMENT_CONNECTORS[:4]
+            + NEW_ECONOMY_CONNECTORS[:4]
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # Creative economy — artists rights, streaming royalties, cultural policy,
+        # arts funding, platform power over creators
+        "creative_economy": (
+            NEW_ECONOMY_CONNECTORS
+            + DEMOCRACY_CONNECTORS[:4]
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # Open access and knowledge commons — open science, open source,
+        # academic publishing monopolies, public domain
+        "open_access_commons": (
+            AI_ALIGNMENT_CONNECTORS[:4]
+            + NEW_ECONOMY_CONNECTORS[:4]
+            + DEMOCRACY_CONNECTORS[:4]
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
     }
     return mapping.get(profile, [])
 

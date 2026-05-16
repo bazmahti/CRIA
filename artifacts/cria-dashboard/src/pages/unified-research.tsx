@@ -901,12 +901,12 @@ export default function UnifiedResearch() {
               </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
                 {([
-                  { key: "general", label: "General Scholarship", icon: "🎓", profiles: ["general_scholarship","partnership_sensitive"] },
-                  { key: "civilisational", label: "Civilisational & Systems", icon: "🌐", profiles: ["civilisational_academic","post_ai_flourishing","new_economy","democracy_governance"] },
-                  { key: "environmental", label: "Environmental & Ecological", icon: "🌱", profiles: ["environmental_polycrisis","food_sovereignty","ocaa_daily_editorial"] },
-                  { key: "technology", label: "Technology & Mind", icon: "🧠", profiles: ["ai_alignment","neurodiversity_health","therapeutic_clinical"] },
+                  { key: "general", label: "General Scholarship", icon: "🎓", profiles: ["general_scholarship","partnership_sensitive","international_law","education_policy"] },
+                  { key: "civilisational", label: "Civilisational & Systems", icon: "🌐", profiles: ["civilisational_academic","post_ai_flourishing","new_economy","democracy_governance","indigenous_futures","consciousness_studies","media_epistemics"] },
+                  { key: "environmental", label: "Environmental & Ecological", icon: "🌱", profiles: ["environmental_polycrisis","food_sovereignty","biodiversity_species","ocean_marine","water_ecology","climate_policy","ocaa_daily_editorial"] },
+                  { key: "technology", label: "Technology & Mind", icon: "🧠", profiles: ["ai_alignment","neurodiversity_health","therapeutic_clinical","platform_accountability","digital_rights"] },
                   { key: "health", label: "Health & Medicine", icon: "⚕️", profiles: ["clinical_biomedical","mental_health","contemplative_neuroscience","psychedelic_research","integrative_medicine","neurofeedback_health","public_health","health_equity","indigenous_health","nutrition_gut_brain","longevity_ageing"] },
-                  { key: "activist", label: "Activist & Issue Research", icon: "✊", profiles: ["environmental_polycrisis","food_sovereignty","new_economy","democracy_governance","ai_alignment","neurodiversity_health"] },
+                  { key: "activist", label: "Activist & Issue Research", icon: "✊", profiles: ["economic_justice","budget_policy","corporate_accountability","labour_rights","housing_inequality","human_rights","indigenous_rights","refugee_asylum","gambling_addiction","arms_security","international_law","environmental_polycrisis","food_sovereignty","democracy_governance","media_epistemics","platform_accountability"] },
                 ] as { key: string; label: string; icon: string; profiles: string[] }[]).map(({ key, label, icon, profiles }) => {
                   const isActive = profiles.includes(profile);
                   return (
