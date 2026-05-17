@@ -138,6 +138,14 @@ PROFILE_REGISTRY = {
         "Activates: WIPO, Copyright Agency Australia, EFF, Creative Commons, IP Australia.",
     "platform_accountability": "Big Tech power, surveillance capitalism, algorithmic accountability. "
         "Activates: EFF, AI alignment connectors, democracy connectors, new economy.",
+    "cybersecurity_policy": "State-sponsored hacking, surveillance of civil society, spyware, "
+        "democratic infrastructure protection, cyber warfare, critical infrastructure. "
+        "Activates: ACSC, ENISA, CISA, NCSC UK, Citizen Lab, Access Now, EFF Security, "
+        "SIPRI Cyber, CFR Cyber Operations Tracker, Atlantic Council Cyber Statecraft.",
+    "cybersecurity_technical": "Vulnerability research, cryptography, AI security, systems security, "
+        "adversarial ML, secure software development. "
+        "Activates: IEEE Security and Privacy, USENIX Security, ACM CCS, NDSS, "
+        "arXiv cs.CR, CVE Details, OWASP, SANS Institute, NIST AI Risk, MITRE ATLAS.",
     "neurodiversity_health": "Neurodiversity, ADHD, autism, learning differences, NFB for neurodiversity. "
         "Activates: Neurodiversity connectors, NeuroRegulation, ISNR, NFB literature.",
     "therapeutic_clinical": "Clinical therapeutic applications, mental health interventions. "

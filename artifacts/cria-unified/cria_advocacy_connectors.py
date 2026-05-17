@@ -996,6 +996,87 @@ NFB_SPECIALIST_CONNECTORS = [
         "Open-source EEG/NFB hardware research, community experiments, signal quality"),
 ]
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CYBERSECURITY CONNECTORS
+#
+# Two streams:
+#   Stream 1: Policy, governance, civil society — surveillance, state actors,
+#             democratic infrastructure, critical infrastructure protection
+#   Stream 2: Technical research — vulnerability, cryptography, AI security,
+#             systems security, open source security
+# ══════════════════════════════════════════════════════════════════════════════
+
+CYBERSECURITY_CONNECTORS = [
+    # ── Stream 1: Policy, governance, civil society ───────────────────────────
+    TargetedWebConnector("cyber.gov.au", "ACSC",
+        "Australian Cyber Security Centre — threat intelligence, policy, incident reports"),
+    TargetedWebConnector("enisa.europa.eu/publications", "ENISA",
+        "EU Cybersecurity Agency — threat landscape, policy, standards, regulatory frameworks"),
+    TargetedWebConnector("cisa.gov/resources-tools/resources", "CISA",
+        "US Cybersecurity and Infrastructure Security Agency — critical infrastructure, policy"),
+    TargetedWebConnector("ncsc.gov.uk/reports", "NCSC UK",
+        "UK National Cyber Security Centre — threat intelligence, guidance, incident reporting"),
+    TargetedWebConnector("citizenlab.ca/research", "Citizen Lab",
+        "Surveillance research — Pegasus spyware, FinFisher, state targeting of civil society"),
+    TargetedWebConnector("accessnow.org/research", "Access Now Research",
+        "Digital rights under attack — surveillance, internet shutdowns, civil society targeting"),
+    TargetedWebConnector("eff.org/issues/security", "EFF Security",
+        "Electronic Frontier Foundation — surveillance law, encryption policy, state hacking"),
+    TargetedWebConnector("pewresearch.org/internet/topic/privacy-security",
+        "Pew Research Cybersecurity",
+        "Public attitudes to cybersecurity, privacy, surveillance — US and global"),
+    TargetedWebConnector("internetsociety.org/resources", "Internet Society",
+        "Internet governance, security policy, open internet advocacy, encryption"),
+    TargetedWebConnector("gfce-cybilresearch.org", "GFCE Global Cyber Expertise",
+        "Cybersecurity capacity building, international governance, developing nations"),
+    TargetedWebConnector("krebsonsecurity.com", "Krebs on Security",
+        "Investigative cybersecurity journalism — breaches, threat actors, incident reporting"),
+    TargetedWebConnector("sipri.org/research/armament-and-disarmament/cyber",
+        "SIPRI Cyber",
+        "Cyber warfare, offensive capabilities, arms control in cyberspace"),
+    TargetedWebConnector("cfr.org/cyber-operations", "CFR Cyber Operations Tracker",
+        "State-sponsored cyber operations database — attribution, targets, methods"),
+    TargetedWebConnector("atlanticcouncil.org/programs/cyber-statecraft",
+        "Atlantic Council Cyber Statecraft",
+        "Cyber policy, geopolitics, norms, international cybersecurity diplomacy"),
+
+    # ── Stream 2: Technical research ─────────────────────────────────────────
+    TargetedWebConnector("ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=8013",
+        "IEEE Security and Privacy",
+        "Primary peer-reviewed security journal — IEEE S&P, cryptography, systems security"),
+    TargetedWebConnector("usenix.org/conferences/byname/108", "USENIX Security",
+        "Premier systems security conference — open access proceedings, vulnerability research"),
+    TargetedWebConnector("dl.acm.org/conference/ccs", "ACM CCS",
+        "ACM Conference on Computer and Communications Security — applied cryptography, attacks"),
+    TargetedWebConnector("ndss-symposium.org/ndss-papers", "NDSS Symposium",
+        "Network and Distributed System Security — network attacks, protocol vulnerabilities"),
+    TargetedWebConnector("arxiv.org/list/cs.CR/recent", "arXiv Cryptography and Security",
+        "Preprints — AI security, cryptography, adversarial ML, privacy-preserving computation"),
+    TargetedWebConnector("cvedetails.com/vulnerability-list", "CVE Details",
+        "Common Vulnerabilities and Exposures database — software vulnerability research"),
+    TargetedWebConnector("owasp.org/projects", "OWASP",
+        "Open Web Application Security Project — application security research and standards"),
+    TargetedWebConnector("sans.org/white-papers", "SANS Institute",
+        "Practitioner-research bridge — threat intelligence, incident response, security training"),
+    TargetedWebConnector("schneier.com/blog", "Schneier on Security",
+        "Bruce Schneier — security policy, cryptography, surveillance, technology and security"),
+    TargetedWebConnector("securityweekly.com/research", "Security Weekly Research",
+        "Applied security research, vulnerability disclosure, defensive techniques"),
+    TargetedWebConnector("verizon.com/business/resources/reports/dbir",
+        "Verizon DBIR",
+        "Data Breach Investigations Report — annual breach data, threat patterns, statistics"),
+
+    # ── AI and cybersecurity intersection ────────────────────────────────────
+    TargetedWebConnector("adversarial.io/research", "Adversarial ML Research",
+        "Adversarial machine learning, AI model attacks, poisoning, evasion techniques"),
+    TargetedWebConnector("nist.gov/artificial-intelligence/ai-risk-management",
+        "NIST AI Risk Management",
+        "AI security standards, risk framework, adversarial AI, secure AI development"),
+    TargetedWebConnector("mitre.org/research/technology/ai", "MITRE AI Security",
+        "ATLAS framework — adversarial threat landscape for AI systems, attack taxonomy"),
+]
+
 ALL_ADVOCACY_CONNECTORS = (
     ENVIRONMENTAL_CONNECTORS
     + FOOD_SOVEREIGNTY_CONNECTORS
@@ -1010,6 +1091,7 @@ ALL_ADVOCACY_CONNECTORS = (
     + CREATIVE_CULTURAL_CONNECTORS
     + EDUCATION_CONNECTORS
     + NFB_SPECIALIST_CONNECTORS
+    + CYBERSECURITY_CONNECTORS
 )
 
 
@@ -1241,8 +1323,23 @@ def get_connectors_for_profile(profile: str) -> List:
 
         # Digital rights and privacy — surveillance, data sovereignty
         "digital_rights": (
-            AI_ALIGNMENT_CONNECTORS
+            CYBERSECURITY_CONNECTORS[4:8]        # Citizen Lab, Access Now, EFF, Pew
+            + AI_ALIGNMENT_CONNECTORS
             + DEMOCRACY_CONNECTORS
+        ),
+
+        # Cybersecurity policy — governance, civil society, surveillance, state actors
+        "cybersecurity_policy": (
+            CYBERSECURITY_CONNECTORS[:14]
+            + DEMOCRACY_CONNECTORS[:4]
+            + AI_ALIGNMENT_CONNECTORS[:4]
+        ),
+
+        # Cybersecurity technical — vulnerability, cryptography, AI security
+        "cybersecurity_technical": (
+            CYBERSECURITY_CONNECTORS[14:25]
+            + CYBERSECURITY_CONNECTORS[25:]
+            + AI_ALIGNMENT_CONNECTORS[:4]
         ),
 
         # International law — trade law, humanitarian law, human rights law, sovereignty
@@ -1339,6 +1436,12 @@ def connector_registry_summary() -> dict:
         "democracy": [c.source_name for c in DEMOCRACY_CONNECTORS],
         "neurodiversity": [c.source_name for c in NEURODIVERSITY_CONNECTORS],
         "civilisational": [c.source_name for c in CIVILISATIONAL_CONNECTORS],
+        "australian_policy": [c.source_name for c in AUSTRALIAN_POLICY_CONNECTORS],
+        "international_specialist": [c.source_name for c in INTERNATIONAL_SPECIALIST_CONNECTORS],
+        "creative_cultural": [c.source_name for c in CREATIVE_CULTURAL_CONNECTORS],
+        "education": [c.source_name for c in EDUCATION_CONNECTORS],
+        "nfb_specialist": [c.source_name for c in NFB_SPECIALIST_CONNECTORS],
+        "cybersecurity": [c.source_name for c in CYBERSECURITY_CONNECTORS],
         "structured_apis": list(STRUCTURED_API_CONNECTORS.keys()),
         "total": len(ALL_ADVOCACY_CONNECTORS) + len(STRUCTURED_API_CONNECTORS),
     }
