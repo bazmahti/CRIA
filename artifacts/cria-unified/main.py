@@ -159,6 +159,9 @@ try:
         ensure_horizon_schema, get_horizon_dashboard,
         generate_research_architecture_report,
         record_absence, record_convergence, record_connector_performance,
+        auto_propose_connector, get_proposed_connectors,
+        approve_connector, dismiss_connector, load_approved_connectors,
+        ensure_proposed_connector_schema,
     )
     _HORIZON_MONITOR_AVAILABLE = True
 except ImportError:
@@ -432,6 +435,7 @@ async def _init_db_pool() -> asyncpg.Pool:
         await ensure_quality_schema(pool)
     if _HORIZON_MONITOR_AVAILABLE:
         await ensure_horizon_schema(pool)
+        await ensure_proposed_connector_schema(pool)
     log_config_summary(log)
     return pool
 
@@ -5369,6 +5373,54 @@ async def horizon_report(request: Request):
         return {"available": False, "report": ""}
     report = await generate_research_architecture_report(_db_pool)
     return {"available": True, "report": report}
+
+
+@app.get(f"{BASE_PATH}/horizon/proposed-connectors")
+async def get_proposed(request: Request, status: str = "proposed"):
+    """Proposed connectors awaiting researcher review."""
+    if not _HORIZON_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        return {"connectors": [], "available": False}
+    connectors = await get_proposed_connectors(_db_pool, status=status)
+    return {"connectors": connectors, "available": True}
+
+
+@app.post(f"{BASE_PATH}/horizon/proposed-connectors/{{connector_id}}/approve")
+async def approve_proposed(request: Request, connector_id: str):
+    """Approve a proposed connector — activates on next restart."""
+    if not _HORIZON_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Horizon monitor not available")
+    success = await approve_connector(_db_pool, connector_id)
+    return {"success": success, "message": "Connector approved — will activate on next restart"}
+
+
+@app.post(f"{BASE_PATH}/horizon/proposed-connectors/{{connector_id}}/dismiss")
+async def dismiss_proposed(request: Request, connector_id: str):
+    """Dismiss a proposed connector."""
+    if not _HORIZON_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Horizon monitor not available")
+    success = await dismiss_connector(_db_pool, connector_id)
+    return {"success": success}
+
+
+@app.post(f"{BASE_PATH}/horizon/propose-connector")
+async def manual_propose(request: Request):
+    """Manually trigger connector proposal for a specific gap."""
+    if not _HORIZON_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Horizon monitor not available")
+    body = await request.json()
+    domain = body.get("domain", "")
+    evidence_sought = body.get("evidence_sought", "")
+    profile = body.get("profile", "general_scholarship")
+    if not domain or not evidence_sought:
+        raise HTTPException(status_code=400, detail="domain and evidence_sought required")
+
+    async def _llm(prompt: str, max_tokens: int = 400, **kw) -> str:
+        return await call_llm(prompt, max_tokens=max_tokens, channel_name="Stage0")
+
+    proposal = await auto_propose_connector(
+        _db_pool, domain, evidence_sought, profile, 1, _llm
+    )
+    return {"proposal": proposal, "success": bool(proposal)}
 
 
 # ── Quality Monitoring Endpoints ─────────────────────────────────────────────

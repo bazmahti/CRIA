@@ -148,7 +148,7 @@ async def record_absence(
                     new_type = "connector_gap"
                     log.warning(
                         "HORIZON: Repeated absence in '%s' domain (%d runs) — "
-                        "likely connector gap, not true absence",
+                        "likely connector gap — auto-proposing connector",
                         domain, new_count
                     )
                     # Auto-generate a recommendation
@@ -160,13 +160,18 @@ async def record_absence(
                         description=(
                             f"Evidence type '{evidence_sought[:80]}' has been absent "
                             f"across {new_count} research runs on {domain} questions. "
-                            "This pattern indicates CRIA cannot reach this literature — "
-                            "not that the literature doesn't exist. "
-                            "Recommend: identify specialist databases or journals for this domain "
-                            "and add as dedicated connectors."
+                            "A new connector has been auto-proposed in the Research Horizon dashboard. "
+                            "Review and approve to activate on next restart."
                         ),
                         evidence={"domain": domain, "run_count": new_count, "profile": profile},
                     )
+                    # Auto-propose a connector — stored for researcher review
+                    # call_llm_fn injected via closure if available
+                    if hasattr(record_absence, "_call_llm_fn") and record_absence._call_llm_fn:
+                        asyncio.create_task(auto_propose_connector(
+                            pool, domain, evidence_sought, profile, new_count,
+                            record_absence._call_llm_fn,
+                        ))
                 await conn.execute(
                     "UPDATE horizon_absence_patterns SET run_count=$1, last_seen=NOW(), "
                     "absence_type=$2, profiles = profiles || $3::jsonb WHERE id=$4",
@@ -473,3 +478,227 @@ async def generate_research_architecture_report(pool) -> str:
             )
 
     return "\n".join(lines)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AUTO-CONNECTOR GENERATION
+#
+# When a connector gap is detected (3+ repeated absences in a domain),
+# the monitor calls the LLM to propose a new connector spec.
+# Proposed connectors are stored in the database for researcher review.
+# Approved connectors activate on next restart — no code change needed.
+# ══════════════════════════════════════════════════════════════════════════════
+
+PROPOSED_CONNECTOR_SCHEMA = """
+CREATE TABLE IF NOT EXISTS proposed_connectors (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    url             TEXT NOT NULL,
+    source_name     TEXT NOT NULL,
+    description     TEXT NOT NULL,
+    profile         TEXT NOT NULL,
+    gap_trigger     TEXT,           -- what absence triggered this proposal
+    domain          TEXT,
+    status          TEXT DEFAULT 'proposed',  -- 'proposed' | 'approved' | 'active' | 'dismissed'
+    auto_generated  BOOLEAN DEFAULT TRUE,
+    proposed_by     TEXT DEFAULT 'horizon_monitor',
+    approved_at     TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    notes           TEXT
+);
+CREATE INDEX IF NOT EXISTS proposed_connectors_status_idx ON proposed_connectors (status);
+"""
+
+
+CONNECTOR_GENERATION_PROMPT = """You are a research infrastructure specialist.
+
+A research system has detected a connector gap: evidence of type "{evidence_sought}"
+has been consistently absent across {run_count} research runs on the domain "{domain}".
+
+The research profile is: {profile}
+
+Your task: propose ONE specific web connector that would reach this evidence.
+
+Requirements:
+- The URL must be REAL and currently accessible (a real database, journal, or institution)
+- The connector should specifically target the gap described — not a general academic search
+- Choose the most authoritative, open-access source available for this evidence type
+- The description (max 120 chars) should describe exactly what the source contains
+
+Respond with ONLY valid JSON, no preamble:
+{{
+  "url": "exact URL of the resource (e.g. eric.ed.gov, ucdp.uu.se)",
+  "source_name": "Short institution/journal name (e.g. UCDP, NeuroRegulation)",
+  "description": "What this source contains — specific, concrete (max 120 chars)",
+  "profile": "{profile}",
+  "confidence": "high|medium|low",
+  "reasoning": "Why this specific source addresses the gap (1-2 sentences)"
+}}"""
+
+
+async def auto_propose_connector(
+    pool,
+    domain: str,
+    evidence_sought: str,
+    profile: str,
+    run_count: int,
+    call_llm_fn,
+) -> Optional[Dict]:
+    """
+    Auto-generate a connector proposal when a gap is detected.
+    Stores in proposed_connectors table for researcher review.
+    Returns the proposed connector dict or None if generation failed.
+    """
+    try:
+        prompt = CONNECTOR_GENERATION_PROMPT.format(
+            evidence_sought=evidence_sought[:200],
+            run_count=run_count,
+            domain=domain,
+            profile=profile,
+        )
+        raw = await call_llm_fn(prompt, max_tokens=400)
+        if not raw:
+            return None
+
+        # Parse JSON response
+        import re as _re
+        clean = _re.sub(r"```json|```", "", raw).strip()
+        data = json.loads(clean)
+
+        url = data.get("url", "").strip()
+        source_name = data.get("source_name", "").strip()
+        description = data.get("description", "").strip()
+
+        if not url or not source_name or not description:
+            log.warning("Auto-connector generation returned incomplete data")
+            return None
+
+        # Validate URL looks real (basic check)
+        if not url.startswith(("http://", "https://")) and "." not in url:
+            log.warning("Auto-connector URL looks invalid: %s", url)
+            return None
+
+        # Store in database
+        async with pool.acquire() as conn:
+            # Ensure table exists
+            await conn.execute(PROPOSED_CONNECTOR_SCHEMA)
+
+            # Check for duplicate
+            existing = await conn.fetchval(
+                "SELECT id FROM proposed_connectors WHERE url ILIKE $1 AND status != 'dismissed'",
+                f"%{url[:50]}%"
+            )
+            if existing:
+                log.info("Auto-connector already proposed for URL: %s", url)
+                return None
+
+            await conn.execute("""
+                INSERT INTO proposed_connectors
+                (url, source_name, description, profile, gap_trigger, domain, auto_generated)
+                VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+            """, url, source_name, description[:120], profile,
+               evidence_sought[:200], domain)
+
+        log.info(
+            "AUTO-CONNECTOR PROPOSED: %s (%s) for profile %s — gap: %s",
+            source_name, url, profile, evidence_sought[:60]
+        )
+
+        return {
+            "url": url,
+            "source_name": source_name,
+            "description": description,
+            "profile": profile,
+            "confidence": data.get("confidence", "medium"),
+            "reasoning": data.get("reasoning", ""),
+        }
+
+    except Exception as e:
+        log.warning("Auto-connector generation failed: %s", e)
+        return None
+
+
+async def ensure_proposed_connector_schema(pool) -> None:
+    """Ensure proposed_connectors table exists."""
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(PROPOSED_CONNECTOR_SCHEMA)
+        log.info("Proposed connectors schema ready")
+    except Exception as e:
+        log.warning("Proposed connector schema setup failed: %s", e)
+
+
+async def get_proposed_connectors(pool, status: str = "proposed") -> List[Dict]:
+    """Retrieve proposed connectors for dashboard display."""
+    try:
+        async with pool.acquire() as conn:
+            # Ensure table exists
+            await conn.execute(PROPOSED_CONNECTOR_SCHEMA)
+            rows = await conn.fetch(
+                "SELECT * FROM proposed_connectors WHERE status = $1 "
+                "ORDER BY created_at DESC",
+                status
+            )
+            return [dict(r) for r in rows]
+    except Exception as e:
+        log.warning("Proposed connectors fetch failed: %s", e)
+        return []
+
+
+async def approve_connector(pool, connector_id: str) -> bool:
+    """
+    Approve a proposed connector.
+    Marks as approved — will be loaded into active connector set on next restart.
+    """
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE proposed_connectors SET status='approved', approved_at=NOW() "
+                "WHERE id=$1",
+                connector_id
+            )
+        log.info("Connector approved: %s", connector_id)
+        return True
+    except Exception as e:
+        log.warning("Connector approval failed: %s", e)
+        return False
+
+
+async def dismiss_connector(pool, connector_id: str) -> bool:
+    """Dismiss a proposed connector — won't be proposed again."""
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE proposed_connectors SET status='dismissed' WHERE id=$1",
+                connector_id
+            )
+        return True
+    except Exception as e:
+        log.warning("Connector dismissal failed: %s", e)
+        return False
+
+
+async def load_approved_connectors(pool) -> List[Dict]:
+    """
+    Load approved connectors from database at startup.
+    These are dynamically added to the connector registry alongside
+    the hard-coded connectors in cria_advocacy_connectors.py.
+    """
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(PROPOSED_CONNECTOR_SCHEMA)
+            rows = await conn.fetch(
+                "SELECT * FROM proposed_connectors WHERE status = 'approved'"
+            )
+            connectors = [dict(r) for r in rows]
+            if connectors:
+                # Mark as active
+                ids = [r["id"] for r in connectors]
+                await conn.execute(
+                    "UPDATE proposed_connectors SET status='active' WHERE id = ANY($1)",
+                    ids
+                )
+            log.info("Loaded %d approved connectors from database", len(connectors))
+            return connectors
+    except Exception as e:
+        log.warning("Approved connectors load failed: %s", e)
+        return []

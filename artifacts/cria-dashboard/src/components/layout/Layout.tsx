@@ -14,6 +14,7 @@ import {
   History,
   Search,
   LogOut,
+  Telescope,
 } from "lucide-react";
 import StorageWarning from "@/components/StorageWarning";
 
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/search", label: "Search Findings", icon: Search },
   { href: "/findings", label: "Findings Index", icon: FileText },
   { href: "/reflexivity", label: "Reflexivity Report", icon: RefreshCw },
+  { href: "/horizon", label: "Research Horizon", icon: Telescope },
   { href: "/templates", label: "Artefact Templates", icon: Library },
 ];
 

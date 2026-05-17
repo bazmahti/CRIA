@@ -13,6 +13,7 @@ import ExperimentDetailPage from "@/pages/experiment-detail";
 import NewExperimentPage from "@/pages/new-experiment";
 import FindingsPage from "@/pages/findings";
 import ReflexivityPage from "@/pages/reflexivity";
+import HorizonPage from "@/pages/horizon";
 import TemplatesPage from "@/pages/templates";
 import ParallelResearch from "@/pages/parallel-research";
 import UnifiedResearch from "@/pages/unified-research";
@@ -183,6 +184,7 @@ function ProtectedApp() {
           <Route path="/search" component={SearchPage} />
           <Route path="/findings" component={FindingsPage} />
           <Route path="/reflexivity" component={ReflexivityPage} />
+          <Route path="/horizon" component={HorizonPage} />
           <Route path="/templates" component={TemplatesPage} />
           <Route component={NotFound} />
         </Switch>
