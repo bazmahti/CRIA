@@ -67,6 +67,141 @@ async def _call_anthropic_direct(system: str, prompt: str, max_tokens: int = 300
         return data["content"][0]["text"]
 
 
+
+# ── Complete profile registry for analyser guidance ───────────────────────────
+# This is passed into the analyser prompt so it can make informed recommendations
+# across the full 40+ profile range.
+
+PROFILE_REGISTRY = {
+    # ── General ──────────────────────────────────────────────────────────────
+    "general_scholarship": "Cross-disciplinary academic research with no specialist domain. "
+        "Activates: Semantic Scholar, OpenAlex, PubMed, arXiv, CORE, PhilPapers, BASE.",
+    "partnership_sensitive": "Research involving Indigenous knowledge. Flags sovereignty gaps. "
+        "Activates: AIATSIS, Reconciliation Australia, UN Permanent Forum on Indigenous Issues.",
+    "international_law": "Trade law, humanitarian law, human rights law, maritime law, sovereignty. "
+        "Activates: ICJ, ICC, UN Treaty Collection, ICRC IHL, WTO disputes, ITLOS.",
+    "education_policy": "Education access, equity, curriculum, funding, privatisation. "
+        "Activates: ERIC, OECD Education, ACER, ACARA, AITSL, Mitchell Institute, Gonski.",
+
+    # ── Civilisational ────────────────────────────────────────────────────────
+    "civilisational_academic": "Cross-civilisational synthesis, frame-extinction, long-run civilisational analysis. "
+        "Activates: INET, Levy Economics Institute, Stockholm Resilience, Cascade Institute, Club of Rome.",
+    "post_ai_flourishing": "Human flourishing after AI, interior resource, meaning and consciousness. "
+        "Activates: Civilisational connectors, AI alignment, new economy.",
+    "new_economy": "Post-growth economics, MMT, heterodox macro, Doughnut Economics. "
+        "Activates: IDEAS/RepEc (Wray, Mitchell, Juniper), Levy, INET, New Economics Foundation.",
+    "democracy_governance": "Democratic institutions, electoral systems, regulatory capture, accountability. "
+        "Activates: Open Government Partnership, V-Dem, Electoral Integrity Project.",
+    "indigenous_futures": "Indigenous sovereignty, self-determination, futures studies, knowledge systems. "
+        "Activates: AIATSIS, First Nations Foundation, Reconciliation Australia.",
+    "consciousness_studies": "Philosophy of mind, contemplative science, meaning, non-ordinary states. "
+        "Activates: Civilisational connectors, Mind and Life Institute, Qualia Research Institute.",
+    "media_epistemics": "Misinformation, media ownership, public discourse, epistemic infrastructure. "
+        "Activates: Reuters Institute, First Draft, NewsGuard, ACMA, Media Diversity Australia.",
+
+    # ── Environmental ─────────────────────────────────────────────────────────
+    "environmental_polycrisis": "Multiple intersecting ecological crises, planetary boundaries. "
+        "Activates: IPBES, Stockholm Resilience Centre, CSIRO, BOM, ACF.",
+    "climate_policy": "Emissions targets, carbon markets, climate adaptation, policy instruments. "
+        "Activates: CSIRO, Climate Council, BOM, DCCEEW, new economy connectors.",
+    "biodiversity_species": "Species extinction, habitat loss, rewilding, conservation. "
+        "Activates: GBIF, IUCN Red List, Biodiversity Heritage Library, CSIRO.",
+    "ocean_marine": "Reef health, fisheries, ocean acidification, marine protected areas. "
+        "Activates: GBRMPA (Great Barrier Reef Marine Park Authority), CSIRO, GBIF.",
+    "water_ecology": "Freshwater systems, catchment health, algal blooms, water allocation. "
+        "Activates: Murray-Darling Basin Authority, CSIRO, BOM.",
+    "food_sovereignty": "Food systems, agricultural policy, land rights, peasant movements. "
+        "Activates: La Via Campesina, GRAIN, FAO, Soil Association.",
+
+    # ── Technology & Mind ─────────────────────────────────────────────────────
+    "ai_alignment": "AI safety, alignment, existential risk, governance. "
+        "Activates: Alignment Forum, AI Safety Research Institute, DeepMind Safety.",
+    "neurofeedback_design": "NFB protocol optimisation, visual feedback design, alpha/theta training, EEG. "
+        "Activates: NeuroRegulation, AAPB journal, Frontiers Human Neuroscience, ACM Digital Library, "
+        "Gamification Research, Biophilic Design, OpenNeuro, Emotiv, OpenBCI.",
+    "biofeedback_research": "Biofeedback clinical research, EEG signal processing, physiological measurement. "
+        "Activates: NeuroRegulation, Clinical EEG and Neuroscience, BCIA, OpenNeuro, FieldTrip, MNE.",
+    "flow_research": "Flow states, optimal experience, theta/alpha consciousness, peak performance. "
+        "Activates: Qualia Research Institute, Journal of Sport and Exercise Psychology, "
+        "Mind and Life Institute, contemplative education connectors.",
+    "biophilic_design": "Nature-based visual stimuli, biophilic environments, attention restoration. "
+        "Activates: Biophilic Design Research, Terrapin Bright Green, "
+        "Attention Restoration Theory, environment/behavior journal, sound and health.",
+    "hci_feedback_design": "Visual interface design, usability, gamification, user engagement measurement. "
+        "Activates: ACM Digital Library (CHI), SUS/UES research, Nielsen Norman, "
+        "Gamification Research Network, Games Journal.",
+    "eeg_methods": "EEG signal processing, neuroimaging analysis, electrode configurations, validation. "
+        "Activates: OpenNeuro, FieldTrip, MNE-Python, Emotiv research, OpenBCI.",
+    "digital_rights": "Surveillance, data sovereignty, privacy, digital civil liberties. "
+        "Activates: EFF, Creative Commons, AI alignment connectors, democracy connectors.",
+    "ip_copyright": "Creator rights, patent law, AI/copyright, fair use, moral rights, TRIPS. "
+        "Activates: WIPO, Copyright Agency Australia, EFF, Creative Commons, IP Australia.",
+    "platform_accountability": "Big Tech power, surveillance capitalism, algorithmic accountability. "
+        "Activates: EFF, AI alignment connectors, democracy connectors, new economy.",
+    "neurodiversity_health": "Neurodiversity, ADHD, autism, learning differences, NFB for neurodiversity. "
+        "Activates: Neurodiversity connectors, NeuroRegulation, ISNR, NFB literature.",
+    "therapeutic_clinical": "Clinical therapeutic applications, mental health interventions. "
+        "Activates: Health connectors, PubMed, clinical trial databases.",
+
+    # ── Health ────────────────────────────────────────────────────────────────
+    "clinical_biomedical": "Clinical medicine, biomedical research, RCTs, systematic reviews. "
+        "Activates: PubMed, Cochrane Library, ClinicalTrials.gov, Europe PMC.",
+    "mental_health": "Mental health, psychology, psychiatry, therapeutic interventions. "
+        "Activates: NIMH, APA, APS, Black Dog Institute, Orygen, medRxiv.",
+    "contemplative_neuroscience": "Meditation neuroscience, mindfulness research, consciousness and brain. "
+        "Activates: Mind and Life Institute, Contemplative Sciences Center UVA, "
+        "Association for Contemplative Mind, MAPS.",
+    "psychedelic_research": "Psychedelic-assisted therapy, MDMA, psilocybin, expanded states. "
+        "Activates: MAPS, Beckley Foundation, Imperial College Psychedelic Research, Johns Hopkins.",
+    "integrative_medicine": "Integrative and functional medicine, complementary approaches. "
+        "Activates: Integrative medicine connectors, PubMed, NCCIH.",
+    "public_health": "Population health, epidemiology, public health policy. "
+        "Activates: WHO, CDC, AIHW, Lancet Public Health, IHME.",
+    "health_equity": "Social determinants of health, health inequality, structural racism in health. "
+        "Activates: WHO SDOH, AIHW, health equity connectors.",
+    "indigenous_health": "Indigenous and community-controlled health, cultural safety. "
+        "Activates: Lowitja Institute, NACCHO, AIHW Indigenous, Te Whatu Ora, Whānau Ora.",
+
+    # ── Activist & Issue Research ─────────────────────────────────────────────
+    "economic_justice": "Inequality, corporate tax evasion, wealth concentration, redistribution. "
+        "Activates: Tax Justice Network, GFI, Oxfam, INET, Australia Institute, ATO stats.",
+    "budget_policy": "Government spending priorities, fiscal policy, budget analysis. "
+        "Activates: Australian Treasury, PBO, Grattan Institute, Australia Institute, OECD fiscal.",
+    "corporate_accountability": "Corporate tax evasion, lobbying, regulatory capture, corporate power. "
+        "Activates: Tax Justice Network, GFI, Australia Institute, Financial Transparency Coalition.",
+    "labour_rights": "Workers rights, wages, conditions, unions, gig economy, wage theft. "
+        "Activates: ILO, Fair Work Commission, ACTU, Worker Rights Consortium, TUAC.",
+    "housing_inequality": "Housing affordability, homelessness, rental stress, spatial inequality. "
+        "Activates: AHURI, National Shelter, Mission Australia, new economy connectors.",
+    "human_rights": "Civil liberties, detention, torture, freedom of expression. "
+        "Activates: Australian Human Rights Commission, Amnesty, HRW, ICRC, Global Detention Project.",
+    "indigenous_rights": "Land rights, self-determination, treaty, sovereignty. "
+        "Activates: AIATSIS, Reconciliation Australia, First Nations Foundation, civilisational connectors.",
+    "refugee_asylum": "Asylum seekers, offshore detention, Nauru, border policy, protection. "
+        "Activates: Refugee Council of Australia, ASRC, UNHCR, Global Detention Project.",
+    "gambling_addiction": "Gambling harm, problem gambling, industry lobbying, regulation. "
+        "Activates: AGRC, Alliance for Gambling Reform, Responsible Gambling Victoria.",
+    "arms_security": "Military spending, arms trade, AUKUS, conflict, strategic policy. "
+        "Activates: SIPRI, IISS, PAX Global, CAAT, ASPI.",
+    "creative_economy": "Artist royalties, streaming economics, cultural policy, arts funding. "
+        "Activates: ARIA, APRA AMCOS, Screen Australia, Music Australia, Australia Council.",
+    "open_access_commons": "Open access publishing, knowledge commons, academic publishing monopolies. "
+        "Activates: SPARC Open Access, DOAJ, World Bank Open Knowledge, Creative Commons.",
+    "contemplative_education": "Contemplative pedagogy, mindfulness in schools, inner curriculum. "
+        "Activates: Association for Contemplative Mind, Garrison Institute, Fetzer Institute, "
+        "Center for Courage and Renewal, UVA Contemplative Sciences, Journal of Contemplative Inquiry.",
+    "alternative_education": "Waldorf, Montessori, Indigenous pedagogy, arts-based, place-based. "
+        "Activates: Waldorf Education Research, Journal of Montessori Research, "
+        "Place-Based Education Network, NAAE.",
+    "ai_education": "AI tools in education, curriculum response to AI, what endures when AI can do the task. "
+        "Activates: TeachAI, HolonIQ EdTech, OECD Education, ERIC.",
+}
+
+PROFILE_REGISTRY_TEXT = "\n".join(
+    f"  {k}: {v}" for k, v in PROFILE_REGISTRY.items()
+)
+
+
 @dataclass
 class VocabularyCluster:
     """How one concept in the question is named across disciplines."""
@@ -131,8 +266,11 @@ class QuestionAnalysis:
     framing_observations: List[FramingObservation]
     scope_signal: ScopeSignal
     observer_note_suggestion: Optional[ObserverNoteSuggestion]
-    profile_suggestion: str         # suggested research profile
-    profile_reasoning: str
+    profile_suggestion: str          # primary profile — exact name from registry
+    profile_reasoning: str           # why this profile, which connectors it activates
+    alternative_profiles: List[Dict] = field(default_factory=list)  # [{profile, rationale, when_to_use}]
+    multi_run_recommended: bool = False
+    multi_run_strategy: str = ""     # how to split into focused sub-queries when multi_run_recommended
     cria_readiness: Literal["ready", "refine_recommended", "refine_strongly_recommended"]
     readiness_explanation: str
     suggested_question_variants: List[str] = field(default_factory=list)
@@ -200,6 +338,9 @@ class QuestionAnalysis:
             } if self.observer_note_suggestion else None,
             "profile_suggestion": self.profile_suggestion,
             "profile_reasoning": self.profile_reasoning,
+            "alternative_profiles": self.alternative_profiles,
+            "multi_run_recommended": self.multi_run_recommended,
+            "multi_run_strategy": self.multi_run_strategy,
             "cria_readiness": self.cria_readiness,
             "readiness_explanation": self.readiness_explanation,
             "suggested_question_variants": self.suggested_question_variants,
@@ -293,8 +434,17 @@ Return ONLY valid JSON with this exact structure:
     "suggested_broadening": "broader framing if likely_absence — empty string otherwise"
   }},
   "observer_note_suggestion": {{"suggested_note": "...", "reasoning": "..."}} or null if observer note already provided and adequate,
-  "profile_suggestion": "profile_name",
-  "profile_reasoning": "why this profile would activate the most relevant connectors",
+  "profile_suggestion": "primary_profile_name",
+  "profile_reasoning": "2-3 sentences: why this profile activates the most relevant connectors for this question",
+  "alternative_profiles": [
+    {
+      "profile": "alternative_profile_name",
+      "rationale": "what this profile adds that the primary misses",
+      "when_to_use": "run this separately if the question is specifically about [sub-domain]"
+    }
+  ],
+  "multi_run_recommended": false,
+  "multi_run_strategy": "Only populate if multi_run_recommended is true. Describe how to split the question into focused sub-queries, one per profile, to get better results than a single broad run.",
   "cria_readiness": "ready|refine_recommended|refine_strongly_recommended",
   "readiness_explanation": "honest assessment of what this question will produce in CRIA",
   "suggested_question_variants": [
@@ -373,6 +523,23 @@ Rules:
 - iteration_reasoning: 2-4 sentences explaining BOTH recommendations separately.
   Address: (a) how many sub-domains → Cognitive count; (b) how many incompatible
   framings → Epistemic count; (c) what specifically would be missed at lower counts.
+
+- profile_suggestion: choose the SINGLE best-fit profile from this registry.
+  You MUST use an exact profile name from the list. Do not invent new ones.
+
+- alternative_profiles: list 1-2 alternative profiles when the question spans
+  genuinely different domains. Each should activate materially different connectors.
+
+- multi_run_recommended: set true when the question is so cross-domain that one
+  profile will miss important evidence. Set true when 3+ distinct specialist domains
+  are present. Common cases:
+    * NFB experiment: spans neurofeedback_design + hci_feedback_design + flow_research + biophilic_design
+    * Budget analysis: spans budget_policy + economic_justice + environmental_polycrisis + refugee_asylum
+    * Education research: spans contemplative_education + alternative_education + ai_education
+  When true, populate multi_run_strategy with the exact sub-queries and profiles to run.
+
+PROFILE REGISTRY — choose ONLY from these exact names:
+  general_scholarship: Cross-disciplinary. Activates: Semantic Scholar, OpenAlex, PubMed, arXiv, CORE, ...\n  partnership_sensitive: Research involving Indigenous knowledge. Flags sovereignty gaps...\n  international_law: ICJ, ICC, UN Treaty Collection, ICRC IHL, WTO, ITLOS...\n  education_policy: ERIC, OECD Education, ACER, ACARA, Mitchell Institute, Gonski...\n  civilisational_academic: Frame-extinction, long-run civilisational. INET, Levy, Stockholm Resilience...\n  post_ai_flourishing: Human flourishing after AI, interior resource, consciousness...\n  new_economy: MMT, heterodox macro. IDEAS/RepEc (Wray, Mitchell, Juniper), Levy, INET...\n  democracy_governance: Democratic institutions, regulatory capture. V-Dem, Open Government...\n  indigenous_futures: Indigenous sovereignty, self-determination. AIATSIS, First Nations Foundation...\n  consciousness_studies: Philosophy of mind, contemplative science. Mind and Life, Qualia Research...\n  media_epistemics: Misinformation, media ownership. Reuters Institute, First Draft, ACMA...\n  environmental_polycrisis: Multiple ecological crises. IPBES, Stockholm Resilience, CSIRO, BOM...\n  climate_policy: Emissions, carbon markets. CSIRO, Climate Council, DCCEEW...\n  biodiversity_species: Species extinction, habitat. GBIF, IUCN Red List, CSIRO...\n  ocean_marine: Reef, fisheries, acidification. GBRMPA, CSIRO, GBIF...\n  water_ecology: Freshwater, catchment, algal bloom. Murray-Darling Basin Authority, BOM...\n  food_sovereignty: Food systems, land rights. La Via Campesina, GRAIN, FAO...\n  ai_alignment: AI safety, existential risk. Alignment Forum, AI Safety Research Institute...\n  neurofeedback_design: NFB, alpha/theta, EEG, visual feedback. NeuroRegulation, AAPB, ACM, Gamification...\n  biofeedback_research: Biofeedback, EEG signal processing. NeuroRegulation, Clinical EEG, OpenNeuro...\n  flow_research: Flow states, optimal experience. Qualia Research, Journal Sport Exercise Psych...\n  biophilic_design: Nature stimuli, attention restoration. Biophilic Design, Terrapin, ART research...\n  hci_feedback_design: Visual feedback, usability, gamification. ACM Digital Library, SUS/UES research...\n  eeg_methods: EEG signal processing, validation. OpenNeuro, FieldTrip, MNE-Python, Emotiv...\n  digital_rights: Surveillance, privacy. EFF, Creative Commons, democracy connectors...\n  ip_copyright: Creator rights, patent, AI/copyright. WIPO, Copyright Agency, EFF...\n  platform_accountability: Big Tech, algorithmic accountability. EFF, AI alignment, democracy...\n  neurodiversity_health: Neurodiversity, ADHD, autism, NFB for neurodiversity...\n  therapeutic_clinical: Clinical therapeutic applications, mental health interventions...\n  clinical_biomedical: Clinical medicine, RCTs. PubMed, Cochrane, ClinicalTrials.gov...\n  mental_health: Mental health, psychiatry. NIMH, APA, Black Dog Institute...\n  contemplative_neuroscience: Meditation neuroscience. Mind and Life, MAPS, Beckley...\n  psychedelic_research: Psychedelic therapy. MAPS, Beckley, Imperial College...\n  public_health: Epidemiology, population health. WHO, CDC, AIHW, Lancet...\n  health_equity: Social determinants. WHO SDOH, AIHW, health equity connectors...\n  indigenous_health: Indigenous health. Lowitja, NACCHO, Te Whatu Ora...\n  economic_justice: Inequality, corporate tax. Tax Justice Network, GFI, Oxfam, ATO...\n  budget_policy: Fiscal policy, spending. Australian Treasury, PBO, Grattan, Australia Institute...\n  corporate_accountability: Tax evasion, lobbying. Tax Justice Network, GFI, Australia Institute...\n  labour_rights: Workers rights, unions. ILO, Fair Work Commission, ACTU...\n  housing_inequality: Affordability, homelessness. AHURI, National Shelter, Mission Australia...\n  human_rights: Civil liberties, detention. AHRC, Amnesty, HRW, ICRC...\n  indigenous_rights: Land rights, treaty. AIATSIS, Reconciliation Australia, First Nations...\n  refugee_asylum: Asylum, detention, Nauru. Refugee Council, ASRC, UNHCR...\n  gambling_addiction: Gambling harm. AGRC, Alliance for Gambling Reform...\n  arms_security: Military spending, AUKUS. SIPRI, IISS, PAX Global, ASPI...\n  creative_economy: Artist royalties, streaming. ARIA, APRA AMCOS, Australia Council...\n  open_access_commons: Open access, knowledge commons. SPARC, DOAJ, Creative Commons...\n  contemplative_education: Mindfulness in schools, inner curriculum. Contemplative Mind, Garrison, Fetzer...\n  alternative_education: Waldorf, Montessori, place-based. Waldorf Research, Montessori Journal...\n  ai_education: AI in education, curriculum futures. TeachAI, ERIC, OECD Education...
 
 Return ONLY valid JSON. No preamble, no markdown fences."""
 
@@ -582,6 +749,9 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
         observer_note_suggestion=obs_suggestion,
         profile_suggestion=data.get("profile_suggestion", profile or "general_scholarship"),
         profile_reasoning=data.get("profile_reasoning", ""),
+        alternative_profiles=data.get("alternative_profiles", []),
+        multi_run_recommended=bool(data.get("multi_run_recommended", False)),
+        multi_run_strategy=data.get("multi_run_strategy", ""),
         cria_readiness=data.get("cria_readiness", "ready"),
         readiness_explanation=data.get("readiness_explanation", ""),
         suggested_question_variants=variants,

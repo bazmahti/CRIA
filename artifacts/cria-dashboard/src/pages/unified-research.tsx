@@ -62,6 +62,9 @@ interface QuestionAnalysis {
   iteration_reasoning: string;
   estimated_cost_aud: string;
   budget_trade_off: string;
+  alternative_profiles: Array<{profile: string; rationale: string; when_to_use: string}>;
+  multi_run_recommended: boolean;
+  multi_run_strategy: string;
   analysis_note: string;
 }
 
@@ -1586,16 +1589,57 @@ export default function UnifiedResearch() {
                     )}
 
                     {/* ── Profile suggestion ── */}
-                    {analysis.profile_suggestion && analysis.profile_suggestion !== profile && (
-                      <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-[11px]">
-                        <div className="font-semibold mb-1">Profile suggestion: <span className="text-primary">{analysis.profile_suggestion}</span></div>
-                        <div className="text-muted-foreground">{analysis.profile_reasoning}</div>
-                        <button
-                          onClick={() => setProfile(analysis!.profile_suggestion)}
-                          className="mt-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium hover:bg-primary/20 transition-colors"
-                        >
-                          Apply suggested profile
-                        </button>
+                    {analysis.profile_suggestion && (
+                      <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-[11px] space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="font-semibold">Recommended profile: <span className="text-primary">{analysis.profile_suggestion}</span></div>
+                          {analysis.multi_run_recommended && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-[9px] font-semibold">MULTI-RUN</span>
+                          )}
+                        </div>
+                        <div className="text-muted-foreground leading-relaxed">{analysis.profile_reasoning}</div>
+                        {analysis.profile_suggestion !== profile && (
+                          <button
+                            onClick={() => setProfile(analysis!.profile_suggestion)}
+                            className="px-3 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium hover:bg-primary/20 transition-colors"
+                          >
+                            Apply this profile
+                          </button>
+                        )}
+                        {/* Alternative profiles */}
+                        {analysis.alternative_profiles?.length > 0 && (
+                          <div className="border-t border-border/30 pt-2 space-y-1.5">
+                            <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Alternative profiles for cross-domain aspects
+                            </div>
+                            {analysis.alternative_profiles.map((alt, i) => (
+                              <div key={i} className="rounded-lg bg-background/60 border border-border/30 px-2.5 py-2">
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <span className="font-semibold text-primary text-[10px]">{alt.profile}</span>
+                                  <button
+                                    onClick={() => setProfile(alt.profile)}
+                                    className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[9px] hover:bg-primary/20 transition-colors"
+                                  >
+                                    Use this
+                                  </button>
+                                </div>
+                                <div className="text-muted-foreground">{alt.rationale}</div>
+                                {alt.when_to_use && (
+                                  <div className="text-muted-foreground/70 italic mt-0.5">{alt.when_to_use}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* Multi-run strategy */}
+                        {analysis.multi_run_recommended && analysis.multi_run_strategy && (
+                          <div className="border-t border-amber-500/20 pt-2">
+                            <div className="text-[9px] font-semibold uppercase tracking-wider text-amber-600 mb-1">
+                              ⚡ Multi-run strategy recommended
+                            </div>
+                            <div className="text-muted-foreground leading-relaxed">{analysis.multi_run_strategy}</div>
+                          </div>
+                        )}
                       </div>
                     )}
 
