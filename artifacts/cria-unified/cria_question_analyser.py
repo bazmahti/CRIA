@@ -30,7 +30,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import List, Optional, Literal
+from typing import List, Dict, Any, Optional, Literal
 
 import httpx
 
@@ -276,11 +276,12 @@ class QuestionAnalysis:
     observer_note_suggestion: Optional[ObserverNoteSuggestion]
     profile_suggestion: str          # primary profile — exact name from registry
     profile_reasoning: str           # why this profile, which connectors it activates
-    alternative_profiles: List[Dict] = field(default_factory=list)  # [{profile, rationale, when_to_use}]
-    multi_run_recommended: bool = False
-    multi_run_strategy: str = ""     # how to split into focused sub-queries when multi_run_recommended
     cria_readiness: Literal["ready", "refine_recommended", "refine_strongly_recommended"]
     readiness_explanation: str
+    # Fields with defaults must follow fields without defaults
+    alternative_profiles: List[Dict] = field(default_factory=list)
+    multi_run_recommended: bool = False
+    multi_run_strategy: str = ""
     suggested_question_variants: List[str] = field(default_factory=list)
     # 2-3 complete alternative question formulations synthesising the improvements
     # These are starting points, not prescriptions — researcher modifies freely
