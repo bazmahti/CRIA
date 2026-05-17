@@ -138,6 +138,39 @@ PROFILE_REGISTRY = {
         "Activates: WIPO, Copyright Agency Australia, EFF, Creative Commons, IP Australia.",
     "platform_accountability": "Big Tech power, surveillance capitalism, algorithmic accountability. "
         "Activates: EFF, AI alignment connectors, democracy connectors, new economy.",
+    # ── Frontier science profiles ─────────────────────────────────────────────
+    "quantum_computing": "Quantum computing research, post-quantum cryptography, "
+        "quantum sensing, quantum-consciousness intersection. "
+        "Activates: npj Quantum Information, arXiv quant-ph, IBM/Google Quantum, NIST Quantum, "
+        "EU Quantum Flagship, Orch-OR consciousness research.",
+    "complexity_emergence": "Complexity science, self-organisation, emergence, criticality. "
+        "Santa Fe Institute tradition — Kauffman, Mitchell, Per Bak. "
+        "Activates: Santa Fe Institute, NECSI, PLOS Computational Biology, Physical Review Letters.",
+    "information_theory_frontier": "Physics-information interface — Wheeler it-from-bit, "
+        "Landauer's principle, information thermodynamics. "
+        "Activates: FQXi, Entropy Journal, IEEE Information Theory, PhilArchive Information.",
+    "biosemiotics": "Meaning in living systems — von Uexküll Umwelt, Deacon Incomplete Nature, "
+        "Peirce applied to biology. Grounds the claim that meaning is not reducible to computation. "
+        "Activates: Biosemiotics Journal, Deacon Lab, Semiotica, Sign Systems Studies.",
+    "enactive_cognition": "4E Cognition — Embodied, Embedded, Enacted, Extended mind. "
+        "Varela, Maturana, Thompson, Alva Noë. Most direct scientific support for interior resource. "
+        "Activates: Enactivism Research, Mind and Life Science, Phenomenology Online, Frontiers Theoretical Psychology.",
+    "animal_consciousness": "Animal consciousness and cognition — de Waal, Bekoff, Safina, "
+        "Cambridge Declaration on Consciousness, dolphin EEG. "
+        "Activates: Journal of Consciousness Studies, Behaviour Journal, Cetacean Research.",
+    "network_science": "Scale-free networks, information propagation, complex network theory. "
+        "Barabási, connectome, social dynamics. "
+        "Activates: Barabási Lab, Network Science Book, Nature Physics, Physical Review X.",
+    "philosophy_of_science": "Epistemology of scientific practice, Kuhn, Lakatos, Feyerabend, "
+        "feminist philosophy of science, standpoint epistemology. "
+        "Activates: PhilSci Archive, BJPS, PhilPapers Philosophy of Science, IUHPST.",
+    "astrobiology": "Life origins, habitability, SETI, consciousness as potentially universal. "
+        "Activates: NASA Astrobiology, Astrobiology Journal, SETI Institute, Origins of Life Journal.",
+    "what_remains_frontier_science": "The deep science of meaning for What Remains — "
+        "biosemiotics + 4E cognition + complexity + information theory frontier + animal consciousness. "
+        "Full suite for the book's most ambitious scientific claims about irreducible meaning-making. "
+        "Activates: 44 dedicated connectors across all frontier science streams.",
+
     "cybersecurity_policy": "State-sponsored hacking, surveillance of civil society, spyware, "
         "democratic infrastructure protection, cyber warfare, critical infrastructure. "
         "Activates: ACSC, ENISA, CISA, NCSC UK, Citizen Lab, Access Now, EFF Security, "

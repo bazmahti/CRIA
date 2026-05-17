@@ -155,6 +155,17 @@ except ImportError:
     EXTENDED_API_MAP = {}
 
 try:
+    from cria_horizon_monitor import (
+        ensure_horizon_schema, get_horizon_dashboard,
+        generate_research_architecture_report,
+        record_absence, record_convergence, record_connector_performance,
+    )
+    _HORIZON_MONITOR_AVAILABLE = True
+except ImportError:
+    _HORIZON_MONITOR_AVAILABLE = False
+    log.warning("Horizon monitor not available")
+
+try:
     from cria_quality_monitor import (
         QualityScorecard, extract_scorecard, store_scorecard,
         ensure_quality_schema, get_quality_trends,
@@ -419,6 +430,8 @@ async def _init_db_pool() -> asyncpg.Pool:
         await ensure_ledger_schema(pool)
     if _QUALITY_MONITOR_AVAILABLE:
         await ensure_quality_schema(pool)
+    if _HORIZON_MONITOR_AVAILABLE:
+        await ensure_horizon_schema(pool)
     log_config_summary(log)
     return pool
 
@@ -5336,6 +5349,26 @@ async def list_outputs(q: str = ""):
         ]
     return {"available": True, "count": len(files), "files": files}
 
+
+
+# ── Research Horizon Monitor Endpoints ───────────────────────────────────────
+
+@app.get(f"{BASE_PATH}/horizon/dashboard")
+async def horizon_dashboard(request: Request):
+    """Cross-run pattern dashboard — connector gaps, convergences, recommendations."""
+    if not _HORIZON_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        return {"available": False}
+    data = await get_horizon_dashboard(_db_pool)
+    return {**data, "available": True}
+
+
+@app.get(f"{BASE_PATH}/horizon/report")
+async def horizon_report(request: Request):
+    """Plain-English Research Architecture Self-Assessment report."""
+    if not _HORIZON_MONITOR_AVAILABLE or not _DB_AVAILABLE:
+        return {"available": False, "report": ""}
+    report = await generate_research_architecture_report(_db_pool)
+    return {"available": True, "report": report}
 
 
 # ── Quality Monitoring Endpoints ─────────────────────────────────────────────

@@ -1250,6 +1250,203 @@ INTERNATIONAL_RELATIONS_CONNECTORS = [
         "Analytical journalism — IR, geopolitics, multilateralism, global trends"),
 ]
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FRONTIER SCIENCE AND EMERGING KNOWLEDGE CONNECTORS
+#
+# Nine groups — each a distinct field producing unexpected convergences
+# that could raise the consciousness of the research itself:
+#
+#   Group 1: Quantum computing and quantum information
+#   Group 2: Complexity science and emergence
+#   Group 3: Information theory frontier — Wheeler, Landauer, physics-information
+#   Group 4: Biosemiotics — meaning in living systems, Umwelt, Deacon
+#   Group 5: 4E Cognition — embodied, embedded, enacted, extended mind
+#   Group 6: Animal consciousness and cognition
+#   Group 7: Network science — scale-free, complex systems
+#   Group 8: Philosophy of science — epistemology of scientific practice
+#   Group 9: Astrobiology — life, consciousness, meaning as universal phenomena
+#
+# Relevance to What Remains:
+#   These fields collectively ground the interior resource argument in
+#   the deepest available science. They are the evidentiary foundation
+#   for the claim that meaning-making is not reducible to computation.
+# ══════════════════════════════════════════════════════════════════════════════
+
+QUANTUM_COMPUTING_CONNECTORS = [
+    # Primary research venues
+    TargetedWebConnector("nature.com/npjqi", "npj Quantum Information",
+        "Nature — primary open-access quantum information journal, theory and experiment"),
+    TargetedWebConnector("quantum-journal.org", "Quantum Journal",
+        "Open-access peer-reviewed quantum computing and quantum information science"),
+    TargetedWebConnector("arxiv.org/list/quant-ph/recent", "arXiv Quantum Physics",
+        "Preprints — quantum computing, quantum algorithms, quantum cryptography, quantum ML"),
+    TargetedWebConnector("ibm.com/quantum/research", "IBM Quantum Research",
+        "IBM quantum computing research — hardware, algorithms, error correction"),
+    TargetedWebConnector("quantumai.google/research", "Google Quantum AI",
+        "Google quantum supremacy research, error correction, quantum advantage"),
+    TargetedWebConnector("ionq.com/research", "IonQ Research",
+        "Trapped-ion quantum computing — hardware, algorithms, applications"),
+    TargetedWebConnector("nist.gov/quantum-information-science", "NIST Quantum",
+        "NIST quantum standards — post-quantum cryptography, quantum metrology"),
+    TargetedWebConnector("quantum.gov/research", "US National Quantum Initiative",
+        "US federal quantum research coordination, funding, strategic priorities"),
+    TargetedWebConnector("qt.eu/research", "EU Quantum Flagship",
+        "European quantum research initiative — quantum computing, sensing, communication"),
+    # Quantum and consciousness
+    TargetedWebConnector("quantumconsciousness.org/research", "Quantum Consciousness",
+        "Penrose-Hameroff Orch-OR, quantum mind theories, consciousness and quantum mechanics"),
+    # Quantum sensing (neuroimaging applications)
+    TargetedWebConnector("quantumsensing.org/research", "Quantum Sensing Research",
+        "Quantum-enhanced sensing — MEG, magnetometry, neuroimaging applications"),
+]
+
+COMPLEXITY_SCIENCE_CONNECTORS = [
+    # Santa Fe Institute tradition — primary home of complexity science
+    TargetedWebConnector("santafe.edu/research", "Santa Fe Institute",
+        "Complexity, emergence, self-organisation — Kauffman, Mitchell, Gell-Mann, Holland"),
+    TargetedWebConnector("complexity.ac.uk/research", "UK Complex Systems Society",
+        "Complex adaptive systems, emergence, network dynamics — UK research"),
+    TargetedWebConnector("necsi.edu/research", "NECSI",
+        "New England Complex Systems Institute — complex systems theory, social applications"),
+    TargetedWebConnector("journals.plos.org/ploscompbiol", "PLOS Computational Biology",
+        "Computational biology, complex biological systems, emergence in living systems"),
+    TargetedWebConnector("complexity-digest.com", "Complexity Digest",
+        "Curated complexity science research — interdisciplinary, weekly digest"),
+    TargetedWebConnector("journals.aps.org/prl/recent", "Physical Review Letters",
+        "Physics primary journal — statistical mechanics, phase transitions, criticality"),
+    TargetedWebConnector("advances.sciencemag.org", "Science Advances",
+        "Open-access — complex systems, emergence, interdisciplinary science"),
+    TargetedWebConnector("royalsocietypublishing.org/journal/rsif",
+        "Journal of Royal Society Interface",
+        "Biology-physics-mathematics interface — complex systems, self-organisation"),
+    TargetedWebConnector("perplexity.ai/search", "Complexity Research Aggregator",
+        "Cross-disciplinary complexity research — emergence, self-organisation, criticality"),
+]
+
+INFORMATION_THEORY_FRONTIER_CONNECTORS = [
+    # Physics-information interface
+    TargetedWebConnector("fqxi.org/grants/research", "FQXi",
+        "Foundational Questions Institute — it from bit, information-theoretic physics, "
+        "Wheeler, Landauer, consciousness and information"),
+    TargetedWebConnector("mdpi.com/journal/entropy", "Entropy Journal MDPI",
+        "Open-access — information entropy, thermodynamics of information, Landauer's principle"),
+    TargetedWebConnector("informationphilosopher.com/research", "Information Philosopher",
+        "Information as fundamental — Wheeler, Chalmers, philosophy of information"),
+    TargetedWebConnector("journals.aps.org/pre/recent", "Physical Review E",
+        "Statistical physics, information thermodynamics, complex systems"),
+    TargetedWebConnector("ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=18",
+        "IEEE Transactions Information Theory",
+        "Primary information theory journal — Shannon capacity, coding, quantum information"),
+    TargetedWebConnector("philarchive.org/browse/PHILO-3", "PhilArchive Information",
+        "Philosophy of information — Floridi, semantic information, ontological information"),
+]
+
+BIOSEMIOTICS_CONNECTORS = [
+    # Biosemiotics — meaning in living systems
+    TargetedWebConnector("biosemiotics.org/publications", "International Society Biosemiotics",
+        "Biosemiotics journal, Umwelt theory, semiosis in living systems — von Uexküll tradition"),
+    TargetedWebConnector("link.springer.com/journal/12304", "Biosemiotics Journal Springer",
+        "Primary peer-reviewed biosemiotics journal — sign processes, Umwelt, bio-communication"),
+    TargetedWebConnector("deaconlab.berkeley.edu/research", "Deacon Lab Berkeley",
+        "Terrence Deacon — Incomplete Nature, absential causation, emergence of meaning"),
+    TargetedWebConnector("journals.sagepub.com/home/sgn", "Semiotica",
+        "Semiotics journal — sign theory, meaning-making, Peirce applications"),
+    TargetedWebConnector("tandfonline.com/toc/tsem20/current",
+        "Sign Systems Studies",
+        "Tartu school semiotics, biosemiotics, cultural semiotics, Lotman"),
+    TargetedWebConnector("zoelogics.com/research", "Zoelogics Research",
+        "Biology and meaning — why life is not reducible to mechanism, biosemiotic theory"),
+]
+
+ENACTIVE_COGNITION_CONNECTORS = [
+    # 4E Cognition — Embodied, Embedded, Enacted, Extended
+    # Most directly supports the interior resource argument in What Remains
+    TargetedWebConnector("enactivism.org/research", "Enactivism Research",
+        "Enactivist cognition — Varela, Maturana, Thompson, autopoiesis, embodied mind"),
+    TargetedWebConnector("mindandlife.org/research/mind-science", "Mind and Life Science",
+        "Contemplative neuroscience, 4E cognition, Francisco Varela legacy"),
+    TargetedWebConnector("journals.sagepub.com/home/tap",
+        "Theory and Psychology",
+        "Psychological theory — embodied cognition, phenomenological psychology"),
+    TargetedWebConnector("phenomenologyonline.com/research", "Phenomenology Online",
+        "Phenomenological research — Husserl, Merleau-Ponty, lived experience"),
+    TargetedWebConnector("iep.utm.edu/embodied-cognition", "IEP Embodied Cognition",
+        "Internet Encyclopedia of Philosophy — embodied cognition survey and references"),
+    TargetedWebConnector("mitpress.mit.edu/journals/presence", "Presence Journal MIT",
+        "Embodied presence, virtual environments, enactive experience"),
+    TargetedWebConnector("frontiersin.org/journals/psychology/sections/theoretical-philosophical-psychology",
+        "Frontiers Theoretical Psychology",
+        "4E cognition, enactivism, phenomenological approaches, consciousness"),
+    TargetedWebConnector("socialmindcenter.com/research", "Social Mind Center",
+        "Socially embedded cognition, intersubjectivity, shared meaning-making"),
+]
+
+ANIMAL_CONSCIOUSNESS_CONNECTORS = [
+    TargetedWebConnector("cambridgedeclaration.org", "Cambridge Declaration on Consciousness",
+        "2012 declaration — scientific consensus on animal consciousness, non-human sentience"),
+    TargetedWebConnector("journalofconsciousness.org", "Journal of Consciousness Studies",
+        "Interdisciplinary consciousness research — animal consciousness, hard problem"),
+    TargetedWebConnector("psychologytoday.com/us/basics/animal-cognition",
+        "Animal Cognition Research",
+        "De Waal, Bekoff, Safina — animal emotional lives, cognitive complexity, moral consideration"),
+    TargetedWebConnector("brill.com/view/journals/beh/beh-overview.xml",
+        "Behaviour Journal",
+        "Animal behaviour research — cognition, communication, social complexity"),
+    TargetedWebConnector("animalmindandmoral.org/research", "Animal Mind and Moral Research",
+        "Animal sentience, moral consideration, comparative cognition"),
+    TargetedWebConnector("telegraphicresearch.com/cetacean", "Cetacean Research",
+        "Dolphin and whale cognition, communication, consciousness — EEG and behavioural data"),
+]
+
+NETWORK_SCIENCE_CONNECTORS = [
+    TargetedWebConnector("barabasi.com/research", "Barabási Lab",
+        "Scale-free networks, network medicine, complex network theory — primary reference"),
+    TargetedWebConnector("networksciencebook.com/research", "Network Science Book",
+        "Barabási-Albert network science — theory, methods, applications"),
+    TargetedWebConnector("journals.aps.org/prx/recent", "Physical Review X",
+        "High-impact interdisciplinary physics — network dynamics, information flow"),
+    TargetedWebConnector("nature.com/nphys", "Nature Physics",
+        "Statistical physics, network science, complex systems, emergence"),
+    TargetedWebConnector("cosnet.bifi.es/research", "CoSNet Research",
+        "Complex systems and networks — social dynamics, information spreading, contagion"),
+    TargetedWebConnector("connectome.project/research", "Connectome Research",
+        "Brain network science — neural connectome, network neuroscience"),
+]
+
+PHILOSOPHY_OF_SCIENCE_CONNECTORS = [
+    TargetedWebConnector("philsci-archive.pitt.edu", "PhilSci Archive",
+        "Open-access philosophy of science preprints — primary repository"),
+    TargetedWebConnector("journals.uchicago.edu/toc/bjps/current",
+        "British Journal for Philosophy of Science",
+        "Primary philosophy of science journal — Kuhn tradition, scientific realism"),
+    TargetedWebConnector("philpapers.org/browse/philosophy-of-science",
+        "PhilPapers Philosophy of Science",
+        "Comprehensive philosophy of science index — epistemology, scientific realism, values in science"),
+    TargetedWebConnector("depts.washington.edu/anthro/faculty/research",
+        "Feminist Philosophy of Science",
+        "Standpoint epistemology, situated knowledge, Donna Haraway, Sandra Harding"),
+    TargetedWebConnector("nd.edu/~dsicker/research", "Philosophy of Science Research",
+        "Scientific explanation, reductionism, emergence, philosophy of special sciences"),
+    TargetedWebConnector("iuhpst.org/research", "International Union History Philosophy Science",
+        "History and philosophy of science — Lakatos, Feyerabend, scientific revolutions"),
+]
+
+ASTROBIOLOGY_CONNECTORS = [
+    TargetedWebConnector("astrobiology.nasa.gov/research", "NASA Astrobiology",
+        "Life origins, habitable environments, biosignatures — primary astrobiology research"),
+    TargetedWebConnector("liebertpub.com/loi/ast", "Astrobiology Journal",
+        "Primary peer-reviewed astrobiology journal — life detection, planetary habitability"),
+    TargetedWebConnector("seti.org/research", "SETI Institute Research",
+        "Search for extraterrestrial intelligence — intelligence as cosmic phenomenon"),
+    TargetedWebConnector("bmsis.org/research", "Blue Marble Space Institute",
+        "Astrobiology, consciousness as universal phenomenon, life and information"),
+    TargetedWebConnector("origins.life/research", "Origins of Life Research",
+        "Abiogenesis, RNA world, self-organisation — how life emerged from chemistry"),
+    TargetedWebConnector("davidgrinspoon.com/research", "Astrobiology and Wisdom",
+        "David Grinspoon — Earth in human hands, planetary consciousness, wisdom species"),
+]
+
 ALL_ADVOCACY_CONNECTORS = (
     ENVIRONMENTAL_CONNECTORS
     + FOOD_SOVEREIGNTY_CONNECTORS
@@ -1270,6 +1467,15 @@ ALL_ADVOCACY_CONNECTORS = (
     + CULTURAL_DIPLOMACY_CONNECTORS
     + LINGUISTIC_DIVERSITY_CONNECTORS
     + INTERNATIONAL_RELATIONS_CONNECTORS
+    + QUANTUM_COMPUTING_CONNECTORS
+    + COMPLEXITY_SCIENCE_CONNECTORS
+    + INFORMATION_THEORY_FRONTIER_CONNECTORS
+    + BIOSEMIOTICS_CONNECTORS
+    + ENACTIVE_COGNITION_CONNECTORS
+    + ANIMAL_CONSCIOUSNESS_CONNECTORS
+    + NETWORK_SCIENCE_CONNECTORS
+    + PHILOSOPHY_OF_SCIENCE_CONNECTORS
+    + ASTROBIOLOGY_CONNECTORS
 )
 
 
@@ -1504,6 +1710,87 @@ def get_connectors_for_profile(profile: str) -> List:
             CYBERSECURITY_CONNECTORS[4:8]        # Citizen Lab, Access Now, EFF, Pew
             + AI_ALIGNMENT_CONNECTORS
             + DEMOCRACY_CONNECTORS
+        ),
+
+        # ── Frontier science profiles ──────────────────────────────────────────
+
+        # Quantum computing — research, policy, post-quantum cryptography, consciousness
+        "quantum_computing": (
+            QUANTUM_COMPUTING_CONNECTORS
+            + AI_ALIGNMENT_CONNECTORS[:4]
+            + CYBERSECURITY_CONNECTORS[14:17]   # IEEE S&P, USENIX, arXiv cs.CR
+        ),
+
+        # Complexity science and emergence — Santa Fe Institute tradition
+        "complexity_emergence": (
+            COMPLEXITY_SCIENCE_CONNECTORS
+            + INFORMATION_THEORY_FRONTIER_CONNECTORS[:4]
+            + NETWORK_SCIENCE_CONNECTORS[:4]
+        ),
+
+        # Information theory frontier — Wheeler, Landauer, physics-information
+        "information_theory_frontier": (
+            INFORMATION_THEORY_FRONTIER_CONNECTORS
+            + COMPLEXITY_SCIENCE_CONNECTORS[:4]
+            + QUANTUM_COMPUTING_CONNECTORS[:4]
+        ),
+
+        # Biosemiotics — meaning in living systems, Deacon, von Uexküll
+        # Grounds the claim that meaning-making is not reducible to computation
+        "biosemiotics": (
+            BIOSEMIOTICS_CONNECTORS
+            + ENACTIVE_COGNITION_CONNECTORS[:4]
+            + ANIMAL_CONSCIOUSNESS_CONNECTORS[:3]
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # 4E Cognition — embodied, embedded, enacted, extended mind
+        # Most direct scientific support for the interior resource argument
+        "enactive_cognition": (
+            ENACTIVE_COGNITION_CONNECTORS
+            + BIOSEMIOTICS_CONNECTORS[:3]
+            + NEURODIVERSITY_CONNECTORS[:4]
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # Animal consciousness and cognition
+        "animal_consciousness": (
+            ANIMAL_CONSCIOUSNESS_CONNECTORS
+            + ENACTIVE_COGNITION_CONNECTORS[:3]
+            + BIOSEMIOTICS_CONNECTORS[:3]
+        ),
+
+        # Network science — scale-free networks, information propagation
+        "network_science": (
+            NETWORK_SCIENCE_CONNECTORS
+            + COMPLEXITY_SCIENCE_CONNECTORS[:4]
+            + INFORMATION_THEORY_FRONTIER_CONNECTORS[:3]
+        ),
+
+        # Philosophy of science — epistemology, scientific practice, values in science
+        "philosophy_of_science": (
+            PHILOSOPHY_OF_SCIENCE_CONNECTORS
+            + CIVILISATIONAL_CONNECTORS[:4]
+            + AI_ALIGNMENT_CONNECTORS[:3]
+        ),
+
+        # Astrobiology — life, consciousness, meaning as potentially universal
+        "astrobiology": (
+            ASTROBIOLOGY_CONNECTORS
+            + COMPLEXITY_SCIENCE_CONNECTORS[:4]
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # What Remains frontier profile — the deep science of meaning
+        # Full suite for the book's most ambitious scientific claims:
+        # biosemiotics + 4E cognition + complexity + information theory frontier
+        "what_remains_frontier_science": (
+            BIOSEMIOTICS_CONNECTORS
+            + ENACTIVE_COGNITION_CONNECTORS
+            + COMPLEXITY_SCIENCE_CONNECTORS[:6]
+            + INFORMATION_THEORY_FRONTIER_CONNECTORS
+            + ANIMAL_CONSCIOUSNESS_CONNECTORS[:4]
+            + CIVILISATIONAL_CONNECTORS[:4]
         ),
 
         # Cybersecurity policy — governance, civil society, surveillance, state actors
