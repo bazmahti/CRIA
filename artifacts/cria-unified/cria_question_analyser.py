@@ -166,6 +166,24 @@ PROFILE_REGISTRY = {
         "Activates: PhilSci Archive, BJPS, PhilPapers Philosophy of Science, IUHPST.",
     "astrobiology": "Life origins, habitability, SETI, consciousness as potentially universal. "
         "Activates: NASA Astrobiology, Astrobiology Journal, SETI Institute, Origins of Life Journal.",
+    # ── Somatic conflict resolution and collective consciousness ─────────────
+    "somatic_conflict_resolution": "Physiological conflict resolution — Polyvagal Theory, "
+        "somatic psychology, aikido principles, nervous system regulation. "
+        "Activates: Polyvagal Institute, Strozzi Institute, Trauma Center, HeartMath, "
+        "Conflict Resolution Quarterly, Journal of Peace Psychology.",
+    "aikido_embodied_practice": "Aikido philosophy and embodied conflict resolution — "
+        "O'Sensei Ueshiba aiki principles, somatic leadership, embodied peace practice. "
+        "Activates: Aikido Journal, Aikido Peace Network, Strozzi Institute, "
+        "Martial Arts Studies, Generative Somatics.",
+    "collective_consciousness": "Collective consciousness raising — Theory U, integral theory, "
+        "collective intelligence, presencing, interpersonal neurobiology. "
+        "Activates: Presencing Institute, Scharmer, Society for Organizational Learning, "
+        "Integral Life, Global Consciousness Project, Social Neuroscience.",
+    "what_remains_somatic": "What Remains practical technology profile — regulated nervous system "
+        "as first requirement, embodied practice as interior resource cultivation, "
+        "collective field as civilisational response. Full somatic + collective suite. "
+        "44+ connectors across all somatic, collective, and contemplative streams.",
+
     "what_remains_frontier_science": "The deep science of meaning for What Remains — "
         "biosemiotics + 4E cognition + complexity + information theory frontier + animal consciousness. "
         "Full suite for the book's most ambitious scientific claims about irreducible meaning-making. "

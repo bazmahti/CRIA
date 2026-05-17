@@ -1447,6 +1447,138 @@ ASTROBIOLOGY_CONNECTORS = [
         "David Grinspoon — Earth in human hands, planetary consciousness, wisdom species"),
 ]
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SOMATIC CONFLICT RESOLUTION CONNECTORS
+#
+# The physiological and embodied approach to conflict resolution.
+# Central to What Remains: regulated nervous system = first requirement.
+# Aikido as somatic technology for the interior resource under adversarial pressure.
+#
+# Two streams:
+#   Stream 1: Physiological foundation — Polyvagal, somatic psychology, trauma
+#   Stream 2: Embodied practice — aikido research, somatic conflict resolution,
+#              NVC, restorative justice, collective consciousness raising
+# ══════════════════════════════════════════════════════════════════════════════
+
+SOMATIC_CONFLICT_CONNECTORS = [
+    # ── Stream 1: Physiological foundation ───────────────────────────────────
+
+    # Polyvagal Theory — Porges — the primary scientific framework
+    TargetedWebConnector("polyvagalinstitute.org/research", "Polyvagal Institute",
+        "Stephen Porges — Polyvagal Theory, social engagement system, vagal brake, "
+        "nervous system regulation as prerequisite for genuine encounter"),
+    TargetedWebConnector("stephenporges.com/research", "Porges Research",
+        "Polyvagal Theory publications, autonomic nervous system and social behaviour"),
+    TargetedWebConnector("traumahealing.org/research", "Somatic Experiencing Research",
+        "Peter Levine — somatic experiencing, trauma resolution, nervous system regulation"),
+    TargetedWebConnector("sensorimotorpsychotherapy.org/research",
+        "Sensorimotor Psychotherapy Institute",
+        "Pat Ogden — body-centred trauma therapy, embodied conflict, somatic resources"),
+    TargetedWebConnector("traumacenter.org/research", "Trauma Center Research",
+        "Bessel van der Kolk — The Body Keeps the Score, trauma, embodiment, regulation"),
+    TargetedWebConnector("societyforpsychophysiology.org/publications",
+        "Society for Psychophysiological Research",
+        "Psychophysiology journal — autonomic nervous system, heart rate variability, "
+        "physiological correlates of emotion and conflict"),
+    TargetedWebConnector("heartmath.org/research", "HeartMath Research",
+        "Heart rate variability coherence, emotional regulation, collective field effects"),
+    TargetedWebConnector("journals.sagepub.com/home/bmo",
+        "Body Movement and Dance in Psychotherapy",
+        "Embodied therapeutic approaches, movement as healing, somatic psychology"),
+    TargetedWebConnector("tandfonline.com/toc/ijbm20/current",
+        "Journal of Bodywork and Movement Therapies",
+        "Somatic practices, body-based therapies, movement and physiological regulation"),
+
+    # ── Stream 2: Aikido and embodied conflict resolution ─────────────────────
+
+    TargetedWebConnector("aikidojournal.com/research", "Aikido Journal",
+        "Primary aikido research publication — history, technique, philosophy, applications"),
+    TargetedWebConnector("aikidopeace.org/research", "Aikido Peace Network",
+        "Aikido principles applied to conflict resolution, peace education, "
+        "O'Sensei Ueshiba philosophy of harmony"),
+    TargetedWebConnector("strozziinstitute.com/research", "Strozzi Institute",
+        "Richard Strozzi-Heckler — embodied leadership, aikido-based conflict resolution, "
+        "somatic learning, leadership and embodiment"),
+    TargetedWebConnector("generativesomatics.org/research", "Generative Somatics",
+        "Somatic practices for social change, collective trauma, organisational transformation"),
+    TargetedWebConnector("conflictresolutionquarterly.com", "Conflict Resolution Quarterly",
+        "Academic conflict resolution research — mediation, negotiation, peacebuilding"),
+    TargetedWebConnector("journals.sagepub.com/home/pax", "Journal of Peace Psychology",
+        "Peace psychology — psychological dimensions of peacebuilding, nonviolence, reconciliation"),
+    TargetedWebConnector("nonviolentcommunication.com/research", "NVC Research",
+        "Marshall Rosenberg Nonviolent Communication — needs-based communication, "
+        "empathy, physiological awareness in dialogue"),
+    TargetedWebConnector("restorativejustice.org/research", "Restorative Justice Research",
+        "Restorative practices, circle processes, embodied accountability, community healing"),
+    TargetedWebConnector("compassion.stanford.edu/research", "Stanford Compassion Lab",
+        "Compassion science — Tania Singer, neuroscience of compassion, "
+        "prosocial behaviour, collective wellbeing"),
+    TargetedWebConnector("greatergood.berkeley.edu/topic/awe", "Greater Good Awe Research",
+        "Awe, wonder, self-transcendence — Dacher Keltner, physiological correlates, "
+        "collective meaning and diminished self-focus"),
+    TargetedWebConnector("martialartsstudies.org/research", "Martial Arts Studies",
+        "Interdisciplinary martial arts research journal — aikido, embodied practice, "
+        "cultural and philosophical dimensions"),
+]
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COLLECTIVE CONSCIOUSNESS AND INTEGRAL THEORY CONNECTORS
+#
+# How individual somatic regulation propagates to collective states.
+# Theory U, integral theory, collective intelligence, presencing.
+# The systemic level of the What Remains civilisational argument.
+# ══════════════════════════════════════════════════════════════════════════════
+
+COLLECTIVE_CONSCIOUSNESS_CONNECTORS = [
+    # Presencing and Theory U
+    TargetedWebConnector("presencing.org/research", "Presencing Institute",
+        "Otto Scharmer Theory U — collective sensing, presencing, collective consciousness, "
+        "systemic change from the emerging future"),
+    TargetedWebConnector("ottoscharmer.com/research", "Otto Scharmer Research",
+        "Theory U publications, collective intelligence, leading from emerging future"),
+    TargetedWebConnector("solonline.org/research", "Society for Organizational Learning",
+        "Peter Senge — systems thinking, collective intelligence, learning organisations, "
+        "The Fifth Discipline, collective presencing"),
+
+    # Integral theory
+    TargetedWebConnector("integrallife.com/research", "Integral Life Research",
+        "Ken Wilber integral theory — AQAL framework, levels of consciousness, "
+        "integral approaches to conflict and collective development"),
+    TargetedWebConnector("tandfonline.com/toc/riit20/current", "Journal of Integral Theory",
+        "Primary integral theory journal — AQAL, integral practice, collective development"),
+    TargetedWebConnector("integralinstitute.org/research", "Integral Institute",
+        "Integral theory applications — conflict, education, leadership, collective evolution"),
+
+    # Collective intelligence and wisdom
+    TargetedWebConnector("collectiveintelligenceproject.org", "Collective Intelligence Project",
+        "Collective intelligence research — how groups think better, wisdom of crowds, "
+        "conditions for collective consciousness raising"),
+    TargetedWebConnector("conversational-leadership.net/research",
+        "Conversational Leadership Research",
+        "Dialogue as collective intelligence — Bohm dialogue, collective meaning-making"),
+    TargetedWebConnector("gaiafield.net/research", "Gaiafield Project",
+        "Subtle activism, collective consciousness, global coherence research, "
+        "meditation and collective field effects"),
+    TargetedWebConnector("noosphere.princeton.edu", "Global Consciousness Project",
+        "Princeton PEAR lab — global consciousness measurement, collective intention, "
+        "field consciousness research"),
+    TargetedWebConnector("wisdomcommons.org/research", "Wisdom Commons",
+        "Cross-cultural wisdom traditions, collective wisdom practices, "
+        "contemplative dialogue, inter-tradition encounter"),
+
+    # Neuroscience of collective states
+    TargetedWebConnector("socialneuroscience.org/research", "Social Neuroscience Journal",
+        "Neural basis of social behaviour — mirror neurons, empathy, collective emotion, "
+        "interpersonal neurobiology, Dan Siegel"),
+    TargetedWebConnector("interpersonalneurobiology.com/research",
+        "Interpersonal Neurobiology",
+        "Dan Siegel — mind, brain, relationships, integration, collective nervous system regulation"),
+    TargetedWebConnector("journalofconsciousness.org/collective", "JCS Collective Consciousness",
+        "Journal of Consciousness Studies — collective consciousness, shared intentionality, "
+        "social dimensions of conscious experience"),
+]
+
 ALL_ADVOCACY_CONNECTORS = (
     ENVIRONMENTAL_CONNECTORS
     + FOOD_SOVEREIGNTY_CONNECTORS
@@ -1476,6 +1608,8 @@ ALL_ADVOCACY_CONNECTORS = (
     + NETWORK_SCIENCE_CONNECTORS
     + PHILOSOPHY_OF_SCIENCE_CONNECTORS
     + ASTROBIOLOGY_CONNECTORS
+    + SOMATIC_CONFLICT_CONNECTORS
+    + COLLECTIVE_CONSCIOUSNESS_CONNECTORS
 )
 
 
@@ -1790,6 +1924,44 @@ def get_connectors_for_profile(profile: str) -> List:
             + COMPLEXITY_SCIENCE_CONNECTORS[:6]
             + INFORMATION_THEORY_FRONTIER_CONNECTORS
             + ANIMAL_CONSCIOUSNESS_CONNECTORS[:4]
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # ── Somatic conflict resolution and collective consciousness ────────────
+
+        # Somatic conflict resolution — Polyvagal, somatic psychology, aikido
+        # Physiological foundation of the What Remains interior resource argument
+        "somatic_conflict_resolution": (
+            SOMATIC_CONFLICT_CONNECTORS
+            + ENACTIVE_COGNITION_CONNECTORS[:4]
+            + NFB_SPECIALIST_CONNECTORS[9:12]   # Flow state research
+            + EDUCATION_CONNECTORS[11:16]        # Contemplative education overlap
+        ),
+
+        # Aikido and embodied practice — specific to martial arts philosophy
+        # O'Sensei, aiki principles, embodied peace, somatic leadership
+        "aikido_embodied_practice": (
+            SOMATIC_CONFLICT_CONNECTORS[9:]      # Aikido-specific stream
+            + SOMATIC_CONFLICT_CONNECTORS[:6]    # Physiological foundation
+            + ENACTIVE_COGNITION_CONNECTORS[:4]
+        ),
+
+        # Collective consciousness raising — Theory U, integral, collective intelligence
+        "collective_consciousness": (
+            COLLECTIVE_CONSCIOUSNESS_CONNECTORS
+            + SOMATIC_CONFLICT_CONNECTORS[:6]    # Physiological foundation
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # What Remains somatic profile — the full suite for the book's
+        # practical technology of the interior resource:
+        # regulated nervous system + embodied practice + collective field
+        "what_remains_somatic": (
+            SOMATIC_CONFLICT_CONNECTORS
+            + COLLECTIVE_CONSCIOUSNESS_CONNECTORS
+            + ENACTIVE_COGNITION_CONNECTORS
+            + EDUCATION_CONNECTORS[11:16]        # Contemplative education
+            + NFB_SPECIALIST_CONNECTORS[9:12]    # Flow state
             + CIVILISATIONAL_CONNECTORS[:4]
         ),
 
