@@ -1825,6 +1825,140 @@ NEUROPLASTICITY_CONNECTORS = [
         "applied neuroplasticity for therapeutic practice, trauma, resilience"),
 ]
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GAME THEORY AND MECHANISM DESIGN CONNECTORS
+#
+# Formal foundations for cooperation, collective action, institutional design,
+# conflict resolution, and AI alignment. Currently missing from CRIA despite
+# being directly relevant to six existing research streams.
+#
+# Five streams:
+#   Stream 1: Core game theory journals and centres
+#   Stream 2: Evolutionary game theory and cooperation emergence
+#   Stream 3: Mechanism design and institutional economics
+#   Stream 4: Game theory applied to conflict, peace, negotiation
+#   Stream 5: Cooperative AI and multi-agent systems
+# ══════════════════════════════════════════════════════════════════════════════
+
+GAME_THEORY_CONNECTORS = [
+    # ── Stream 1: Core game theory ────────────────────────────────────────────
+    TargetedWebConnector("sciencedirect.com/journal/games-and-economic-behavior",
+        "Games and Economic Behavior",
+        "Primary peer-reviewed game theory journal — Nash equilibria, "
+        "strategic interaction, auction theory, mechanism design"),
+    TargetedWebConnector("link.springer.com/journal/182",
+        "International Journal of Game Theory",
+        "Springer — cooperative and non-cooperative game theory, "
+        "bargaining, coalition formation, social choice"),
+    TargetedWebConnector("econtheory.org",
+        "Theoretical Economics",
+        "Open-access — game theory, mechanism design, social choice, "
+        "mathematical economics, equilibrium theory"),
+    TargetedWebConnector("cowles.yale.edu/research",
+        "Cowles Foundation Yale",
+        "Game theory and mathematical economics — Nash, Harsanyi tradition, "
+        "general equilibrium, mechanism design"),
+    TargetedWebConnector("ratio.huji.ac.il/research",
+        "Center for the Study of Rationality",
+        "Hebrew University — rationality, game theory, decision theory, "
+        "bounded rationality, social choice"),
+    TargetedWebConnector("gametheorysociety.org/research",
+        "Game Theory Society",
+        "International Game Theory Society — conferences, publications, "
+        "research network across all game theory subfields"),
+    TargetedWebConnector("tse-fr.eu/research/game-theory",
+        "Toulouse School of Economics Game Theory",
+        "TSE — mechanism design, auction theory, market design, "
+        "contract theory, industrial organisation"),
+
+    # ── Stream 2: Evolutionary game theory and cooperation ────────────────────
+    # Formal foundations for: how cooperation emerges from self-interest
+    # Directly relevant to reciprocal community (What Remains 4th requirement)
+    TargetedWebConnector("ped.fas.harvard.edu/research",
+        "Nowak Lab Harvard — Evolution of Cooperation",
+        "Martin Nowak — evolutionary game theory, cooperation emergence, "
+        "spatial games, kin selection, direct and indirect reciprocity"),
+    TargetedWebConnector("axelrodresearch.com",
+        "Axelrod Research — Evolution of Cooperation",
+        "Robert Axelrod — tit-for-tat, iterated prisoner's dilemma, "
+        "how cooperation evolves without central authority"),
+    TargetedWebConnector("journals.plos.org/plosone/game-theory",
+        "PLOS ONE Game Theory",
+        "Open-access evolutionary game theory — cooperation, "
+        "network games, evolutionary dynamics, experimental game theory"),
+    TargetedWebConnector("royalsocietypublishing.org/journal/rspb",
+        "Proceedings Royal Society B",
+        "Evolutionary biology including cooperation, altruism, "
+        "social evolution, multi-level selection theory"),
+    TargetedWebConnector("behavioraleconomics.com/research/game-theory",
+        "Behavioral Game Theory Research",
+        "Experimental game theory — how real humans play strategic games, "
+        "ultimatum game, public goods, trust games, social preferences"),
+
+    # ── Stream 3: Mechanism design and institutional economics ────────────────
+    # Ostrom's commons work — foundational for environmental and new economy streams
+    # Hurwicz, Maskin, Myerson — how institutions produce cooperative equilibria
+    TargetedWebConnector("ostromworkshop.indiana.edu/research",
+        "Ostrom Workshop Indiana",
+        "Elinor Ostrom — governing the commons, polycentricity, "
+        "institutional design for collective action, Nobel 2009"),
+    TargetedWebConnector("economicdynamics.org/research",
+        "Economic Dynamics and Control",
+        "Dynamic mechanism design, repeated games, long-run institutional design"),
+    TargetedWebConnector("marketdesigner.blogspot.com/research",
+        "Market Design Research",
+        "Al Roth — market design, matching theory, Nobel 2012, "
+        "mechanism design applied to real institutions"),
+    TargetedWebConnector("nber.org/topic/game-theory-mechanism-design",
+        "NBER Game Theory and Mechanism Design",
+        "National Bureau of Economic Research — working papers on "
+        "mechanism design, auctions, social choice theory"),
+    TargetedWebConnector("econdesign.net/research",
+        "Economic Design Network",
+        "Mechanism design, social choice, implementation theory, "
+        "voting theory, fair division, matching markets"),
+
+    # ── Stream 4: Conflict, peace, negotiation ────────────────────────────────
+    # Game theory applied to the peace_conflict and somatic streams
+    # Schelling's focal points — foundational to conflict resolution theory
+    TargetedWebConnector("www.prio.org/publications/game-theory",
+        "PRIO Game Theory and Conflict",
+        "Game-theoretic models of conflict — deterrence, arms races, "
+        "bargaining in the shadow of conflict, Schelling tradition"),
+    TargetedWebConnector("conflict-resolution.org/research/game-theory",
+        "Game Theory in Conflict Resolution",
+        "Negotiation theory, mediation models, cooperative game theory "
+        "applied to peacebuilding, Raiffa tradition"),
+    TargetedWebConnector("negotiation.harvard.edu/research",
+        "Harvard Program on Negotiation",
+        "Principled negotiation, BATNA, integrative bargaining — "
+        "game theory applied to conflict resolution practice"),
+    TargetedWebConnector("journals.sagepub.com/home/jcr",
+        "Journal of Conflict Resolution",
+        "Primary conflict research journal — includes formal models, "
+        "game-theoretic approaches to war and peace"),
+
+    # ── Stream 5: Cooperative AI and multi-agent systems ──────────────────────
+    # Game theory × AI alignment — most urgent missing piece
+    TargetedWebConnector("cooperativeai.com/research",
+        "Cooperative AI Foundation",
+        "Cooperative AI research — multi-agent cooperation, "
+        "AI systems that cooperate with humans and each other"),
+    TargetedWebConnector("deepmind.com/research/publications/multi-agent",
+        "DeepMind Multi-Agent Research",
+        "Multi-agent reinforcement learning, emergent cooperation, "
+        "game-theoretic AI safety, agent cooperation"),
+    TargetedWebConnector("arxiv.org/list/cs.GT/recent",
+        "arXiv Computer Science Game Theory",
+        "Preprints — algorithmic game theory, mechanism design in AI, "
+        "multi-agent systems, AI auction design, computational social choice"),
+    TargetedWebConnector("sigecom.org/research",
+        "ACM SIGecom",
+        "Economics and Computation — algorithmic mechanism design, "
+        "online auctions, multi-agent systems, fair division algorithms"),
+]
+
 ALL_ADVOCACY_CONNECTORS = (
     ENVIRONMENTAL_CONNECTORS
     + FOOD_SOVEREIGNTY_CONNECTORS
@@ -1859,6 +1993,7 @@ ALL_ADVOCACY_CONNECTORS = (
     + ACADEMIC_FREEDOM_CONNECTORS
     + PRESS_FREEDOM_CONNECTORS
     + NEUROPLASTICITY_CONNECTORS
+    + GAME_THEORY_CONNECTORS
 )
 
 
@@ -2212,6 +2347,45 @@ def get_connectors_for_profile(profile: str) -> List:
             + EDUCATION_CONNECTORS[11:16]        # Contemplative education
             + NFB_SPECIALIST_CONNECTORS[9:12]    # Flow state
             + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # ── Game theory profiles ──────────────────────────────────────────────────
+
+        # Core game theory — formal foundations, strategic interaction
+        "game_theory": (
+            GAME_THEORY_CONNECTORS[:7]           # Core journals and centres
+            + GAME_THEORY_CONNECTORS[12:17]      # Mechanism design
+            + ECONOMICS_RESEARCH_CONNECTORS[:4]
+        ),
+
+        # Evolutionary game theory — cooperation emergence, reciprocity
+        # Formal foundation for What Remains reciprocal community requirement
+        "evolutionary_game_theory": (
+            GAME_THEORY_CONNECTORS[7:12]         # Evolution of cooperation stream
+            + GAME_THEORY_CONNECTORS[:4]         # Core game theory
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # Mechanism design and institutional economics — Ostrom, commons governance
+        "mechanism_design": (
+            GAME_THEORY_CONNECTORS[12:17]        # Mechanism design stream
+            + GAME_THEORY_CONNECTORS[:4]         # Core
+            + ECONOMICS_RESEARCH_CONNECTORS[:4]
+            + NEW_ECONOMY_CONNECTORS[:4]
+        ),
+
+        # Game theory applied to conflict and negotiation
+        "game_theory_conflict": (
+            GAME_THEORY_CONNECTORS[17:21]        # Conflict/peace stream
+            + PEACE_CONFLICT_CONNECTORS[:6]
+            + GAME_THEORY_CONNECTORS[7:10]       # Evolutionary cooperation
+        ),
+
+        # Cooperative AI and multi-agent game theory
+        "cooperative_ai_game_theory": (
+            GAME_THEORY_CONNECTORS[21:]          # Cooperative AI stream
+            + AI_ALIGNMENT_CONNECTORS[:6]
+            + GAME_THEORY_CONNECTORS[:4]         # Core
         ),
 
         # ── Neuroplasticity profiles ──────────────────────────────────────────────

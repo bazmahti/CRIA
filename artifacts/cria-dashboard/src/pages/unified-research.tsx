@@ -1063,7 +1063,8 @@ export default function UnifiedResearch() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
                 {([
                   { key: "general", label: "General Scholarship", icon: "🎓", profiles: ["general_scholarship","partnership_sensitive","international_law","education_policy"] },
-                  { key: "civilisational", label: "Civilisational & Systems", icon: "🌐", profiles: ["civilisational_academic","post_ai_flourishing","new_economy","democracy_governance","indigenous_futures","consciousness_studies","media_epistemics","cultural_linguistic_civilisational"] },
+                  { key: "civilisational", label: "Civilisational & Systems", icon: "🌐", profiles: ["civilisational_academic","post_ai_flourishing","new_economy","democracy_governance","indigenous_futures","consciousness_studies","media_epistemics","cultural_linguistic_civilisational","evolutionary_game_theory","mechanism_design"] },
+                  { key: "game_theory", label: "Game Theory & Cooperation", icon: "♟️", profiles: ["game_theory","evolutionary_game_theory","mechanism_design","game_theory_conflict","cooperative_ai_game_theory"] },
                   { key: "global_culture", label: "Global Culture & Peace", icon: "🕊️", profiles: ["peace_conflict","global_governance","cultural_diplomacy","linguistic_diversity","international_relations","cultural_linguistic_civilisational","international_law"] },
                   { key: "environmental", label: "Environmental & Ecological", icon: "🌱", profiles: ["environmental_polycrisis","food_sovereignty","biodiversity_species","ocean_marine","water_ecology","climate_policy","ocaa_daily_editorial"] },
                   { key: "somatic_practice", label: "Somatic & Collective", icon: "🥋", profiles: ["somatic_conflict_resolution","aikido_embodied_practice","collective_consciousness","what_remains_somatic","contemplative_neuroscience","enactive_cognition","flow_research"] },
@@ -1108,6 +1109,15 @@ export default function UnifiedResearch() {
                     { value: "consciousness_studies", label: "Consciousness & Meaning Studies" },
                     { value: "media_epistemics", label: "Media, Truth & Public Epistemics" },
                     { value: "cultural_linguistic_civilisational", label: "Cultural & Linguistic Civilisational" },
+                    { value: "evolutionary_game_theory", label: "Evolution of Cooperation" },
+                    { value: "mechanism_design", label: "Mechanism Design & Institutional Economics" },
+                  ],
+                  game_theory: [
+                    { value: "game_theory", label: "Game Theory — Core Formal Foundations" },
+                    { value: "evolutionary_game_theory", label: "Evolutionary Game Theory & Cooperation" },
+                    { value: "mechanism_design", label: "Mechanism Design & Commons Governance" },
+                    { value: "game_theory_conflict", label: "Game Theory Applied to Conflict" },
+                    { value: "cooperative_ai_game_theory", label: "Cooperative AI & Multi-Agent Systems" },
                   ],
                   global_culture: [
                     { value: "peace_conflict", label: "Peace & Conflict Research" },

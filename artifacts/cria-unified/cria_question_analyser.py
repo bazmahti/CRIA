@@ -191,6 +191,25 @@ PROFILE_REGISTRY = {
 
     # ── Academic and press freedom ───────────────────────────────────────────
     # ── Neuroplasticity ───────────────────────────────────────────────────────
+    # ── Game theory ───────────────────────────────────────────────────────────
+    "game_theory": "Formal game theory — Nash equilibria, strategic interaction, "
+        "cooperative and non-cooperative games, social choice theory. "
+        "Activates: Games and Economic Behavior, IJGT, Theoretical Economics, "
+        "Cowles Foundation, Center for Study of Rationality.",
+    "evolutionary_game_theory": "Evolution of cooperation, reciprocity, altruism — "
+        "how cooperation emerges from self-interested agents. Directly relevant to "
+        "What Remains reciprocal community requirement. "
+        "Activates: Nowak Lab Harvard, Axelrod Research, PLOS ONE, Proc Royal Society B.",
+    "mechanism_design": "Institutional design, governing the commons, market design — "
+        "Ostrom, Hurwicz, Maskin, Myerson. How institutions produce cooperative equilibria. "
+        "Activates: Ostrom Workshop, Economic Design Network, NBER, Market Design Research.",
+    "game_theory_conflict": "Game theory applied to conflict and negotiation — "
+        "Schelling focal points, deterrence, bargaining, negotiation theory. "
+        "Activates: Harvard Negotiation Program, Journal of Conflict Resolution, PRIO.",
+    "cooperative_ai_game_theory": "Multi-agent AI systems, cooperative AI, "
+        "AI arms races, game-theoretic alignment approaches. "
+        "Activates: Cooperative AI Foundation, DeepMind Multi-Agent, arXiv cs.GT, ACM SIGecom.",
+
     "neuroplasticity": "Foundational neuroplasticity science — synaptic plasticity, "
         "LTP, adult neurogenesis, experience-dependent cortical remapping. "
         "Activates: Nature Neuroscience, Journal of Neuroscience, Neuron, "
