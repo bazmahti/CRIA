@@ -1693,6 +1693,138 @@ PRESS_FREEDOM_CONNECTORS = [
         "political pressure, media independence"),
 ]
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NEUROPLASTICITY CONNECTORS
+#
+# The scientific foundation for What Remains' interior resource argument:
+# the brain changes in response to practice, experience, and intentional
+# cultivation — therefore the interior resource can be developed, not just
+# discovered. Without this literature, the cultivation argument rests on
+# phenomenology rather than neuroscience.
+#
+# Six streams:
+#   Stream 1: Foundational plasticity science — primary journals
+#   Stream 2: Experience-dependent plasticity — practice changes brain structure
+#   Stream 3: Critical periods and plasticity windows
+#   Stream 4: Trauma and adverse plasticity — connects to somatic stream
+#   Stream 5: Therapeutic neuroplasticity — clinical applications
+#   Stream 6: Technology and plasticity — AI/screen use reshaping neural architecture
+# ══════════════════════════════════════════════════════════════════════════════
+
+NEUROPLASTICITY_CONNECTORS = [
+    # ── Stream 1: Foundational plasticity science ─────────────────────────────
+    TargetedWebConnector("nature.com/neuro", "Nature Neuroscience",
+        "Primary high-impact neuroscience journal — synaptic plasticity, LTP, "
+        "Hebbian learning, adult neurogenesis, structural plasticity"),
+    TargetedWebConnector("jneurosci.org", "Journal of Neuroscience",
+        "Society for Neuroscience flagship — primary peer-reviewed neuroscience, "
+        "neuroplasticity mechanisms, learning and memory"),
+    TargetedWebConnector("cell.com/neuron/home", "Neuron Journal",
+        "Cell Press — high-impact neuroscience, synaptic mechanisms, "
+        "circuit plasticity, computational neuroscience"),
+    TargetedWebConnector("academic.oup.com/cercor", "Cerebral Cortex",
+        "Cortical organisation and plasticity — experience-dependent changes, "
+        "critical periods, cortical maps, somatosensory plasticity"),
+    TargetedWebConnector("journals.sagepub.com/home/nro",
+        "Neuroscience and Biobehavioral Reviews",
+        "Review journal — synthesising neuroplasticity research across domains, "
+        "Merzenich tradition, adult plasticity"),
+    TargetedWebConnector("cell.com/trends/cognitive-sciences/home",
+        "Trends in Cognitive Sciences",
+        "High-impact reviews — plasticity and cognition, learning mechanisms, "
+        "brain-behaviour relationships, technology and cognition"),
+    TargetedWebConnector("frontiersin.org/journals/synaptic-neuroscience",
+        "Frontiers in Synaptic Neuroscience",
+        "Open-access — synaptic plasticity, LTP/LTD, Hebbian mechanisms"),
+    TargetedWebConnector("pnas.org/topic/biological-sciences/neuroscience",
+        "PNAS Neuroscience",
+        "Proceedings National Academy — high-impact plasticity research, "
+        "neuromodulation, critical period mechanisms"),
+
+    # ── Stream 2: Experience-dependent plasticity ─────────────────────────────
+    TargetedWebConnector("merzenich-lab.ucsf.edu/research", "Merzenich Lab UCSF",
+        "Michael Merzenich — established adult neuroplasticity, cortical remapping, "
+        "experience-dependent plasticity, targeted brain training"),
+    TargetedWebConnector("brainhq.com/brain-resources/brain-plasticity",
+        "BrainHQ Plasticity Research",
+        "Posit Science — applied neuroplasticity research, cognitive training, "
+        "evidence base for brain training efficacy"),
+    TargetedWebConnector("normanodoidge.com/research", "Norman Doidge Research",
+        "The Brain That Changes Itself — accessible synthesis of plasticity research, "
+        "case studies, Merzenich and Taub collaborations"),
+    TargetedWebConnector("jeffreyschwartz.com/research", "Jeffrey Schwartz Research",
+        "Self-directed neuroplasticity — mindfulness-based brain training, OCD, "
+        "intentional practice changing neural architecture"),
+    TargetedWebConnector("learningandmemory.cshlp.org",
+        "Learning and Memory Journal",
+        "Cold Spring Harbor — primary learning and memory research, "
+        "synaptic plasticity, memory consolidation, hippocampal plasticity"),
+    TargetedWebConnector("hubermanlab.com/research", "Huberman Lab Research",
+        "Andrew Huberman Stanford — neuroplasticity protocols, neuromodulators, "
+        "acetylcholine and norepinephrine gating plasticity, actionable protocols"),
+    TargetedWebConnector("gazzaleylab.ucsf.edu/research", "Gazzaley Lab UCSF Neuroscape",
+        "Adam Gazzaley — technology and brain, video game-based brain training, "
+        "closed-loop neurofeedback, attention and plasticity"),
+
+    # ── Stream 3: Critical periods and plasticity windows ─────────────────────
+    TargetedWebConnector("hensch-lab.mcb.harvard.edu/research", "Hensch Lab Harvard",
+        "Takao Hensch — critical period mechanisms, GABA circuits, "
+        "reopening critical periods in adult brain, valproate research"),
+    TargetedWebConnector("bear-lab.mit.edu/research", "Bear Lab MIT",
+        "Mark Bear — synaptic plasticity, critical periods, mGluR theory of fragile X, "
+        "visual cortex plasticity, metaplasticity"),
+    TargetedWebConnector("journals.sagepub.com/home/ncp",
+        "Neuroscience and Clinical Practice",
+        "Critical period interventions, plasticity windows in clinical contexts"),
+
+    # ── Stream 4: Trauma and adverse plasticity ───────────────────────────────
+    # Connects directly to the somatic conflict resolution stream
+    TargetedWebConnector("traumaresearchfoundation.org/research",
+        "Trauma Research Foundation",
+        "Bessel van der Kolk — trauma and neural architecture, PTSD as plasticity "
+        "phenomenon, somatic approaches to rewiring trauma responses"),
+    TargetedWebConnector("acestudy.org/research", "ACE Study Research",
+        "Adverse Childhood Experiences — long-term neural and physiological impacts, "
+        "toxic stress and brain development, resilience and plasticity"),
+    TargetedWebConnector("developmentaltraumainstitute.com/research",
+        "Developmental Trauma Institute",
+        "Early adversity and neuroplasticity, developmental trauma, "
+        "intervention windows, therapeutic rewiring"),
+
+    # ── Stream 5: Therapeutic neuroplasticity ─────────────────────────────────
+    TargetedWebConnector("neurorehabilitationjournal.com",
+        "Neurorehabilitation Journal",
+        "Clinical neuroplasticity — stroke rehabilitation, constraint-induced movement, "
+        "cognitive remediation, recovery mechanisms"),
+    TargetedWebConnector("constraint-induced.org/research",
+        "Constraint-Induced Movement Therapy Research",
+        "Edward Taub — forced use, cortical reorganisation, rehabilitation plasticity"),
+    TargetedWebConnector("medicalacupuncture.org/research",
+        "Medical Acupuncture Research",
+        "Acupuncture and neuroplasticity — fMRI studies, pain modulation, "
+        "somatosensory cortex reorganisation"),
+
+    # ── Stream 6: Technology and plasticity — AI era ──────────────────────────
+    # Most urgent What Remains angle: how AI/screen use reshapes neural architecture
+    TargetedWebConnector("centerforhumanetechnology.org/research",
+        "Center for Humane Technology",
+        "Technology and brain — attention economy impacts on neural architecture, "
+        "dopamine loop effects, social media and adolescent brain"),
+    TargetedWebConnector("apa.org/research/technology-brain",
+        "APA Technology and Brain Research",
+        "Psychological research on technology use and brain development, "
+        "screen time effects, cognitive load and plasticity"),
+    TargetedWebConnector("commonsensmedia.org/research/technology-brain",
+        "Common Sense Media Brain Research",
+        "Children and adolescent brain development under technology exposure, "
+        "neuroplasticity implications of digital environment"),
+    TargetedWebConnector("nicabm.com/neuroplasticity-research",
+        "NICABM Neuroplasticity",
+        "National Institute for the Clinical Application of Behavioral Medicine — "
+        "applied neuroplasticity for therapeutic practice, trauma, resilience"),
+]
+
 ALL_ADVOCACY_CONNECTORS = (
     ENVIRONMENTAL_CONNECTORS
     + FOOD_SOVEREIGNTY_CONNECTORS
@@ -1726,6 +1858,7 @@ ALL_ADVOCACY_CONNECTORS = (
     + COLLECTIVE_CONSCIOUSNESS_CONNECTORS
     + ACADEMIC_FREEDOM_CONNECTORS
     + PRESS_FREEDOM_CONNECTORS
+    + NEUROPLASTICITY_CONNECTORS
 )
 
 
@@ -2079,6 +2212,40 @@ def get_connectors_for_profile(profile: str) -> List:
             + EDUCATION_CONNECTORS[11:16]        # Contemplative education
             + NFB_SPECIALIST_CONNECTORS[9:12]    # Flow state
             + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # ── Neuroplasticity profiles ──────────────────────────────────────────────
+
+        # Core neuroplasticity research — foundational science
+        "neuroplasticity": (
+            NEUROPLASTICITY_CONNECTORS[:8]       # Foundational journals
+            + NEUROPLASTICITY_CONNECTORS[8:15]   # Experience-dependent
+            + NEURODIVERSITY_CONNECTORS[:4]
+        ),
+
+        # Therapeutic neuroplasticity — clinical and rehabilitation applications
+        "therapeutic_neuroplasticity": (
+            NEUROPLASTICITY_CONNECTORS[20:24]    # Therapeutic stream
+            + NEUROPLASTICITY_CONNECTORS[:6]     # Foundational science
+            + SOMATIC_CONFLICT_CONNECTORS[:6]    # Polyvagal/somatic connection
+        ),
+
+        # Technology and brain — AI/screen use reshaping neural architecture
+        # Most urgent What Remains angle
+        "technology_brain_plasticity": (
+            NEUROPLASTICITY_CONNECTORS[24:]      # Technology stream
+            + NEUROPLASTICITY_CONNECTORS[:6]     # Foundational science
+            + AI_ALIGNMENT_CONNECTORS[:4]
+        ),
+
+        # What Remains neuroplasticity profile — full suite
+        # Scientific foundation for: interior resource can be cultivated,
+        # practice changes brain structure, therefore development is possible
+        "what_remains_neuroplasticity": (
+            NEUROPLASTICITY_CONNECTORS
+            + SOMATIC_CONFLICT_CONNECTORS[:6]    # Polyvagal/trauma connection
+            + ENACTIVE_COGNITION_CONNECTORS[:4]  # 4E cognition connection
+            + EDUCATION_CONNECTORS[11:16]        # Contemplative education
         ),
 
         # Academic freedom — institutional autonomy, researcher safety, knowledge censorship

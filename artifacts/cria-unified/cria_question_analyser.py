@@ -190,6 +190,23 @@ PROFILE_REGISTRY = {
         "Activates: 44 dedicated connectors across all frontier science streams.",
 
     # ── Academic and press freedom ───────────────────────────────────────────
+    # ── Neuroplasticity ───────────────────────────────────────────────────────
+    "neuroplasticity": "Foundational neuroplasticity science — synaptic plasticity, "
+        "LTP, adult neurogenesis, experience-dependent cortical remapping. "
+        "Activates: Nature Neuroscience, Journal of Neuroscience, Neuron, "
+        "Merzenich Lab, BrainHQ, Learning and Memory, Trends in Cognitive Sciences.",
+    "therapeutic_neuroplasticity": "Clinical neuroplasticity — stroke rehabilitation, "
+        "constraint-induced movement, cognitive remediation, trauma rewiring. "
+        "Activates: Neurorehabilitation Journal, Trauma Research Foundation, "
+        "ACE Study, Developmental Trauma Institute.",
+    "technology_brain_plasticity": "AI and screen use reshaping neural architecture — "
+        "attention economy impacts, dopamine loops, adolescent brain under technology. "
+        "Activates: Center for Humane Technology, APA Technology and Brain, "
+        "Common Sense Media, Gazzaley Lab Neuroscape.",
+    "what_remains_neuroplasticity": "Full neuroplasticity suite for What Remains — "
+        "scientific foundation that interior resource can be cultivated through practice. "
+        "Activates: All 28 neuroplasticity connectors + somatic + 4E cognition streams.",
+
     "academic_freedom": "Institutional academic freedom — attacks on researchers, "
         "university autonomy, political interference, knowledge censorship. "
         "Activates: Scholars at Risk, Academic Freedom Index, AAUP, PEN America, "

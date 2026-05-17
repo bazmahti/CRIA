@@ -1069,7 +1069,7 @@ export default function UnifiedResearch() {
                   { key: "somatic_practice", label: "Somatic & Collective", icon: "🥋", profiles: ["somatic_conflict_resolution","aikido_embodied_practice","collective_consciousness","what_remains_somatic","contemplative_neuroscience","enactive_cognition","flow_research"] },
                   { key: "frontier_science", label: "Frontier Science", icon: "⚛️", profiles: ["quantum_computing","complexity_emergence","information_theory_frontier","biosemiotics","enactive_cognition","animal_consciousness","network_science","philosophy_of_science","astrobiology","what_remains_frontier_science"] },
                   { key: "technology", label: "Technology & Mind", icon: "🧠", profiles: ["ai_alignment","neurofeedback_design","biofeedback_research","flow_research","biophilic_design","hci_feedback_design","eeg_methods","cybersecurity_policy","cybersecurity_technical","platform_accountability","digital_rights","ip_copyright","neurodiversity_health","therapeutic_clinical"] },
-                  { key: "health", label: "Health & Medicine", icon: "⚕️", profiles: ["clinical_biomedical","mental_health","contemplative_neuroscience","psychedelic_research","integrative_medicine","neurofeedback_health","public_health","health_equity","indigenous_health","nutrition_gut_brain","longevity_ageing"] },
+                  { key: "health", label: "Health & Medicine", icon: "⚕️", profiles: ["clinical_biomedical","mental_health","neuroplasticity","therapeutic_neuroplasticity","technology_brain_plasticity","what_remains_neuroplasticity","contemplative_neuroscience","psychedelic_research","integrative_medicine","neurofeedback_health","public_health","health_equity","indigenous_health","nutrition_gut_brain","longevity_ageing"] },
                   { key: "activist", label: "Activist & Issue Research", icon: "✊", profiles: ["economic_justice","budget_policy","corporate_accountability","labour_rights","housing_inequality","human_rights","indigenous_rights","refugee_asylum","gambling_addiction","arms_security","international_law","academic_freedom","press_freedom","digital_censorship","information_freedom","environmental_polycrisis","food_sovereignty","democracy_governance","media_epistemics","platform_accountability","ip_copyright","creative_economy","open_access_commons"] },
                 ] as { key: string; label: string; icon: string; profiles: string[] }[]).map(({ key, label, icon, profiles }) => {
                   const isActive = profiles.includes(profile);
@@ -1165,6 +1165,10 @@ export default function UnifiedResearch() {
                     { value: "therapeutic_clinical", label: "Therapeutic-Clinical" },
                   ],
                   health: [
+                    { value: "neuroplasticity", label: "Neuroplasticity — Foundational Science" },
+                    { value: "therapeutic_neuroplasticity", label: "Therapeutic Neuroplasticity" },
+                    { value: "technology_brain_plasticity", label: "Technology & Brain Plasticity" },
+                    { value: "what_remains_neuroplasticity", label: "What Remains — Neuroplasticity" },
                     { value: "clinical_biomedical", label: "Clinical and Biomedical" },
                     { value: "mental_health", label: "Mental Health and Psychology" },
                     { value: "contemplative_neuroscience", label: "Contemplative Neuroscience" },
