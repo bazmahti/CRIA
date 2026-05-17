@@ -931,7 +931,7 @@ export default function UnifiedResearch() {
                   { key: "general", label: "General Scholarship", icon: "🎓", profiles: ["general_scholarship","partnership_sensitive","international_law","education_policy"] },
                   { key: "civilisational", label: "Civilisational & Systems", icon: "🌐", profiles: ["civilisational_academic","post_ai_flourishing","new_economy","democracy_governance","indigenous_futures","consciousness_studies","media_epistemics"] },
                   { key: "environmental", label: "Environmental & Ecological", icon: "🌱", profiles: ["environmental_polycrisis","food_sovereignty","biodiversity_species","ocean_marine","water_ecology","climate_policy","ocaa_daily_editorial"] },
-                  { key: "technology", label: "Technology & Mind", icon: "🧠", profiles: ["ai_alignment","neurodiversity_health","therapeutic_clinical","platform_accountability","digital_rights"] },
+                  { key: "technology", label: "Technology & Mind", icon: "🧠", profiles: ["ai_alignment","neurodiversity_health","neurofeedback_design","biofeedback_research","flow_research","biophilic_design","hci_feedback_design","eeg_methods","therapeutic_clinical","platform_accountability","digital_rights","ip_copyright"] },
                   { key: "health", label: "Health & Medicine", icon: "⚕️", profiles: ["clinical_biomedical","mental_health","contemplative_neuroscience","psychedelic_research","integrative_medicine","neurofeedback_health","public_health","health_equity","indigenous_health","nutrition_gut_brain","longevity_ageing"] },
                   { key: "activist", label: "Activist & Issue Research", icon: "✊", profiles: ["economic_justice","budget_policy","corporate_accountability","labour_rights","housing_inequality","human_rights","indigenous_rights","refugee_asylum","gambling_addiction","arms_security","international_law","environmental_polycrisis","food_sovereignty","democracy_governance","media_epistemics","platform_accountability"] },
                 ] as { key: string; label: string; icon: string; profiles: string[] }[]).map(({ key, label, icon, profiles }) => {
@@ -981,6 +981,12 @@ export default function UnifiedResearch() {
                     { value: "ocaa_daily_editorial", label: "OCAA Daily Editorial" },
                   ],
                   technology: [
+                    { value: "neurofeedback_design", label: "Neurofeedback Design & Optimisation" },
+                    { value: "biofeedback_research", label: "Biofeedback & EEG Research" },
+                    { value: "flow_research", label: "Flow State & Optimal Experience" },
+                    { value: "biophilic_design", label: "Biophilic Design & Nature Stimuli" },
+                    { value: "hci_feedback_design", label: "HCI & Visual Feedback Design" },
+                    { value: "eeg_methods", label: "EEG Methods & Signal Processing" },
                     { value: "ai_alignment", label: "AI Alignment and Safety" },
                     { value: "platform_accountability", label: "Platform Accountability" },
                     { value: "digital_rights", label: "Digital Rights & Privacy" },

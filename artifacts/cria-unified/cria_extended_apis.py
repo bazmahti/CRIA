@@ -765,6 +765,89 @@ class IUCNConnectorV3:
                 except Exception:
                     return []
 
+
+
+# ── ERIC API Client (Education Resources Information Center) ─────────────────
+# The primary structured academic database for education research.
+# 1.9M+ records. Free, federally funded, no key required.
+# Field-specific queries: education level, subject, geographic focus.
+# Substantially stronger than site-searching eric.ed.gov via Brave.
+# Critical for: What Remains education chapters, contemplative pedagogy,
+# learning science, curriculum research, alternative education traditions.
+
+class ERICConnector:
+    BASE = "https://api.ies.ed.gov/eric"
+    SOURCE = "ERIC"
+
+    # Subject field mappings for targeted education queries
+    SUBJECT_MAP = {
+        "contemplative": "Mindfulness,Meditation,Contemplative Learning",
+        "flow": "Creative Thinking,Optimal Experience,Student Motivation",
+        "arts": "Arts Education,Creative Activities,Aesthetic Education",
+        "montessori": "Montessori Method,Open Education,Child Centered Curriculum",
+        "waldorf": "Waldorf Education,Steiner,Holistic Approach",
+        "indigenous_education": "Indigenous Knowledge,Native Education,Place Based Education",
+        "wellbeing": "Student Welfare,Social Emotional Learning,Positive Psychology",
+        "ai_education": "Artificial Intelligence,Technology Education,Digital Literacy",
+        "higher_education": "Higher Education,College Students,University",
+        "early_childhood": "Early Childhood Education,Child Development",
+    }
+
+    async def search(self, query: str, limit: int = 8) -> List[Paper]:
+        params = {
+            "search": query,
+            "rows": limit,
+            "fl": "title,author,description,publicationdateyear,issn,id,subject",
+            "start": 0,
+        }
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            try:
+                resp = await client.get(
+                    f"{self.BASE}/",
+                    params=params,
+                    headers={"Accept": "application/json"},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                docs = data.get("response", {}).get("docs", [])
+                results = []
+                for item in docs[:limit]:
+                    title = _clean(item.get("title", ""))
+                    abstract = _clean(item.get("description", "") or "")
+                    authors_raw = item.get("author", [])
+                    if isinstance(authors_raw, str):
+                        authors = [authors_raw]
+                    elif isinstance(authors_raw, list):
+                        authors = authors_raw[:5]
+                    else:
+                        authors = []
+                    year = str(item.get("publicationdateyear", ""))
+                    eric_id = item.get("id", "")
+                    doi = f"https://eric.ed.gov/?id={eric_id}" if eric_id else ""
+                    if title:
+                        results.append(Paper(
+                            title=title, authors=authors, year=year,
+                            abstract=abstract, source=self.SOURCE, doi=doi,
+                        ))
+                log.info("ERIC: %d results for '%s'", len(results), query[:50])
+                return results
+            except Exception as e:
+                log.warning("ERIC error: %s", e)
+                return []
+
+    async def search_contemplative(self, query: str, limit: int = 8) -> List[Paper]:
+        """Targeted search for contemplative education literature."""
+        enriched = f"{query} mindfulness contemplative meditation classroom"
+        return await self.search(enriched, limit)
+
+    async def search_ai_education(self, query: str, limit: int = 8) -> List[Paper]:
+        """Targeted search for AI and education literature."""
+        enriched = f"{query} artificial intelligence education learning"
+        return await self.search(enriched, limit)
+
+
+eric_connector = ERICConnector()
+
 # ── Instantiate all connectors ────────────────────────────────────────────────
 
 core_connector = COREConnector()
@@ -796,6 +879,10 @@ EXTENDED_API_MAP = {
     "S2 Author Search": s2_enhanced_connector,
     "PubChem": pubchem_connector,
 
+    # Education research
+    "ERIC": eric_connector,
+    "Education Resources Information Center": eric_connector,
+
     # Tier 2 — free key registration
     "Dimensions": dimensions_connector,
     "NASA ADS": nasa_ads_connector,
@@ -822,6 +909,7 @@ def get_extended_api_status() -> dict:
         "Semantic Scholar (enhanced)": True,
         "PubChem": True,
         "IDEAS/RepEc": True,
+        "ERIC": True,
         "Dimensions": dimensions_connector.available(),
         "NASA ADS": nasa_ads_connector.available(),
         "IUCN Red List (v4)": iucn_v3_connector.available(),

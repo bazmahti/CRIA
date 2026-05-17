@@ -574,6 +574,428 @@ CIVILISATIONAL_CONNECTORS = [
 
 # ── Complete advocacy registry ───────────────────────────────────────────────
 
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TIER 1 — AUSTRALIAN POLICY RESEARCH CONNECTORS
+# Critical for Australian-context research: budget, environment, Indigenous,
+# tax, housing, health equity, media regulation.
+# ══════════════════════════════════════════════════════════════════════════════
+
+AUSTRALIAN_POLICY_CONNECTORS = [
+    # Fiscal and budget
+    TargetedWebConnector("treasury.gov.au", "Australian Treasury",
+        "Federal budget, fiscal policy, economic outlook, tax expenditures"),
+    TargetedWebConnector("pbo.gov.au", "Parliamentary Budget Office",
+        "Independent fiscal analysis, budget costings, Australian government spending"),
+    TargetedWebConnector("grattan.edu.au", "Grattan Institute",
+        "Australian public policy — health, education, energy, housing, budget"),
+    TargetedWebConnector("tai.org.au", "The Australia Institute",
+        "Independent research: tax, environment, democracy, inequality, Australia"),
+    TargetedWebConnector("apo.org.au", "Australian Policy Online",
+        "Grey literature, policy reports, working papers — Australian policy"),
+    TargetedWebConnector("aihw.gov.au", "AIHW",
+        "Australian Institute of Health and Welfare — health, housing, welfare data"),
+    TargetedWebConnector("pc.gov.au", "Productivity Commission",
+        "Australian government efficiency, regulation, economic analysis"),
+
+    # Corporate tax and inequality
+    TargetedWebConnector("taxjustice.net", "Tax Justice Network",
+        "Corporate tax avoidance, tax havens, financial secrecy, illicit flows"),
+    TargetedWebConnector("financialtransparency.org", "Financial Transparency Coalition",
+        "Illicit financial flows, corporate tax evasion, transparency advocacy"),
+    TargetedWebConnector("gfintegrity.org", "Global Financial Integrity",
+        "Illicit financial flows, trade misinvoicing, corporate tax evasion data"),
+    TargetedWebConnector("ato.gov.au/about-ato/research-and-statistics",
+        "ATO Tax Statistics", "Australian Taxation Office data — corporate tax, income, GST"),
+    TargetedWebConnector("oxfam.org/en/research", "Oxfam Research",
+        "Inequality, corporate power, tax justice, wealth concentration globally"),
+
+    # Environment — Australia specific
+    TargetedWebConnector("csiro.au", "CSIRO",
+        "Australian scientific research — climate, reef, biodiversity, water, agriculture"),
+    TargetedWebConnector("gbrmpa.gov.au", "Great Barrier Reef Marine Park Authority",
+        "Reef health, water quality, climate impacts, marine park management"),
+    TargetedWebConnector("mdba.gov.au", "Murray-Darling Basin Authority",
+        "Water management, catchment health, algal blooms, basin plan, agriculture"),
+    TargetedWebConnector("climatecouncil.org.au", "Climate Council Australia",
+        "Climate science communication, extreme weather, energy transition, Australia"),
+    TargetedWebConnector("acf.org.au", "Australian Conservation Foundation",
+        "Environmental advocacy, biodiversity, climate, reef, forests — Australia"),
+    TargetedWebConnector("bom.gov.au/climate", "Bureau of Meteorology Climate",
+        "Australian climate data, rainfall, temperature, extreme events, floods, fires"),
+    TargetedWebConnector("dcceew.gov.au", "DCCEEW",
+        "Australian environment and energy department — policy, regulations, reports"),
+
+    # Housing
+    TargetedWebConnector("ahuri.edu.au", "AHURI",
+        "Australian Housing and Urban Research Institute — housing policy, homelessness"),
+    TargetedWebConnector("shelter.org.au", "National Shelter",
+        "Housing affordability, homelessness, rental stress, social housing — Australia"),
+    TargetedWebConnector("missionaustralia.com.au/research", "Mission Australia Research",
+        "Homelessness, youth housing, social services, disadvantage — Australia"),
+
+    # Human rights and detention
+    TargetedWebConnector("humanrights.gov.au", "Australian Human Rights Commission",
+        "Human rights, discrimination, Indigenous rights, disability, detention"),
+    TargetedWebConnector("refugeecouncil.org.au", "Refugee Council of Australia",
+        "Refugee policy, asylum seekers, offshore detention, Nauru, settlement"),
+    TargetedWebConnector("asrc.org.au", "Asylum Seeker Resource Centre",
+        "Asylum seeker rights, detention conditions, legal support, advocacy"),
+
+    # Indigenous — Australia specific
+    TargetedWebConnector("aiatsis.gov.au", "AIATSIS",
+        "Australian Institute of Aboriginal and Torres Strait Islander Studies"),
+    TargetedWebConnector("reconciliation.org.au", "Reconciliation Australia",
+        "Reconciliation, truth-telling, treaty, Indigenous rights, Australia"),
+    TargetedWebConnector("fnf.org.au", "First Nations Foundation",
+        "First Nations economic and financial wellbeing, self-determination"),
+
+    # Media regulation
+    TargetedWebConnector("acma.gov.au", "ACMA",
+        "Australian Communications and Media Authority — media regulation, misinformation"),
+    TargetedWebConnector("mediadiversity.org.au", "Media Diversity Australia",
+        "Media ownership concentration, diversity, representation — Australia"),
+
+    # Gambling
+    TargetedWebConnector("agrc.vu.edu.au", "Australian Gambling Research Centre",
+        "Gambling harm, problem gambling, industry practices, regulation — Australia"),
+    TargetedWebConnector("responsiblegambling.vic.gov.au", "Responsible Gambling Victoria",
+        "Gambling harm reduction, research, prevention — Victoria/Australia"),
+    TargetedWebConnector("allianceforgamblingreform.org.au",
+        "Alliance for Gambling Reform",
+        "Gambling harm advocacy, advertising reform, industry accountability — Australia"),
+
+    # Labour
+    TargetedWebConnector("fairwork.gov.au", "Fair Work Commission",
+        "Australian industrial relations, minimum wage, enterprise agreements, awards"),
+    TargetedWebConnector("actu.org.au", "ACTU",
+        "Australian Council of Trade Unions — wages, conditions, labour rights"),
+]
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TIER 2 — INTERNATIONAL SPECIALIST CONNECTORS
+# Arms trade, international law, labour, human rights, misinformation research
+# ══════════════════════════════════════════════════════════════════════════════
+
+INTERNATIONAL_SPECIALIST_CONNECTORS = [
+    # Arms and security
+    TargetedWebConnector("sipri.org", "SIPRI",
+        "Stockholm International Peace Research Institute — arms trade, military spending, conflict"),
+    TargetedWebConnector("iiss.org", "IISS",
+        "International Institute for Strategic Studies — defence, security, military balance"),
+    TargetedWebConnector("paxforpeace.nl", "PAX Global",
+        "Arms trade, autonomous weapons, conflict impact, civilian harm"),
+    TargetedWebConnector("caat.org.uk", "Campaign Against Arms Trade",
+        "Arms trade, export licences, corporate accountability, AUKUS"),
+    TargetedWebConnector("aspi.org.au", "ASPI",
+        "Australian Strategic Policy Institute — defence, security, AUKUS, Indo-Pacific"),
+
+    # International law
+    TargetedWebConnector("icj-cij.org", "International Court of Justice",
+        "ICJ rulings, international law cases, state responsibility, treaties"),
+    TargetedWebConnector("icc-cpi.int", "International Criminal Court",
+        "ICC cases, war crimes, crimes against humanity, Rome Statute"),
+    TargetedWebConnector("legal.un.org", "UN Treaty Collection",
+        "International treaties, multilateral agreements, ratification status"),
+    TargetedWebConnector("ihl-databases.icrc.org", "ICRC IHL Database",
+        "International humanitarian law, Geneva Conventions, armed conflict law"),
+    TargetedWebConnector("wto.org/english/tratop_e/dispu_e", "WTO Disputes",
+        "World Trade Organization dispute settlement, trade law, rulings"),
+    TargetedWebConnector("itlos.org", "ITLOS",
+        "International Tribunal for the Law of the Sea — maritime law, ocean governance"),
+
+    # Human rights — international
+    TargetedWebConnector("unhcr.org/research", "UNHCR Research",
+        "UN refugee agency — displacement, protection, asylum, statelessness"),
+    TargetedWebConnector("amnesty.org/en/research", "Amnesty International Research",
+        "Human rights violations, detention, torture, freedom of expression globally"),
+    TargetedWebConnector("hrw.org/research", "Human Rights Watch Research",
+        "Human rights documentation, detention, conflict, corporate accountability"),
+    TargetedWebConnector("globaldetentionproject.org", "Global Detention Project",
+        "Immigration detention, conditions, statistics, policy — worldwide"),
+    TargetedWebConnector("icrc.org/en/research", "ICRC Research",
+        "International Red Cross — humanitarian law, conflict, detention, protection"),
+
+    # Labour — international
+    TargetedWebConnector("ilo.org/global/research", "ILO Research",
+        "International Labour Organization — decent work, wages, rights, statistics"),
+    TargetedWebConnector("tuac.org", "TUAC OECD",
+        "Trade Union Advisory Committee — labour standards, OECD policy"),
+    TargetedWebConnector("workersrights.org", "Worker Rights Consortium",
+        "Supply chain labour rights, factory conditions, wage theft, enforcement"),
+
+    # Misinformation and media
+    TargetedWebConnector("reutersinstitute.politics.ox.ac.uk", "Reuters Institute",
+        "Digital News Report, media trust, journalism research, misinformation"),
+    TargetedWebConnector("firstdraftnews.org", "First Draft",
+        "Misinformation, disinformation, verification, information disorder research"),
+    TargetedWebConnector("newsguardtech.com/misinformation-research",
+        "NewsGuard Research", "Misinformation tracking, news reliability, health misinformation"),
+    TargetedWebConnector("pressfredomindex.rsf.org", "Press Freedom Index",
+        "Reporters Without Borders — press freedom, journalist safety, media independence"),
+]
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TIER 3 — CREATIVE, CULTURAL AND IP CONNECTORS
+# Copyright, creator rights, cultural policy, open access, knowledge commons
+# ══════════════════════════════════════════════════════════════════════════════
+
+CREATIVE_CULTURAL_CONNECTORS = [
+    # Intellectual property
+    TargetedWebConnector("wipo.int/portal/en/research", "WIPO Research",
+        "World Intellectual Property Organization — patents, copyright, trademarks, treaties"),
+    TargetedWebConnector("ipaustralia.gov.au", "IP Australia",
+        "Australian patents, trademarks, designs, copyright policy"),
+    TargetedWebConnector("copyright.com.au", "Copyright Agency Australia",
+        "Australian copyright licensing, creator payments, fair dealing, AI/copyright"),
+    TargetedWebConnector("eff.org/deeplinks", "EFF",
+        "Electronic Frontier Foundation — digital rights, copyright, surveillance, AI"),
+    TargetedWebConnector("creativecommons.org/blog", "Creative Commons",
+        "Open licensing, commons-based approaches, copyright reform, open culture"),
+    TargetedWebConnector("authorsguild.org/industry-advocacy", "Authors Guild",
+        "Writers rights, AI training data, copyright, publisher contracts"),
+
+    # Creator and music rights
+    TargetedWebConnector("aria.com.au", "ARIA",
+        "Australian Recording Industry Association — music, streaming royalties, copyright"),
+    TargetedWebConnector("apra-amcos.com.au/news-research", "APRA AMCOS Research",
+        "Music creators, streaming economics, licensing, royalties — Australia/NZ"),
+    TargetedWebConnector("screenaustralia.gov.au/research", "Screen Australia Research",
+        "Screen industry data, funding, production, streaming — Australia"),
+    TargetedWebConnector("musicaustralia.org.au", "Music Australia",
+        "Australian music industry research, policy, creator economy"),
+    TargetedWebConnector("creativeindependence.org", "The Creative Independent",
+        "Creative practice, artist economics, sustaining creative work"),
+
+    # Cultural policy and arts funding
+    TargetedWebConnector("australiacouncil.gov.au/research", "Australia Council Research",
+        "Arts funding, cultural policy, creative industries research — Australia"),
+    TargetedWebConnector("artslaw.com.au", "Arts Law Centre of Australia",
+        "Artist legal rights, copyright, contracts, moral rights — Australia"),
+    TargetedWebConnector("creativeindustriesfederation.com/research",
+        "Creative Industries Federation UK",
+        "Creative economy research, copyright, cultural value, policy"),
+    TargetedWebConnector("uis.unesco.org/en/topic/cultural-diversity",
+        "UNESCO Cultural Statistics",
+        "Cultural diversity, creative economy, cultural rights — global statistics"),
+
+    # Open access and knowledge commons
+    TargetedWebConnector("sparcopen.org", "SPARC Open Access",
+        "Open access publishing, academic publishing reform, preprint movement"),
+    TargetedWebConnector("doaj.org", "DOAJ",
+        "Directory of Open Access Journals — verified open access research"),
+    TargetedWebConnector("openknowledge.worldbank.org", "World Bank Open Knowledge",
+        "Development research, grey literature, open access — global"),
+    TargetedWebConnector("knowledgecommons.org", "Knowledge Commons",
+        "Commons-based approaches to knowledge, information governance"),
+]
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EDUCATION CONNECTORS — Comprehensive suite for What Remains book research
+#
+# Four streams:
+#   Stream 1: Critique of mainstream education (measurement, narrowing)
+#   Stream 2: Evidence base for interior learning (contemplative, flow, arts)
+#   Stream 3: Alternative traditions (Waldorf, Montessori, Indigenous, Finnish)
+#   Stream 4: AI and education (displacement, curriculum, what endures)
+# ══════════════════════════════════════════════════════════════════════════════
+
+EDUCATION_CONNECTORS = [
+    # ── Stream 1: Policy, critique, measurement culture ──────────────────────
+    TargetedWebConnector("oecd.org/education", "OECD Education",
+        "Education at a Glance, PISA, education policy, international statistics"),
+    TargetedWebConnector("uis.unesco.org/en/topic/education", "UNESCO Education",
+        "Global education data, SDG4, literacy, access, equity — worldwide"),
+    TargetedWebConnector("ibe.unesco.org", "UNESCO IBE",
+        "International Bureau of Education — curriculum research, education systems globally"),
+    TargetedWebConnector("acer.edu.au/research", "ACER",
+        "Australian Council for Educational Research — primary Australian education research"),
+    TargetedWebConnector("acara.edu.au/reporting", "ACARA",
+        "Australian Curriculum and Reporting Authority — curriculum, NAPLAN, standards"),
+    TargetedWebConnector("aitsl.edu.au/research", "AITSL",
+        "Australian Institute for Teaching and School Leadership"),
+    TargetedWebConnector("mitchellinstitute.org.au", "Mitchell Institute",
+        "Education and health policy, equity, early childhood — Victoria University"),
+    TargetedWebConnector("gonski.com.au/research", "Gonski Institute",
+        "Education equity, school funding, disadvantage — UNSW"),
+    TargetedWebConnector("ascd.org/research", "ASCD",
+        "Association for Supervision and Curriculum Development — largest US educator body"),
+    TargetedWebConnector("educationservicesaustralia.com.au", "Education Services Australia",
+        "Australian curriculum resources, digital learning, national education infrastructure"),
+    TargetedWebConnector("oph.fi/en", "Finnish National Agency for Education",
+        "Finnish education system, curriculum, teacher education — world-leading model"),
+
+    # ── Stream 2: Contemplative education and interior learning ───────────────
+    # This stream is central to What Remains — the evidence that interior
+    # states can be cultivated, measured, and should be the curriculum aim
+    TargetedWebConnector("contemplativemind.org/higher-education",
+        "Association for Contemplative Mind in Higher Education",
+        "Contemplative practices in higher education, mindfulness pedagogy, inner life"),
+    TargetedWebConnector("garrisoninstitute.org/contemplative-education",
+        "Garrison Institute Education",
+        "Contemplative education programs, teacher training, inner curriculum"),
+    TargetedWebConnector("fetzer.org/themes/education", "Fetzer Institute Education",
+        "Inner life in education, whole person learning, spirit in education"),
+    TargetedWebConnector("couragerenewal.org/research", "Center for Courage and Renewal",
+        "Parker Palmer — teacher inner life, wholeness, contemplative leadership in education"),
+    TargetedWebConnector("uvacontemplation.org", "UVA Contemplative Sciences Center",
+        "Neuroscience of contemplation in education — Roeser, mindfulness schools research"),
+    TargetedWebConnector("mindandlifeinstitute.org/research", "Mind and Life Institute Education",
+        "Contemplative neuroscience applied to education — Dalai Lama collaborations"),
+    TargetedWebConnector("casel.org/research", "CASEL",
+        "Social and emotional learning, whole-child education — leading SEL research body"),
+    TargetedWebConnector("greatergood.berkeley.edu/education", "Greater Good Education",
+        "Wellbeing science in education, social-emotional learning, positive psychology"),
+    TargetedWebConnector("mindfuleducation.org/research", "Mindful Education Research",
+        "Mindfulness in schools research, MiSP, classroom contemplative practice"),
+    TargetedWebConnector("journalofcontemplativeinquiry.org",
+        "Journal of Contemplative Inquiry",
+        "Peer-reviewed contemplative pedagogy — primary scholarly journal for this field"),
+
+    # ── Stream 3: Alternative traditions ─────────────────────────────────────
+    TargetedWebConnector("waldorfeducation.org/research", "Waldorf Education Research",
+        "Steiner-Waldorf pedagogy research, arts-integrated, developmental approach"),
+    TargetedWebConnector("journalofmontessoriresearch.org",
+        "Journal of Montessori Research",
+        "Open access peer-reviewed Montessori research — child-centred, self-directed"),
+    TargetedWebConnector("internationalmontessori.org/research", "International Montessori",
+        "Montessori pedagogy, outcomes research, alternative education globally"),
+    TargetedWebConnector("placebasededucation.org", "Place-Based Education Network",
+        "Place-based, land-connected, Indigenous-grounded education approaches"),
+    TargetedWebConnector("arteducators.org/research", "National Art Education Association",
+        "Arts education research, creative learning, aesthetic experience in schools"),
+    TargetedWebConnector("kennedy-center.org/education/research",
+        "Kennedy Center Arts Education",
+        "Arts integration in education, creative learning research"),
+
+    # ── Stream 4: AI, education futures, what endures ────────────────────────
+    TargetedWebConnector("teachai.org/research", "TeachAI",
+        "AI in education policy, curriculum response to AI, what to teach in AI era"),
+    TargetedWebConnector("aieducation.org", "AI and Education Research",
+        "Academic research on AI tools in learning, displacement concerns, pedagogy"),
+    TargetedWebConnector("holoniq.com/edtech-research", "HolonIQ EdTech Research",
+        "Education technology market research, AI in education, sector analysis"),
+
+    # ── Higher education ──────────────────────────────────────────────────────
+    TargetedWebConnector("universitiesaustralia.edu.au/research", "Universities Australia",
+        "Higher education policy, research funding, university sector — Australia"),
+    TargetedWebConnector("teqsa.gov.au/resources", "TEQSA",
+        "Tertiary Education Quality and Standards Agency — higher education regulation"),
+    TargetedWebConnector("timeshighereducation.com/research", "Times Higher Education",
+        "University research, higher education policy, global rankings"),
+]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NEUROFEEDBACK AND BIOFEEDBACK SPECIALIST CONNECTORS
+#
+# Four streams for NFB research:
+#   Stream 1: Primary NFB journals and professional bodies
+#   Stream 2: Flow state and optimal experience research
+#   Stream 3: HCI/UX — visual feedback design, usability, gamification
+#   Stream 4: Biophilic design, nature-based stimuli, parasympathetic research
+#   Stream 5: EEG signal processing, neuroimaging repositories
+# ══════════════════════════════════════════════════════════════════════════════
+
+NFB_SPECIALIST_CONNECTORS = [
+    # ── Stream 1: Primary NFB journals and bodies ─────────────────────────────
+    TargetedWebConnector("isnr.org/research", "ISNR Research",
+        "International Society for Neuroregulation and Research — primary NFB professional body"),
+    TargetedWebConnector("neuroregulation.org", "NeuroRegulation Journal",
+        "ISNR open-access peer-reviewed journal — primary venue for NFB research"),
+    TargetedWebConnector("aapb.org/research", "AAPB Research",
+        "Association for Applied Psychophysiology and Biofeedback — journal, conference proceedings"),
+    TargetedWebConnector("springerlink.com/journal/10484", "Applied Psychophysiology Biofeedback",
+        "Primary peer-reviewed NFB/biofeedback journal — Springer, AAPB official journal"),
+    TargetedWebConnector("frontiersin.org/journals/human-neuroscience",
+        "Frontiers in Human Neuroscience",
+        "Open-access journal — heavy NFB and EEG publication venue"),
+    TargetedWebConnector("journals.sagepub.com/home/eeg", "Clinical EEG and Neuroscience",
+        "Primary clinical EEG journal — NFB protocols, alpha/theta research"),
+    TargetedWebConnector("journals.lww.com/neurotherapeutics", "Journal of Neurotherapy",
+        "Historical NFB literature, alpha/theta training, Peniston-Kulkosky protocols"),
+    TargetedWebConnector("bcia.org/research", "BCIA",
+        "Biofeedback Certification International Alliance — standards, protocols, research"),
+    TargetedWebConnector("eeginfo.com/research", "EEGInfo Othmer Method",
+        "Othmer protocol NFB research, clinical outcomes, frequency-based training"),
+
+    # ── Stream 2: Flow state and optimal experience ───────────────────────────
+    # Critical for the theta/alpha — flow state — interior resource connection
+    # Links the NFB experiment to the What Remains theoretical framework
+    TargetedWebConnector("qualiaresearchinstitute.org", "Qualia Research Institute",
+        "Consciousness, subjective experience, altered states — theoretical grounding for NFB design"),
+    TargetedWebConnector("journals.humankinetics.com/view/journals/jsp",
+        "Journal of Sport and Exercise Psychology",
+        "Flow state scale validation, optimal experience in performance contexts"),
+    TargetedWebConnector("tandfonline.com/toc/rjsp20/current",
+        "Journal of Sports Sciences",
+        "Flow state, peak performance, psychological skills — FSS-2 validation literature"),
+    TargetedWebConnector("psychologytoday.com/us/basics/flow", "Flow Psychology Research",
+        "Csikszentmihalyi flow research, optimal experience, consciousness"),
+    TargetedWebConnector("positivepsychology.com/flow-research",
+        "Positive Psychology Flow Research",
+        "Flow state research compendium, measurement tools, applications"),
+    TargetedWebConnector("interscijournals.com/brain-and-mind", "Brain and Mind Journal",
+        "Consciousness, altered states, neuroscience of experience"),
+
+    # ── Stream 3: HCI, visual feedback design, gamification, usability ────────
+    # Essential for the visual feedback design optimisation question
+    # SUS, UES, gamification literature all live here
+    TargetedWebConnector("dl.acm.org", "ACM Digital Library",
+        "Primary HCI research database — CHI conference, UIST, visual feedback design"),
+    TargetedWebConnector("usabilitynet.org/research", "Usability Research",
+        "System Usability Scale validation, SUS methodology, usability research"),
+    TargetedWebConnector("nngroup.com/research", "Nielsen Norman Group Research",
+        "UX research, usability, visual design, user engagement — practitioner-research bridge"),
+    TargetedWebConnector("journals.sagepub.com/home/ijhcs",
+        "International Journal of Human-Computer Studies",
+        "HCI research, visual interfaces, user engagement, feedback design"),
+    TargetedWebConnector("gamification-research.org", "Gamification Research Network",
+        "Gamification in health contexts, engagement mechanics, reward systems"),
+    TargetedWebConnector("mdpi.com/journal/games", "Games Journal MDPI",
+        "Gamification research, game mechanics in non-game contexts, engagement"),
+    TargetedWebConnector("journals.sagepub.com/home/gab",
+        "Games and Culture Journal",
+        "Game design theory, engagement mechanics, user experience in games"),
+    TargetedWebConnector("chi2025.acm.org/research", "CHI Conference Research",
+        "ACM CHI — premier HCI conference, visual feedback, human factors"),
+    TargetedWebConnector("userengagement.net/research", "User Engagement Scale Research",
+        "UES validation studies, user engagement measurement in health technology"),
+
+    # ── Stream 4: Biophilic design and nature-based stimuli ───────────────────
+    # Condition B in the experiment: nature video + birdsong as NFB feedback
+    # The biophilic design literature grounds the design rationale
+    TargetedWebConnector("biophilicdesign.net/research", "Biophilic Design Research",
+        "Biophilic design principles, nature connection, Kellert, Browning, Ryan"),
+    TargetedWebConnector("terrapin.com/research", "Terrapin Bright Green Research",
+        "14 patterns of biophilic design, evidence base, built environment and nature"),
+    TargetedWebConnector("internationaljournalofenvironmentalresearch.com",
+        "IJER",
+        "Environmental psychology, nature-based interventions, attention restoration"),
+    TargetedWebConnector("restorative-environments.org", "Restorative Environments Research",
+        "Attention Restoration Theory, Kaplan, stress recovery, nature exposure"),
+    TargetedWebConnector("journals.sagepub.com/home/env",
+        "Environment and Behavior Journal",
+        "Environmental psychology, biophilic responses, nature and wellbeing"),
+    TargetedWebConnector("sound-in-health.org/research", "Sound and Health Research",
+        "Birdsong, nature sounds, psychoacoustics, parasympathetic activation"),
+
+    # ── Stream 5: EEG signal processing and neuroimaging ─────────────────────
+    TargetedWebConnector("openneuro.org", "OpenNeuro",
+        "Open EEG/fMRI dataset repository — validation datasets for signal processing"),
+    TargetedWebConnector("fieldtriptoolbox.org/references", "FieldTrip References",
+        "EEG/MEG analysis methods, signal processing validation, open-source toolbox"),
+    TargetedWebConnector("mne.tools/stable/references", "MNE-Python References",
+        "EEG signal processing, alpha/theta extraction methods, open-source"),
+    TargetedWebConnector("emotiv.com/research", "Emotiv Research",
+        "Emotiv EPOC X validation studies, consumer EEG research applications"),
+    TargetedWebConnector("openbci.com/research", "OpenBCI Research",
+        "Open-source EEG/NFB hardware research, community experiments, signal quality"),
+]
+
 ALL_ADVOCACY_CONNECTORS = (
     ENVIRONMENTAL_CONNECTORS
     + FOOD_SOVEREIGNTY_CONNECTORS
@@ -583,6 +1005,11 @@ ALL_ADVOCACY_CONNECTORS = (
     + NEURODIVERSITY_CONNECTORS
     + CIVILISATIONAL_CONNECTORS
     + ECONOMICS_RESEARCH_CONNECTORS
+    + AUSTRALIAN_POLICY_CONNECTORS
+    + INTERNATIONAL_SPECIALIST_CONNECTORS
+    + CREATIVE_CULTURAL_CONNECTORS
+    + EDUCATION_CONNECTORS
+    + NFB_SPECIALIST_CONNECTORS
 )
 
 
@@ -620,7 +1047,54 @@ def get_connectors_for_profile(profile: str) -> List:
         "food_sovereignty": FOOD_SOVEREIGNTY_CONNECTORS + ENVIRONMENTAL_CONNECTORS[13:17],
         "new_economy": NEW_ECONOMY_CONNECTORS + ECONOMICS_RESEARCH_CONNECTORS + [owid],
         "ai_alignment": AI_ALIGNMENT_CONNECTORS + [alignment_forum],
-        "neurodiversity_health": NEURODIVERSITY_CONNECTORS,
+        # Neurodiversity — expanded with NFB primary literature
+        "neurodiversity_health": (
+            NEURODIVERSITY_CONNECTORS
+            + NFB_SPECIALIST_CONNECTORS[:9]
+        ),
+
+        # Neurofeedback design optimisation — full specialist suite
+        # Built for the GCRP alpha/theta visual feedback study
+        "neurofeedback_design": (
+            NFB_SPECIALIST_CONNECTORS[:9]      # Primary NFB journals/bodies
+            + NFB_SPECIALIST_CONNECTORS[9:15]  # Flow state research
+            + NFB_SPECIALIST_CONNECTORS[15:24] # HCI/UX/gamification
+            + NEURODIVERSITY_CONNECTORS[:4]    # Adjacent neuroscience
+        ),
+
+        # Biofeedback and physiological research
+        "biofeedback_research": (
+            NFB_SPECIALIST_CONNECTORS[:9]
+            + NFB_SPECIALIST_CONNECTORS[30:]   # EEG signal processing
+            + NEURODIVERSITY_CONNECTORS[:4]
+        ),
+
+        # Flow state and optimal experience research
+        "flow_research": (
+            NFB_SPECIALIST_CONNECTORS[9:15]    # Flow state stream
+            + EDUCATION_CONNECTORS[11:21]      # Contemplative education overlap
+            + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # Biophilic design and nature-based interventions
+        "biophilic_design": (
+            NFB_SPECIALIST_CONNECTORS[24:30]   # Biophilic design stream
+            + ENVIRONMENTAL_CONNECTORS[:6]
+            + NEURODIVERSITY_CONNECTORS[:4]
+        ),
+
+        # HCI and visual feedback design
+        "hci_feedback_design": (
+            NFB_SPECIALIST_CONNECTORS[15:24]   # HCI/UX stream
+            + AI_ALIGNMENT_CONNECTORS[:4]
+        ),
+
+        # EEG and neuroimaging methods
+        "eeg_methods": (
+            NFB_SPECIALIST_CONNECTORS[30:]     # EEG signal processing stream
+            + NFB_SPECIALIST_CONNECTORS[:9]    # NFB journals
+            + NEURODIVERSITY_CONNECTORS[:4]
+        ),
         "democracy_governance": DEMOCRACY_CONNECTORS,
         "civilisational_academic": (
             CIVILISATIONAL_CONNECTORS
