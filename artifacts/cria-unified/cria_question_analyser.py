@@ -189,6 +189,24 @@ PROFILE_REGISTRY = {
         "Full suite for the book's most ambitious scientific claims about irreducible meaning-making. "
         "Activates: 44 dedicated connectors across all frontier science streams.",
 
+    # ── Academic and press freedom ───────────────────────────────────────────
+    "academic_freedom": "Institutional academic freedom — attacks on researchers, "
+        "university autonomy, political interference, knowledge censorship. "
+        "Activates: Scholars at Risk, Academic Freedom Index, AAUP, PEN America, "
+        "Index on Censorship, Journal of Academic Freedom.",
+    "press_freedom": "Journalism safety, press freedom, media independence, "
+        "AI-enabled censorship, digital surveillance of journalists. "
+        "Activates: RSF Press Freedom Index, CPJ, Freedom of the Press Foundation, "
+        "Freedom on the Net, NetBlocks, OONI, MEAA, Journalism Studies.",
+    "digital_censorship": "Internet shutdowns, content filtering, deep packet inspection, "
+        "algorithmic suppression of speech, AI surveillance. "
+        "Activates: NetBlocks, OONI, AlgorithmWatch, Access Now KeepItOn, "
+        "Open Technology Fund, Citizen Lab.",
+    "information_freedom": "Full information freedom suite — academic + press + digital. "
+        "Use when question spans all three domains. "
+        "Activates: Scholars at Risk, RSF, CPJ, Freedom on the Net, OONI, "
+        "Citizen Lab, Index on Censorship, full freedom connector set.",
+
     "cybersecurity_policy": "State-sponsored hacking, surveillance of civil society, spyware, "
         "democratic infrastructure protection, cyber warfare, critical infrastructure. "
         "Activates: ACSC, ENISA, CISA, NCSC UK, Citizen Lab, Access Now, EFF Security, "

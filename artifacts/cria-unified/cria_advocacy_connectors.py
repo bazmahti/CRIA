@@ -1579,6 +1579,120 @@ COLLECTIVE_CONSCIOUSNESS_CONNECTORS = [
         "social dimensions of conscious experience"),
 ]
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ACADEMIC FREEDOM AND PRESS FREEDOM CONNECTORS
+#
+# Two distinct streams — different research traditions, different institutions:
+#
+#   Stream 1: Academic freedom — institutional autonomy, researcher safety,
+#             censorship of knowledge production
+#   Stream 2: Press freedom — journalism, information flow, democratic
+#             accountability, digital censorship, AI-enabled suppression
+#
+# The AI dimension is new territory for both:
+#   — Automated content moderation suppressing political speech
+#   — Algorithmic surveillance of journalists and academics
+#   — AI-enabled censorship at scale without explicit policy
+# ══════════════════════════════════════════════════════════════════════════════
+
+ACADEMIC_FREEDOM_CONNECTORS = [
+    # Primary institutions and databases
+    TargetedWebConnector("scholarsatrisk.org/research", "Scholars at Risk",
+        "Primary database of attacks on academics — dismissals, imprisonment, violence. "
+        "Academic Freedom Monitoring Project, global tracking."),
+    TargetedWebConnector("academicfreedomindex.net", "Academic Freedom Index",
+        "FAU Erlangen-Nürnberg + V-Dem — country-level academic freedom scores, "
+        "empirical data, trend analysis, constitutional protections"),
+    TargetedWebConnector("gppi.net/research/academic-freedom", "GPPI Academic Freedom",
+        "Global Public Policy Institute — academic freedom policy, institutional autonomy, "
+        "political interference in universities"),
+    TargetedWebConnector("aaup.org/research", "AAUP",
+        "American Association of University Professors — academic freedom standards, "
+        "censorship incidents, faculty rights, institutional pressure"),
+    TargetedWebConnector("the-ria.org/research", "Research Institute for Academic Freedom",
+        "European academic freedom research — legal frameworks, case studies, "
+        "political interference, university autonomy"),
+    TargetedWebConnector("freemuse.org/research", "Freemuse",
+        "Freedom of artistic expression — censorship of artists, academics, cultural workers"),
+    TargetedWebConnector("pen.org/research", "PEN America Research",
+        "PEN America — academic freedom, campus speech, book bans, literary censorship"),
+    TargetedWebConnector("indexoncensorship.org/research", "Index on Censorship",
+        "Global censorship documentation — academics, journalists, artists, "
+        "political prisoners, internet freedom"),
+
+    # Australian specific
+    TargetedWebConnector("iml.edu.au/research", "Institute for Media and Learning",
+        "Australian academic freedom, university governance, political interference"),
+    TargetedWebConnector("teqsa.gov.au/academic-freedom", "TEQSA Academic Freedom",
+        "Australian higher education academic freedom requirements, compliance, reporting"),
+
+    # Political economy of censorship in academic contexts
+    TargetedWebConnector("journalofacademicfreedom.org", "Journal of Academic Freedom",
+        "Peer-reviewed academic freedom research — institutional, legal, political dimensions"),
+    TargetedWebConnector("highereducation.org/research/academic-freedom",
+        "Higher Education Research",
+        "University governance, academic freedom, political economy of knowledge production"),
+]
+
+PRESS_FREEDOM_CONNECTORS = [
+    # Primary press freedom institutions
+    TargetedWebConnector("rsf.org/research", "Reporters Without Borders (RSF)",
+        "Press Freedom Index — primary annual ranking, journalist safety, censorship, "
+        "country profiles, methodology"),
+    TargetedWebConnector("cpj.org/research", "Committee to Protect Journalists",
+        "CPJ — journalist imprisonments, killings, attacks. Primary database of "
+        "journalist safety incidents globally"),
+    TargetedWebConnector("freedom.press/research", "Freedom of the Press Foundation",
+        "Digital press freedom — encryption, surveillance, source protection, "
+        "SecureDrop, journalist security tools"),
+    TargetedWebConnector("ifj.org/research", "International Federation of Journalists",
+        "IFJ — journalist rights, press freedom, labour conditions, safety protocols"),
+    TargetedWebConnector("pen.org/press-freedom", "PEN International Press Freedom",
+        "Literary and press freedom — imprisoned writers, book bans, censorship cases"),
+
+    # Digital censorship and internet freedom
+    TargetedWebConnector("freedomhouse.org/report/freedom-net", "Freedom on the Net",
+        "Freedom House — annual internet freedom report, country scores, "
+        "digital censorship, content filtering, surveillance"),
+    TargetedWebConnector("netblocks.org/research", "NetBlocks",
+        "Real-time internet shutdown monitoring — government-ordered outages, "
+        "social media blocks, election interference via connectivity"),
+    TargetedWebConnector("ooni.org/research", "OONI — Open Observatory Network Interference",
+        "Technical measurement of internet censorship — DNS blocking, "
+        "deep packet inspection, content filtering at infrastructure level"),
+    TargetedWebConnector("opentech.fund/research", "Open Technology Fund",
+        "Internet freedom technology — censorship circumvention, secure communications, "
+        "digital rights tools for journalists and activists"),
+    TargetedWebConnector("accessnow.org/keepiton", "Access Now KeepItOn",
+        "Internet shutdown documentation — government-ordered shutdowns, "
+        "political context, economic and human rights impacts"),
+
+    # AI-enabled censorship (new territory)
+    TargetedWebConnector("algorithmwatch.org/research", "AlgorithmWatch",
+        "Algorithmic censorship — automated content moderation suppressing political speech, "
+        "platform accountability, AI surveillance of journalists"),
+    TargetedWebConnector("witness.org/research", "WITNESS Research",
+        "Video documentation, human rights evidence, platform content moderation "
+        "and its impact on human rights journalism"),
+
+    # Australian press freedom
+    TargetedWebConnector("meaa.org/media-freedom", "MEAA Media Freedom",
+        "Media Entertainment Arts Alliance — Australian press freedom, "
+        "AFP raids, classified information prosecutions, journalist safety"),
+    TargetedWebConnector("mccallum-review.com.au/research",
+        "Australian Press Freedom Review",
+        "Australian press freedom legal frameworks, shield laws, public interest journalism"),
+
+    # Academic research venues
+    TargetedWebConnector("tandfonline.com/toc/rjou20/current", "Journalism Studies",
+        "Primary journalism research journal — press freedom, political economy of media, "
+        "censorship, journalist safety, democratic function of press"),
+    TargetedWebConnector("journals.sagepub.com/home/jou", "Journalism Journal",
+        "Peer-reviewed journalism research — censorship, self-censorship, "
+        "political pressure, media independence"),
+]
+
 ALL_ADVOCACY_CONNECTORS = (
     ENVIRONMENTAL_CONNECTORS
     + FOOD_SOVEREIGNTY_CONNECTORS
@@ -1610,6 +1724,8 @@ ALL_ADVOCACY_CONNECTORS = (
     + ASTROBIOLOGY_CONNECTORS
     + SOMATIC_CONFLICT_CONNECTORS
     + COLLECTIVE_CONSCIOUSNESS_CONNECTORS
+    + ACADEMIC_FREEDOM_CONNECTORS
+    + PRESS_FREEDOM_CONNECTORS
 )
 
 
@@ -1963,6 +2079,39 @@ def get_connectors_for_profile(profile: str) -> List:
             + EDUCATION_CONNECTORS[11:16]        # Contemplative education
             + NFB_SPECIALIST_CONNECTORS[9:12]    # Flow state
             + CIVILISATIONAL_CONNECTORS[:4]
+        ),
+
+        # Academic freedom — institutional autonomy, researcher safety, knowledge censorship
+        "academic_freedom": (
+            ACADEMIC_FREEDOM_CONNECTORS
+            + DEMOCRACY_CONNECTORS[:4]
+            + INTERNATIONAL_RELATIONS_CONNECTORS[:3]
+            + PRESS_FREEDOM_CONNECTORS[:4]
+        ),
+
+        # Press freedom — journalism safety, information flow, digital censorship
+        "press_freedom": (
+            PRESS_FREEDOM_CONNECTORS
+            + ACADEMIC_FREEDOM_CONNECTORS[:4]
+            + CYBERSECURITY_CONNECTORS[4:8]     # Citizen Lab, Access Now, EFF
+            + DEMOCRACY_CONNECTORS[:4]
+        ),
+
+        # Digital censorship — internet shutdowns, content filtering, AI surveillance
+        "digital_censorship": (
+            PRESS_FREEDOM_CONNECTORS[5:14]      # Internet freedom stream
+            + CYBERSECURITY_CONNECTORS[4:8]     # Citizen Lab, EFF
+            + AI_ALIGNMENT_CONNECTORS[:4]
+            + DEMOCRACY_CONNECTORS[:4]
+        ),
+
+        # Combined freedom of information — academic + press + digital together
+        # Use when question spans all three domains simultaneously
+        "information_freedom": (
+            ACADEMIC_FREEDOM_CONNECTORS
+            + PRESS_FREEDOM_CONNECTORS
+            + CYBERSECURITY_CONNECTORS[4:8]
+            + DEMOCRACY_CONNECTORS[:4]
         ),
 
         # Cybersecurity policy — governance, civil society, surveillance, state actors

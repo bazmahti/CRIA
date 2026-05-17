@@ -1070,7 +1070,7 @@ export default function UnifiedResearch() {
                   { key: "frontier_science", label: "Frontier Science", icon: "⚛️", profiles: ["quantum_computing","complexity_emergence","information_theory_frontier","biosemiotics","enactive_cognition","animal_consciousness","network_science","philosophy_of_science","astrobiology","what_remains_frontier_science"] },
                   { key: "technology", label: "Technology & Mind", icon: "🧠", profiles: ["ai_alignment","neurofeedback_design","biofeedback_research","flow_research","biophilic_design","hci_feedback_design","eeg_methods","cybersecurity_policy","cybersecurity_technical","platform_accountability","digital_rights","ip_copyright","neurodiversity_health","therapeutic_clinical"] },
                   { key: "health", label: "Health & Medicine", icon: "⚕️", profiles: ["clinical_biomedical","mental_health","contemplative_neuroscience","psychedelic_research","integrative_medicine","neurofeedback_health","public_health","health_equity","indigenous_health","nutrition_gut_brain","longevity_ageing"] },
-                  { key: "activist", label: "Activist & Issue Research", icon: "✊", profiles: ["economic_justice","budget_policy","corporate_accountability","labour_rights","housing_inequality","human_rights","indigenous_rights","refugee_asylum","gambling_addiction","arms_security","international_law","environmental_polycrisis","food_sovereignty","democracy_governance","media_epistemics","platform_accountability"] },
+                  { key: "activist", label: "Activist & Issue Research", icon: "✊", profiles: ["economic_justice","budget_policy","corporate_accountability","labour_rights","housing_inequality","human_rights","indigenous_rights","refugee_asylum","gambling_addiction","arms_security","international_law","academic_freedom","press_freedom","digital_censorship","information_freedom","environmental_polycrisis","food_sovereignty","democracy_governance","media_epistemics","platform_accountability","ip_copyright","creative_economy","open_access_commons"] },
                 ] as { key: string; label: string; icon: string; profiles: string[] }[]).map(({ key, label, icon, profiles }) => {
                   const isActive = profiles.includes(profile);
                   return (
@@ -1196,6 +1196,10 @@ export default function UnifiedResearch() {
                     { value: "environmental_polycrisis", label: "Environmental Polycrisis" },
                     { value: "food_sovereignty", label: "Food Sovereignty" },
                     { value: "democracy_governance", label: "Democracy and Governance" },
+                    { value: "academic_freedom", label: "Academic Freedom & Knowledge Censorship" },
+                    { value: "press_freedom", label: "Press Freedom & Journalism Safety" },
+                    { value: "digital_censorship", label: "Digital Censorship & Internet Freedom" },
+                    { value: "information_freedom", label: "Information Freedom — Full Suite" },
                   ],
                   general: [
                     { value: "general_scholarship", label: "General Scholarship" },
