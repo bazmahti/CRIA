@@ -155,6 +155,15 @@ except ImportError:
     EXTENDED_API_MAP = {}
 
 try:
+    from cria_recursive_engine import (
+        detect_convergences, format_recursive_opportunities,
+    )
+    _RECURSIVE_ENGINE_AVAILABLE = True
+except ImportError:
+    _RECURSIVE_ENGINE_AVAILABLE = False
+    log.warning("Recursive engine not available")
+
+try:
     from cria_horizon_monitor import (
         ensure_horizon_schema, get_horizon_dashboard,
         generate_research_architecture_report,
@@ -4836,6 +4845,45 @@ async def _run_research_job(job_id: str, artefact: ResearchArtefact) -> None:
         result["models_used"] = used_list
         result["fallback_used"] = bool(used_list and any(m != MODEL_CHAIN[0] for m in used_list))
         result["primary_model"] = MODEL_CHAIN[0]
+
+        # ── Recursive engine — convergence detection across all channel findings ──
+        if _RECURSIVE_ENGINE_AVAILABLE:
+            try:
+                all_findings = context.get("previous_findings", [])
+                findings_as_dicts = []
+                for f in all_findings:
+                    if hasattr(f, "__dict__"):
+                        findings_as_dicts.append(f.__dict__)
+                    elif isinstance(f, dict):
+                        findings_as_dicts.append(f)
+
+                async def _recursive_llm(prompt: str, max_tokens: int = 2000, **kw) -> str:
+                    return await call_llm(prompt, max_tokens=max_tokens,
+                                         channel_name="Stage0")
+
+                convergence_specs = await detect_convergences(
+                    research_question=artefact.research_question,
+                    channel_findings=findings_as_dicts,
+                    call_llm_fn=_recursive_llm,
+                    min_channels_for_convergence=3,
+                )
+
+                recursive_opportunities = format_recursive_opportunities(
+                    specs=convergence_specs,
+                    original_question=artefact.research_question,
+                    original_observer_note=artefact.observer_note,
+                )
+                result["recursive_research_opportunities"] = recursive_opportunities
+
+                if convergence_specs:
+                    log.info(
+                        "Recursive engine: %d convergence(s) detected for job %s",
+                        len(convergence_specs), job_id
+                    )
+            except Exception as _re:
+                log.warning("Recursive engine failed: %s", _re)
+                result["recursive_research_opportunities"] = {"count": 0, "opportunities": []}
+
         await db_complete_job(job_id, result)
 
         # ── Quality scorecard, alerts, and model version tracking ───────────
@@ -5356,6 +5404,72 @@ async def list_outputs(q: str = ""):
 
 
 # ── Research Horizon Monitor Endpoints ───────────────────────────────────────
+
+# ── Recursive Research Endpoints ─────────────────────────────────────────────
+
+class RecursiveRunRequest(BaseModel):
+    recursive_question: str = Field(..., min_length=10, max_length=MAX_QUERY_LENGTH)
+    observer_note: str = Field("", max_length=MAX_OBSERVER_LENGTH)
+    recommended_profiles: List[str] = Field(default_factory=list)
+    cognitive_iterations: int = Field(3, ge=1, le=5)
+    epistemic_iterations: int = Field(2, ge=1, le=3)
+    dissonance_budget: float = Field(0.30, ge=0.0, le=0.8)
+    voices: List[str] = Field(default_factory=lambda: ["academic", "editorial"])
+    parent_job_id: str = Field("", description="Job ID of the run that generated this")
+
+    model_config = {"extra": "ignore"}
+
+
+@app.post(f"{BASE_PATH}/recursive-run")
+async def launch_recursive_run(
+    request: Request,
+    body: RecursiveRunRequest,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Launch a recursive research run based on a convergence detected in a prior run.
+    Uses the recommended profiles to assemble a targeted hybrid connector set.
+    """
+    job_id = str(uuid.uuid4())
+    request_id = getattr(request.state, "request_id", "")
+
+    # Use first recommended profile as primary, or general_scholarship
+    primary_profile = (
+        body.recommended_profiles[0] if body.recommended_profiles
+        else "general_scholarship"
+    )
+
+    artefact = ResearchArtefact(
+        research_question=body.recursive_question,
+        observer_note=body.observer_note or (
+            f"Recursive research run — convergence follow-up from job {body.parent_job_id}"
+        ),
+        profile=primary_profile,
+        dissonance_budget=body.dissonance_budget,
+        voices=body.voices,
+        max_iterations=body.cognitive_iterations,
+        cognitive_iterations=body.cognitive_iterations,
+        epistemic_iterations=body.epistemic_iterations,
+        job_id=job_id,
+    )
+
+    try:
+        await db_create_job(job_id, body.recursive_question, primary_profile, request_id)
+    except Exception as e:
+        log.error("Failed to create recursive job record: %s", e)
+
+    background_tasks.add_task(_run_research_job, job_id, artefact)
+    log.info(
+        "Recursive run launched: job=%s parent=%s profiles=%s",
+        job_id, body.parent_job_id, body.recommended_profiles
+    )
+    return {
+        "jobId": job_id,
+        "status": "queued",
+        "parent_job_id": body.parent_job_id,
+        "profile": primary_profile,
+    }
+
 
 @app.get(f"{BASE_PATH}/horizon/dashboard")
 async def horizon_dashboard(request: Request):

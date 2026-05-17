@@ -526,6 +526,130 @@ const WARMUP_DELAY_MS = 5_000;
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
+// ── Recursive Opportunity Card ────────────────────────────────────────────────
+function RecursiveOpportunityCard({
+  opp, parentJobId, onLaunch
+}: {
+  opp: any;
+  parentJobId: string;
+  onLaunch: (jobId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [launching, setLaunching] = useState(false);
+  const [launched, setLaunched] = useState(false);
+  const BASE = import.meta.env.VITE_CRIA_UNIFIED_BASE_URL || "";
+
+  const confidenceColour = opp.confidence === "high"
+    ? "text-emerald-600 bg-emerald-500/15"
+    : opp.confidence === "medium"
+    ? "text-amber-600 bg-amber-500/15"
+    : "text-muted-foreground bg-muted/30";
+
+  const launch = async () => {
+    if (!opp.recursive_question) return;
+    setLaunching(true);
+    try {
+      const resp = await fetch(`${BASE}/cria-unified/recursive-run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recursive_question: opp.recursive_question,
+          recommended_profiles: opp.recommended_profiles || [],
+          cognitive_iterations: opp.cognitive_iterations || 3,
+          epistemic_iterations: opp.epistemic_iterations || 2,
+          dissonance_budget: 0.35,
+          parent_job_id: parentJobId,
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setLaunched(true);
+        onLaunch(data.jobId);
+      }
+    } catch {}
+    setLaunching(false);
+  };
+
+  return (
+    <div className="rounded-lg border border-violet-500/20 bg-background/60 p-3 text-[11px]">
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={cn(
+              "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase",
+              confidenceColour
+            )}>
+              {opp.confidence}
+            </span>
+            <span className="text-[9px] text-muted-foreground">
+              {opp.contributing_traditions?.slice(0, 3).join(" · ")}
+            </span>
+          </div>
+          <div className="font-semibold leading-snug text-violet-700 mb-1 cursor-pointer"
+               onClick={() => setExpanded(!expanded)}>
+            {opp.convergence_point?.slice(0, 120)}
+            {(opp.convergence_point?.length || 0) > 120 ? "…" : ""}
+          </div>
+          {expanded && (
+            <div className="space-y-2 mt-2 pt-2 border-t border-violet-500/15">
+              {opp.significance && (
+                <div className="text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground">Why this matters: </span>
+                  {opp.significance}
+                </div>
+              )}
+              {opp.what_remains_relevance && (
+                <div className="text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground">What Remains: </span>
+                  {opp.what_remains_relevance}
+                </div>
+              )}
+              {opp.recursive_question && (
+                <div className="rounded-lg bg-violet-500/8 border border-violet-500/15 px-2.5 py-2">
+                  <div className="text-[9px] font-semibold uppercase tracking-wider text-violet-600 mb-1">
+                    Recursive question
+                  </div>
+                  <div className="text-foreground leading-relaxed">{opp.recursive_question}</div>
+                </div>
+              )}
+              {opp.recommended_profiles?.length > 0 && (
+                <div className="text-muted-foreground">
+                  <span className="font-medium">Profiles: </span>
+                  {opp.recommended_profiles.join(", ")}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-1.5 flex-shrink-0">
+          {launched ? (
+            <div className="px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-600 text-[10px] font-semibold text-center">
+              Launched ✓
+            </div>
+          ) : (
+            <button
+              onClick={launch}
+              disabled={launching || !opp.recursive_question}
+              className="px-3 py-1.5 rounded-lg bg-violet-500 text-white text-[10px] font-semibold hover:bg-violet-600 disabled:opacity-40 transition-colors whitespace-nowrap"
+            >
+              {launching ? "…" : "Launch →"}
+            </button>
+          )}
+          <div className="text-[9px] text-muted-foreground text-center">
+            {opp.estimated_cost_aud}
+          </div>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-[9px] text-muted-foreground hover:text-foreground text-center"
+          >
+            {expanded ? "less" : "details"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function UnifiedResearch() {
   const [query, setQuery] = useState("");
   const [observerNote, setObserverNote] = useState("");
@@ -745,6 +869,13 @@ export default function UnifiedResearch() {
   const qualityScore = (() => {
     try {
       return (result as any)?.quality_scorecard?.quality_score || null;
+    } catch { return null; }
+  })();
+
+  // Recursive research opportunities — convergences detected in this run
+  const recursiveOpps = (() => {
+    try {
+      return (result as any)?.recursive_research_opportunities || null;
     } catch { return null; }
   })();
 
@@ -1871,6 +2002,39 @@ export default function UnifiedResearch() {
               <div className="mb-2 flex items-center gap-2 text-[10px] text-muted-foreground">
                 <span className="text-green-500">✓</span>
                 <span>Quality score: <span className="font-semibold text-foreground">{Math.round(qualityScore)}/100</span> · No alerts</span>
+              </div>
+            )}
+
+            {/* Recursive Research Opportunities — convergences detected in this run */}
+            {recursiveOpps && recursiveOpps.count > 0 && (
+              <div className="mb-4 rounded-xl border-2 border-violet-500/30 bg-violet-500/5 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-violet-500 text-base">⟳</span>
+                  <div className="font-semibold text-violet-700 text-sm">
+                    Recursive Research Opportunities
+                  </div>
+                  <span className="ml-auto px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-600 text-[9px] font-bold">
+                    {recursiveOpps.count} convergence{recursiveOpps.count !== 1 ? "s" : ""} detected
+                  </span>
+                </div>
+                {recursiveOpps.summary && (
+                  <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
+                    {recursiveOpps.summary}
+                  </p>
+                )}
+                <div className="space-y-3">
+                  {recursiveOpps.opportunities?.map((opp: any, i: number) => (
+                    <RecursiveOpportunityCard
+                      key={opp.convergence_id || i}
+                      opp={opp}
+                      parentJobId={jobId || ""}
+                      onLaunch={(newJobId) => {
+                        setJobId(newJobId);
+                        setRunning(true);
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
