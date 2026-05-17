@@ -155,6 +155,12 @@ except ImportError:
     EXTENDED_API_MAP = {}
 
 try:
+    from cria_research_modes import get_rapid_connectors, MODES
+    _RESEARCH_MODES_AVAILABLE = True
+except ImportError:
+    _RESEARCH_MODES_AVAILABLE = False
+
+try:
     from cria_recursive_engine import (
         detect_convergences, format_recursive_opportunities,
     )
@@ -5404,6 +5410,90 @@ async def list_outputs(q: str = ""):
 
 
 # ── Research Horizon Monitor Endpoints ───────────────────────────────────────
+
+# ── Research Mode Endpoints ──────────────────────────────────────────────────
+
+class RapidResearchRequest(BaseModel):
+    query: str = Field(..., min_length=10, max_length=MAX_QUERY_LENGTH)
+    observer_note: str = Field("", max_length=MAX_OBSERVER_LENGTH)
+    profile: str = Field("general_scholarship", max_length=100)
+    dissonance_budget: float = Field(0.20, ge=0.0, le=0.8)
+    model_config = {"extra": "ignore"}
+
+
+@app.post(f"{BASE_PATH}/rapid-research")
+async def rapid_research(
+    request: Request,
+    body: RapidResearchRequest,
+    background_tasks: BackgroundTasks,
+):
+    """Rapid Response — 1 Cog / 1 Epi iteration, editorial voice, 4-8 min."""
+    job_id = str(uuid.uuid4())
+    request_id = getattr(request.state, "request_id", "")
+    artefact = ResearchArtefact(
+        research_question=body.query,
+        observer_note=body.observer_note,
+        profile=body.profile,
+        dissonance_budget=body.dissonance_budget,
+        voices=["editorial"],
+        max_iterations=1,
+        cognitive_iterations=1,
+        epistemic_iterations=1,
+        job_id=job_id,
+    )
+    try:
+        await db_create_job(job_id, body.query, body.profile, request_id)
+    except Exception as e:
+        log.error("Rapid job DB error: %s", e)
+    background_tasks.add_task(_run_research_job, job_id, artefact)
+    rapid_connectors = get_rapid_connectors(body.profile) if _RESEARCH_MODES_AVAILABLE else []
+    return {"jobId": job_id, "status": "queued", "mode": "rapid",
+            "rapid_connectors": rapid_connectors,
+            "estimated_minutes": "4-8", "estimated_cost_aud": "AUD $0.75"}
+
+
+class ResearchProgrammeRequest(BaseModel):
+    plan: Dict[str, Any] = Field(...)
+    model_config = {"extra": "ignore"}
+
+
+@app.post(f"{BASE_PATH}/research-programme")
+async def research_programme(
+    request: Request,
+    body: ResearchProgrammeRequest,
+    background_tasks: BackgroundTasks,
+):
+    """Research Programme — queues multiple runs in dependency order."""
+    plan = body.plan
+    runs = plan.get("runs", [])
+    if not runs:
+        raise HTTPException(status_code=400, detail="Research plan has no runs")
+    request_id = getattr(request.state, "request_id", "")
+    job_ids = []
+    for run in runs:
+        job_id = str(uuid.uuid4())
+        artefact = ResearchArtefact(
+            research_question=run.get("question", plan.get("original_question", "")),
+            observer_note=run.get("observer_note", plan.get("original_observer_note", "")),
+            profile=run.get("profile", "general_scholarship"),
+            dissonance_budget=run.get("dissonance_budget", 0.35),
+            voices=run.get("voices", ["academic", "editorial"]),
+            max_iterations=run.get("cognitive_iterations", 3),
+            cognitive_iterations=run.get("cognitive_iterations", 3),
+            epistemic_iterations=run.get("epistemic_iterations", 2),
+            job_id=job_id,
+        )
+        try:
+            await db_create_job(job_id, artefact.research_question, artefact.profile, request_id)
+        except Exception as e:
+            log.error("Programme job DB error: %s", e)
+        background_tasks.add_task(_run_research_job, job_id, artefact)
+        job_ids.append({"run_number": run.get("run_number", len(job_ids)+1),
+                        "job_id": job_id, "profile": artefact.profile})
+    log.info("Research programme: %d runs launched", len(job_ids))
+    return {"status": "queued", "mode": "programme",
+            "plan_id": plan.get("plan_id", ""), "run_count": len(job_ids), "job_ids": job_ids}
+
 
 # ── Recursive Research Endpoints ─────────────────────────────────────────────
 

@@ -65,6 +65,8 @@ interface QuestionAnalysis {
   alternative_profiles: Array<{profile: string; rationale: string; when_to_use: string}>;
   multi_run_recommended: boolean;
   multi_run_strategy: string;
+  recommended_mode: string;
+  mode_recommendation: any;
   analysis_note: string;
 }
 
@@ -657,6 +659,9 @@ export default function UnifiedResearch() {
   const [iterations, setIterations] = useState(1);
   const [voice, setVoice] = useState("all");
   const [profile, setProfile] = useState("general_scholarship");
+  const [selectedMode, setSelectedMode] = useState<string>("standard");
+  const [programmePlan, setProgrammePlan] = useState<any>(null);
+  const [launchingMode, setLaunchingMode] = useState<string | null>(null);
   const [showConnectorGroups, setShowConnectorGroups] = useState(false);
   const [activeStream, setActiveStream] = useState<string>("general");
   const [epistemicIterations, setEpistemicIterations] = useState<number>(2);
@@ -1427,6 +1432,13 @@ export default function UnifiedResearch() {
                     setAnalysis(data);
                     setConfirmedQuery(query);
                     setRefinedQuestion("");  // Start blank — chips populate it
+                    // Auto-apply mode recommendation
+                    if (data.recommended_mode) {
+                      setSelectedMode(data.recommended_mode);
+                    }
+                    if (data.mode_recommendation?.research_plan) {
+                      setProgrammePlan(data.mode_recommendation.research_plan);
+                    }
                     // Auto-apply split iteration recommendations
                     if (data.cognitive_iterations && [1,2,3,4,5].includes(data.cognitive_iterations)) {
                       setIterations(data.cognitive_iterations);
@@ -1447,19 +1459,84 @@ export default function UnifiedResearch() {
                   ? <><Loader2 className="w-4 h-4 animate-spin" /> Analysing…</>
                   : <><Sparkles className="w-4 h-4" /> Analyse Question</>}
               </button>
-              <button
-                onClick={launch}
-                disabled={loading || !query.trim() || job?.status === "running"}
-                className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl px-6 py-3 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {warmingUp ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Warming up…</>
-                ) : (loading || job?.status === "running") ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Running…</>
-                ) : (
-                  <><Layers className="w-4 h-4" /> Launch Research</>
-                )}
-              </button>
+              {/* Three-mode launch panel */}
+              <div className="flex-1 space-y-2">
+                {/* Mode pills */}
+                <div className="flex gap-1.5">
+                  {([
+                    { mode: "rapid", icon: "⚡", label: "Rapid", activeClass: "bg-amber-500 text-white border-amber-500", inactiveClass: "border-amber-400/50 text-amber-700 hover:bg-amber-500/10" },
+                    { mode: "standard", icon: "◎", label: "Standard", activeClass: "bg-primary text-primary-foreground border-primary", inactiveClass: "border-primary/40 text-primary hover:bg-primary/10" },
+                    { mode: "programme", icon: "◈", label: "Programme", activeClass: "bg-violet-600 text-white border-violet-600", inactiveClass: "border-violet-400/50 text-violet-700 hover:bg-violet-500/10" },
+                  ] as const).map(({ mode, icon, label, activeClass, inactiveClass }) => {
+                    const isSelected = selectedMode === mode;
+                    const isRecommended = analysis?.recommended_mode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        onClick={() => setSelectedMode(mode)}
+                        disabled={loading || job?.status === "running"}
+                        className={`flex-1 flex items-center justify-center gap-1 border rounded-lg px-2 py-1.5 text-[10px] font-semibold transition-all ${isSelected ? activeClass : inactiveClass}`}
+                      >
+                        <span>{icon}</span>
+                        <span>{label}</span>
+                        {isRecommended && !isSelected && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70 ml-0.5" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Cost and time hint */}
+                <div className="text-[9px] text-muted-foreground text-center">
+                  {selectedMode === "rapid" && "⚡ 4–8 min · ~AUD $0.75 · editorial voice · deadline-driven questions"}
+                  {selectedMode === "standard" && "◎ 25–40 min · ~AUD $2.10 · academic + editorial + practitioner outputs"}
+                  {selectedMode === "programme" && "◈ 90–180 min · ~AUD $6–12 · sequenced multi-run · publication-grade"}
+                  {!selectedMode && "◎ 25–40 min · ~AUD $2.10 · academic + editorial + practitioner outputs"}
+                </div>
+                {/* Launch button */}
+                <button
+                  onClick={async () => {
+                    const BASE = import.meta.env.VITE_CRIA_UNIFIED_BASE_URL || "";
+                    if (selectedMode === "rapid") {
+                      setLaunchingMode("rapid");
+                      try {
+                        const r = await fetch(`${BASE}/cria-unified/rapid-research`, {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ query: query.trim(), observer_note: observerNote, profile, dissonance_budget: dissonanceBudget }),
+                        });
+                        if (r.ok) { const d = await r.json(); setJobId(d.jobId); poll(d.jobId); }
+                      } catch {}
+                      setLaunchingMode(null);
+                    } else if (selectedMode === "programme" && programmePlan) {
+                      setLaunchingMode("programme");
+                      try {
+                        const r = await fetch(`${BASE}/cria-unified/research-programme`, {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ plan: programmePlan }),
+                        });
+                        if (r.ok) { const d = await r.json(); if (d.job_ids?.[0]?.job_id) { setJobId(d.job_ids[0].job_id); poll(d.job_ids[0].job_id); } }
+                      } catch {}
+                      setLaunchingMode(null);
+                    } else {
+                      launch();
+                    }
+                  }}
+                  disabled={loading || !query.trim() || job?.status === "running" || !!launchingMode}
+                  className={`w-full flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    selectedMode === "rapid" ? "bg-amber-500 text-white hover:bg-amber-600" :
+                    selectedMode === "programme" ? "bg-violet-600 text-white hover:bg-violet-700" :
+                    "bg-primary text-primary-foreground hover:bg-primary/90"
+                  }`}
+                >
+                  {warmingUp || loading || job?.status === "running" || launchingMode ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> {launchingMode === "programme" ? "Queuing runs…" : "Running…"}</>
+                  ) : selectedMode === "rapid" ? (
+                    <>⚡ Launch Rapid Response</>
+                  ) : selectedMode === "programme" ? (
+                    <>◈ Execute Research Programme</>
+                  ) : (
+                    <><Layers className="w-4 h-4" /> Launch Standard Research</>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1823,6 +1900,53 @@ export default function UnifiedResearch() {
                               ⚡ Multi-run strategy recommended
                             </div>
                             <div className="text-muted-foreground leading-relaxed">{analysis.multi_run_strategy}</div>
+                          </div>
+                        )}
+
+                        {/* Mode recommendation */}
+                        {(analysis as any).mode_recommendation?.recommended_mode && (
+                          <div className="border-t border-border/30 pt-2">
+                            <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Research mode</div>
+                            <div className="flex items-center gap-2">
+                              <span>{(analysis as any).mode_recommendation.mode_icon}</span>
+                              <span className="font-semibold text-[11px]">{(analysis as any).mode_recommendation.mode_label}</span>
+                              <span className="text-[10px] text-muted-foreground">{(analysis as any).mode_recommendation.estimated_cost_aud} · {(analysis as any).mode_recommendation.estimated_time}</span>
+                              <button onClick={() => setSelectedMode((analysis as any).mode_recommendation.recommended_mode)}
+                                className="ml-auto px-2 py-0.5 rounded-full bg-primary/10 border border-primary/30 text-primary text-[9px] font-medium hover:bg-primary/20 transition-colors">
+                                Apply
+                              </button>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground mt-1 leading-relaxed">{(analysis as any).mode_recommendation.mode_description}</div>
+                            {(analysis as any).mode_recommendation.alternative_modes?.length > 0 && (
+                              <div className="flex gap-3 mt-1.5">
+                                {(analysis as any).mode_recommendation.alternative_modes.map((alt: any) => (
+                                  <button key={alt.mode} onClick={() => setSelectedMode(alt.mode)}
+                                    className="text-[9px] text-muted-foreground hover:text-foreground transition-colors">
+                                    {alt.icon} {alt.label} {alt.cost_aud}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Research Programme plan display */}
+                        {programmePlan && selectedMode === "programme" && programmePlan.runs?.length > 0 && (
+                          <div className="border-t border-violet-500/20 pt-2 space-y-1.5">
+                            <div className="text-[9px] font-semibold uppercase tracking-wider text-violet-600">
+                              Programme · {programmePlan.run_count} runs · AUD ${programmePlan.total_cost_aud?.toFixed(2)} · ~{programmePlan.total_minutes}m
+                            </div>
+                            {programmePlan.runs.map((run: any) => (
+                              <div key={run.run_number} className="rounded-lg border border-violet-500/20 bg-violet-500/5 px-2.5 py-2 text-[10px]">
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  <span className="font-bold text-violet-700">Run {run.run_number}</span>
+                                  <span className="text-muted-foreground font-mono text-[9px]">{run.profile}</span>
+                                  <span className="ml-auto text-muted-foreground">{run.estimated_minutes}m</span>
+                                </div>
+                                <div className="text-foreground leading-snug">{run.question?.slice(0,120)}{run.question?.length > 120 ? "…" : ""}</div>
+                                {run.rationale && <div className="text-muted-foreground mt-0.5 italic text-[9px]">{run.rationale}</div>}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>

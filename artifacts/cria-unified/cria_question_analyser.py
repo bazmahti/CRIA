@@ -34,6 +34,12 @@ from typing import List, Dict, Any, Optional, Literal
 
 import httpx
 
+try:
+    from cria_research_modes import detect_mode, build_mode_recommendation
+    _RESEARCH_MODES_AVAILABLE = True
+except ImportError:
+    _RESEARCH_MODES_AVAILABLE = False
+
 log = logging.getLogger("cria-analyser")
 
 # ── Direct Anthropic API call (bypasses OpenAI-compatible proxy) ─────────────
@@ -387,6 +393,8 @@ class QuestionAnalysis:
     alternative_profiles: List[Dict] = field(default_factory=list)
     multi_run_recommended: bool = False
     multi_run_strategy: str = ""
+    recommended_mode: str = "standard"
+    mode_recommendation: Dict = field(default_factory=dict)
     suggested_question_variants: List[str] = field(default_factory=list)
     # 2-3 complete alternative question formulations synthesising the improvements
     # These are starting points, not prescriptions — researcher modifies freely
@@ -455,6 +463,8 @@ class QuestionAnalysis:
             "alternative_profiles": self.alternative_profiles,
             "multi_run_recommended": self.multi_run_recommended,
             "multi_run_strategy": self.multi_run_strategy,
+            "recommended_mode": self.recommended_mode,
+            "mode_recommendation": self.mode_recommendation,
             "cria_readiness": self.cria_readiness,
             "readiness_explanation": self.readiness_explanation,
             "suggested_question_variants": self.suggested_question_variants,
@@ -882,3 +892,28 @@ Return ONLY valid JSON. No preamble, no markdown fences."""
         estimated_cost_aud=cost_aud,
         budget_trade_off=budget_trade_off,
     )
+
+    # ── Research mode detection ───────────────────────────────────────────────
+    if _RESEARCH_MODES_AVAILABLE:
+        try:
+            mode = detect_mode(
+                question=question,
+                profile=analysis.profile_suggestion,
+                scope_signal=analysis.scope.assessment,
+                multi_run_recommended=analysis.multi_run_recommended,
+                n_domains=len(analysis.vocab_clusters),
+            )
+            mode_rec = build_mode_recommendation(
+                mode=mode,
+                profile=analysis.profile_suggestion,
+                cognitive_iterations=analysis.cognitive_iterations,
+                epistemic_iterations=analysis.epistemic_iterations,
+                question=question,
+                observer_note=observer_note,
+            )
+            analysis.recommended_mode = mode
+            analysis.mode_recommendation = mode_rec
+        except Exception as _me:
+            log.warning("Mode detection failed: %s", _me)
+
+    return analysis
