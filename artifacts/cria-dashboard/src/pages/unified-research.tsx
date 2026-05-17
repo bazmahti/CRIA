@@ -932,7 +932,8 @@ export default function UnifiedResearch() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
                 {([
                   { key: "general", label: "General Scholarship", icon: "🎓", profiles: ["general_scholarship","partnership_sensitive","international_law","education_policy"] },
-                  { key: "civilisational", label: "Civilisational & Systems", icon: "🌐", profiles: ["civilisational_academic","post_ai_flourishing","new_economy","democracy_governance","indigenous_futures","consciousness_studies","media_epistemics"] },
+                  { key: "civilisational", label: "Civilisational & Systems", icon: "🌐", profiles: ["civilisational_academic","post_ai_flourishing","new_economy","democracy_governance","indigenous_futures","consciousness_studies","media_epistemics","cultural_linguistic_civilisational"] },
+                  { key: "global_culture", label: "Global Culture & Peace", icon: "🕊️", profiles: ["peace_conflict","global_governance","cultural_diplomacy","linguistic_diversity","international_relations","cultural_linguistic_civilisational","international_law"] },
                   { key: "environmental", label: "Environmental & Ecological", icon: "🌱", profiles: ["environmental_polycrisis","food_sovereignty","biodiversity_species","ocean_marine","water_ecology","climate_policy","ocaa_daily_editorial"] },
                   { key: "technology", label: "Technology & Mind", icon: "🧠", profiles: ["ai_alignment","neurofeedback_design","biofeedback_research","flow_research","biophilic_design","hci_feedback_design","eeg_methods","cybersecurity_policy","cybersecurity_technical","platform_accountability","digital_rights","ip_copyright","neurodiversity_health","therapeutic_clinical"] },
                   { key: "health", label: "Health & Medicine", icon: "⚕️", profiles: ["clinical_biomedical","mental_health","contemplative_neuroscience","psychedelic_research","integrative_medicine","neurofeedback_health","public_health","health_equity","indigenous_health","nutrition_gut_brain","longevity_ageing"] },
@@ -973,6 +974,16 @@ export default function UnifiedResearch() {
                     { value: "indigenous_futures", label: "Indigenous Futures & Sovereignty" },
                     { value: "consciousness_studies", label: "Consciousness & Meaning Studies" },
                     { value: "media_epistemics", label: "Media, Truth & Public Epistemics" },
+                    { value: "cultural_linguistic_civilisational", label: "Cultural & Linguistic Civilisational" },
+                  ],
+                  global_culture: [
+                    { value: "peace_conflict", label: "Peace & Conflict Research" },
+                    { value: "global_governance", label: "Global Governance & Multilateralism" },
+                    { value: "cultural_diplomacy", label: "Cultural Diplomacy & Intercultural Dialogue" },
+                    { value: "linguistic_diversity", label: "Linguistic Diversity & Language Loss" },
+                    { value: "international_relations", label: "International Relations Theory" },
+                    { value: "cultural_linguistic_civilisational", label: "What Remains — Cultural & Linguistic" },
+                    { value: "international_law", label: "International Law & Treaties" },
                   ],
                   environmental: [
                     { value: "environmental_polycrisis", label: "Environmental Polycrisis" },

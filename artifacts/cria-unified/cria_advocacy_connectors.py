@@ -1077,6 +1077,179 @@ CYBERSECURITY_CONNECTORS = [
         "ATLAS framework — adversarial threat landscape for AI systems, attack taxonomy"),
 ]
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GLOBAL CULTURE, PEACE AND INTERNATIONAL COOPERATION CONNECTORS
+#
+# Five streams — each a distinct literature with its own databases:
+#
+#   Stream 1: Peace and conflict research — empirical, Uppsala/PRIO tradition
+#   Stream 2: Global governance and multilateral institutions
+#   Stream 3: Cultural diplomacy and intercultural dialogue
+#   Stream 4: Linguistic diversity, endangered languages, cognitive plurality
+#   Stream 5: International relations theory — academic discipline
+#
+# Relevance to What Remains:
+#   Language death = loss of irreplaceable cognitive architecture
+#   Cultural homogenisation = collective interior resource destruction
+#   The international complement to the book's individual interior resource argument
+# ══════════════════════════════════════════════════════════════════════════════
+
+PEACE_CONFLICT_CONNECTORS = [
+    # Primary empirical databases
+    TargetedWebConnector("ucdp.uu.se", "Uppsala Conflict Data Program",
+        "Primary empirical conflict database — armed conflict, battle deaths, peace agreements"),
+    TargetedWebConnector("prio.org/research", "PRIO",
+        "Peace Research Institute Oslo — conflict, peacekeeping, post-conflict reconstruction"),
+    TargetedWebConnector("conflictbarometer.org", "Heidelberg Conflict Barometer",
+        "Annual global conflict census — intensity, trends, regional patterns"),
+    TargetedWebConnector("crisisgroup.org/research", "International Crisis Group",
+        "Conflict prevention, early warning, mediation — practitioner-researcher bridge"),
+    TargetedWebConnector("cartercenter.org/peace/conflict_resolution",
+        "Carter Center Peace",
+        "Conflict mediation, election observation, post-conflict — Carter Center"),
+    TargetedWebConnector("usip.org/publications", "USIP",
+        "United States Institute of Peace — conflict resolution, peacebuilding, stabilisation"),
+    TargetedWebConnector("berghof-foundation.org/publications", "Berghof Foundation",
+        "Transformative peacebuilding, dialogue processes, conflict transformation"),
+    TargetedWebConnector("gsdrc.org/research", "GSDRC",
+        "Governance, Social Development, Resource Centre — fragile states, conflict, recovery"),
+    # Primary journals
+    TargetedWebConnector("journals.sagepub.com/home/jpr", "Journal of Peace Research",
+        "Primary peer-reviewed peace and conflict journal — PRIO flagship publication"),
+    TargetedWebConnector("belfercenter.org/publication", "Belfer Center Publications",
+        "Harvard Kennedy School — nuclear security, conflict, international security"),
+    TargetedWebConnector("sipri.org/yearbook", "SIPRI Yearbook",
+        "Annual arms, conflict, and security data — primary reference for peace researchers"),
+]
+
+GLOBAL_GOVERNANCE_CONNECTORS = [
+    # Multilateral institutions
+    TargetedWebConnector("un.org/en/chronicle", "UN Chronicle",
+        "United Nations system — SDGs, multilateralism, global governance analysis"),
+    TargetedWebConnector("undp.org/research", "UNDP Research",
+        "Human development, inequality, governance capacity — global data"),
+    TargetedWebConnector("oecd.org/gov", "OECD Governance",
+        "Institutional quality, regulatory frameworks, multilateral cooperation"),
+    TargetedWebConnector("worldbank.org/en/research", "World Bank Research",
+        "Development economics, institutional reform, global governance, data"),
+    TargetedWebConnector("chathamhouse.org/research", "Chatham House",
+        "UK foreign policy, international law, global governance, geopolitics"),
+    TargetedWebConnector("brookings.edu/research", "Brookings Institution",
+        "Global governance, US foreign policy, development, democracy"),
+    TargetedWebConnector("carnegieendowment.org/research", "Carnegie Endowment",
+        "International peace, nuclear policy, multilateralism, democracy"),
+    TargetedWebConnector("global-governance.org", "Global Governance Journal",
+        "Academic journal on multilateral institutions, global governance theory"),
+    TargetedWebConnector("lowyinstitute.org/research", "Lowy Institute",
+        "Australian foreign policy, Indo-Pacific, global governance — Australian angle"),
+    TargetedWebConnector("rand.org/research/international-affairs.html", "RAND International",
+        "Strategic analysis, conflict prevention, multilateral institutions"),
+    TargetedWebConnector("ipi.int/publications", "International Peace Institute",
+        "UN reform, peacekeeping, multilateral cooperation, conflict prevention"),
+    TargetedWebConnector("g20.utoronto.ca/research", "G20 Research Group",
+        "G20, multilateral economic governance, global summitry"),
+    TargetedWebConnector("kof.ethz.ch/globalisation", "KOF Globalisation Index",
+        "Empirical globalisation data — political, economic, social dimensions"),
+]
+
+CULTURAL_DIPLOMACY_CONNECTORS = [
+    # Intercultural dialogue institutions
+    TargetedWebConnector("unaoc.org/resources", "UN Alliance of Civilizations",
+        "Intercultural dialogue, cultural diversity, countering polarisation — UN body"),
+    TargetedWebConnector("kaiciid.org/resources", "KAICIID",
+        "King Abdullah Centre for Interreligious and Intercultural Dialogue — Vienna"),
+    TargetedWebConnector("annalindhfoundation.org/research", "Anna Lindh Foundation",
+        "Euro-Mediterranean intercultural dialogue, cultural diplomacy, bridge-building"),
+    TargetedWebConnector("culturaldiplomacy.org/research", "Institute for Cultural Diplomacy",
+        "Cultural diplomacy theory, soft power, people-to-people exchange"),
+    TargetedWebConnector("britishcouncil.org/research-and-insight",
+        "British Council Research",
+        "Cultural relations, soft power, arts and international relations, trust-building"),
+    TargetedWebConnector("goethe.de/en/kul/koo/res.html", "Goethe Institut Research",
+        "Cultural foreign policy, language and culture, German cultural diplomacy model"),
+    TargetedWebConnector("diplomacy.edu/research", "DiploFoundation",
+        "Digital diplomacy, multilateral negotiation, intercultural diplomatic practice"),
+    # UNESCO cultural diversity
+    TargetedWebConnector("en.unesco.org/creativity", "UNESCO Creative Diversity",
+        "Convention on Cultural Diversity, intangible cultural heritage, cultural rights"),
+    TargetedWebConnector("en.unesco.org/themes/intangible-cultural-heritage",
+        "UNESCO Intangible Heritage",
+        "Intangible cultural heritage protection, living traditions, cultural memory"),
+    TargetedWebConnector("mondiacult.unesco.org/research", "UNESCO Mondiacult",
+        "UNESCO world culture conferences — cultural policy, diversity, cooperation"),
+    # Academic
+    TargetedWebConnector("tandfonline.com/toc/rcpd20/current",
+        "Place and Culture Journal",
+        "Cultural geography, place identity, intercultural encounter"),
+    TargetedWebConnector("journals.sagepub.com/home/crs",
+        "Cultural Sociology Journal",
+        "Cultural meaning-making, identity, cultural boundaries, hybridisation"),
+]
+
+LINGUISTIC_DIVERSITY_CONNECTORS = [
+    # Primary language databases and institutions
+    TargetedWebConnector("ethnologue.com", "Ethnologue",
+        "Primary global language database — 7,000+ languages, vitality, geographic distribution"),
+    TargetedWebConnector("endangeredlanguages.com", "Endangered Languages Project",
+        "Google/First Peoples — endangered language documentation, revitalisation"),
+    TargetedWebConnector("sil.org/resources/publications", "SIL International",
+        "Language documentation, minority languages, orthography development, literacy"),
+    TargetedWebConnector("eldp.soas.ac.uk/resources", "ELDP",
+        "Endangered Languages Documentation Programme — field recordings, grammars"),
+    TargetedWebConnector("terralingua.org/research", "Terralingua",
+        "Biocultural diversity — the parallel loss of languages, cultures, and biodiversity"),
+    TargetedWebConnector("unesco.org/en/articles/atlas-worlds-languages-danger",
+        "UNESCO Atlas Languages in Danger",
+        "UNESCO endangered language tracking — status, speaker counts, documentation"),
+    # Cognitive and philosophical dimensions — critical for What Remains
+    TargetedWebConnector("journals.cambridge.org/action/displayJournal?jid=LIN",
+        "Language Journal Cambridge",
+        "Linguistics research — linguistic relativity, Sapir-Whorf, language and cognition"),
+    TargetedWebConnector("languagedocumentationconservation.org",
+        "Language Documentation and Conservation",
+        "Open-access journal — field linguistics, revitalisation, community language work"),
+    TargetedWebConnector("degruyter.com/journal/key/MULTI/html", "Multilingua Journal",
+        "Multilingualism, language policy, code-switching, linguistic diversity"),
+    TargetedWebConnector("journals.sagepub.com/home/lsa",
+        "Language and Social Action",
+        "Language in social context, conversational analysis, pragmatics"),
+    # Language policy and linguistic rights
+    TargetedWebConnector("languageonthemove.com/research", "Language on the Move",
+        "Language policy, multilingualism in practice, migration and language"),
+    TargetedWebConnector("minorityrights.org/languages", "Minority Rights Group",
+        "Linguistic minority rights, language discrimination, legal protections"),
+]
+
+INTERNATIONAL_RELATIONS_CONNECTORS = [
+    # Primary academic journals
+    TargetedWebConnector("journals.sagepub.com/home/isq",
+        "International Studies Quarterly",
+        "Primary peer-reviewed IR journal — theory, empirics, foreign policy analysis"),
+    TargetedWebConnector("oup.com/journals/pages/politics_and_international_relations/ris",
+        "Review of International Studies",
+        "Critical and constructivist IR theory, normative IR, global justice"),
+    TargetedWebConnector("foreignaffairs.com/articles", "Foreign Affairs",
+        "Premier policy-academic bridge — geopolitics, multilateralism, global order"),
+    TargetedWebConnector("mitpressjournals.org/loi/isec", "International Security",
+        "Security studies, conflict, deterrence, arms control"),
+    TargetedWebConnector("ejil.org", "European Journal of International Law",
+        "International law-IR intersection — legal norms, sovereignty, global justice"),
+    TargetedWebConnector("globalstudiesjournal.com", "Global Studies Journal",
+        "Globalisation, transnational processes, world-systems, cosmopolitanism"),
+    # Think tanks and institutions
+    TargetedWebConnector("iiss.org/publications", "IISS Publications",
+        "Strategic studies, military balance, security — comprehensive annual data"),
+    TargetedWebConnector("swp-berlin.org/en/research", "SWP Berlin",
+        "German Institute for International and Security Affairs — European IR perspective"),
+    TargetedWebConnector("ifri.org/en/research", "IFRI",
+        "French Institute for International Relations — French and European IR perspective"),
+    TargetedWebConnector("gcr21.org/research", "GCR21",
+        "Global Cooperation Research Centre — cooperation theory, multilateralism"),
+    TargetedWebConnector("worldpoliticsreview.com/research", "World Politics Review",
+        "Analytical journalism — IR, geopolitics, multilateralism, global trends"),
+]
+
 ALL_ADVOCACY_CONNECTORS = (
     ENVIRONMENTAL_CONNECTORS
     + FOOD_SOVEREIGNTY_CONNECTORS
@@ -1092,6 +1265,11 @@ ALL_ADVOCACY_CONNECTORS = (
     + EDUCATION_CONNECTORS
     + NFB_SPECIALIST_CONNECTORS
     + CYBERSECURITY_CONNECTORS
+    + PEACE_CONFLICT_CONNECTORS
+    + GLOBAL_GOVERNANCE_CONNECTORS
+    + CULTURAL_DIPLOMACY_CONNECTORS
+    + LINGUISTIC_DIVERSITY_CONNECTORS
+    + INTERNATIONAL_RELATIONS_CONNECTORS
 )
 
 
@@ -1358,9 +1536,61 @@ def get_connectors_for_profile(profile: str) -> List:
 
         # Arms and security — military spending, arms trade, conflict, AUKUS
         "arms_security": (
-            DEMOCRACY_CONNECTORS
+            INTERNATIONAL_SPECIALIST_CONNECTORS[:5]
+            + PEACE_CONFLICT_CONNECTORS[:3]
+            + DEMOCRACY_CONNECTORS
+        ),
+
+        # ── Global culture, peace and international cooperation ────────────────
+
+        # Peace and conflict research — empirical, Uppsala/PRIO tradition
+        "peace_conflict": (
+            PEACE_CONFLICT_CONNECTORS
+            + GLOBAL_GOVERNANCE_CONNECTORS[:5]
+            + INTERNATIONAL_RELATIONS_CONNECTORS[:4]
+        ),
+
+        # Global governance and multilateralism
+        "global_governance": (
+            GLOBAL_GOVERNANCE_CONNECTORS
+            + PEACE_CONFLICT_CONNECTORS[:5]
+            + INTERNATIONAL_RELATIONS_CONNECTORS[:4]
+        ),
+
+        # Cultural diplomacy — intercultural dialogue, soft power, bridge-building
+        # The tension between distinct cultural identity and global harmonious interaction
+        "cultural_diplomacy": (
+            CULTURAL_DIPLOMACY_CONNECTORS
+            + LINGUISTIC_DIVERSITY_CONNECTORS[:6]
+            + GLOBAL_GOVERNANCE_CONNECTORS[:4]
             + CIVILISATIONAL_CONNECTORS[:4]
-            + NEW_ECONOMY_CONNECTORS[:4]
+        ),
+
+        # Linguistic diversity — language death as cognitive loss
+        # Core to What Remains: each language = irreplaceable interior architecture
+        # The collective complement to the individual interior resource argument
+        "linguistic_diversity": (
+            LINGUISTIC_DIVERSITY_CONNECTORS
+            + CULTURAL_DIPLOMACY_CONNECTORS[:6]
+            + CIVILISATIONAL_CONNECTORS[:4]
+            + EDUCATION_CONNECTORS[:4]
+        ),
+
+        # International relations theory — academic discipline
+        "international_relations": (
+            INTERNATIONAL_RELATIONS_CONNECTORS
+            + GLOBAL_GOVERNANCE_CONNECTORS[:6]
+            + PEACE_CONFLICT_CONNECTORS[:5]
+        ),
+
+        # What Remains civilisational profile — linguistic + cultural diversity
+        # as collective interior resource. Full suite for book chapter research.
+        "cultural_linguistic_civilisational": (
+            LINGUISTIC_DIVERSITY_CONNECTORS
+            + CULTURAL_DIPLOMACY_CONNECTORS
+            + CIVILISATIONAL_CONNECTORS
+            + PEACE_CONFLICT_CONNECTORS[:5]
+            + GLOBAL_GOVERNANCE_CONNECTORS[:4]
         ),
 
         # Intellectual property and copyright — creator rights, patent, AI/copyright,
